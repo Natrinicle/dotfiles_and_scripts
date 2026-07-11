@@ -1,0 +1,19 @@
+if cmds_exist pwgen; then
+  alias genpass="pwgen -1yBn"
+fi
+
+# add thefuck function
+#eval $(thefuck --alias)
+function fuck () {
+  local TF_PREVIOUS TF_CMD
+  TF_PREVIOUS=$(fc -ln -1)
+  # TF_* / PYTHONIOENCODING are read by thefuck from the environment
+  TF_CMD=$(
+    export TF_ALIAS=fuck
+    export TF_SHELL_ALIASES
+    TF_SHELL_ALIASES=$(alias)
+    export PYTHONIOENCODING=utf-8
+    thefuck "$TF_PREVIOUS" THEFUCK_ARGUMENT_PLACEHOLDER "$@"
+  ) && eval "$TF_CMD"
+  history -s "$TF_CMD"
+}

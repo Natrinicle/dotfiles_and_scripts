@@ -1,0 +1,80 @@
+if cmds_exist exiftool; then
+  alias extract-jpg-from-dngs="for file in *.dng; do exiftool -b -JpgFromRaw $file > $file.jpg; done"
+fi
+
+if cmds_exist youtube-dl; then
+  alias youtube-dl-best="youtube-dl -f bestvideo+bestaudio/best"
+fi
+if cmds_exist yt-dlp; then
+  alias yt-dlp-best="yt-dlp -f bestvideo+bestaudio/best --compat-options multistreams --extractor-args 'youtube:bypass_native_jsi' --extractor-args 'youtube:getpot_bgutil_baseurl=http://127.0.0.1:4416'"
+  alias yt-dlp-ffcookies-best="yt-dlp -f bestvideo+bestaudio/best --compat-options multistreams --extractor-args 'youtube:bypass_native_jsi' --extractor-args 'youtube:getpot_bgutil_baseurl=http://127.0.0.1:4416' --cookies-from-browser firefox:~/.mozilla/firefox/{firefox_profile} --user-agent 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0'"
+  alias yt-dlp-bravecookies-best="yt-dlp -f bestvideo+bestaudio/best --compat-options multistreams --extractor-args 'youtube:bypass_native_jsi' --extractor-args 'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416' --cookies-from-browser chrome:~/.config/BraveSoftware/Brave-Browser --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'"
+fi
+
+if cmds_exist play; then
+  # miller@diasp.de
+  # https://{personal_site}/posts/1810581
+  alias enterprise_engine="play -n -c2 synth whitenoise lowpass -1 120 lowpass -1 120 lowpass -1 120"
+  alias vertiform_city="play -n -c2 synth whitenoise lowpass -1 120 lowpass -1 100 tremolo 6 70"
+fi
+
+if cmds_exist ffmpeg; then
+  convert_video_to_webm () {
+    filename=${1}
+    filename_wo_ext=$(echo ${filename} | rev | cut -d"." -f2- | rev)
+
+    # First pass
+    ffmpeg -i ${filename} -c:v libvpx-vp9 -pass 1 -b:v 0 -crf 21 -threads 8 -speed 4 -tile-columns 6 -frame-parallel 1 -an -f webm -y /dev/null
+
+    # Second pass
+    ffmpeg -i ${filename} -c:v libvpx-vp9 -pass 2 -b:v 0 -crf 21 -threads 8 -speed 2 -tile-columns 6 -frame-parallel 1 -auto-alt-ref 1 -lag-in-frames 25 -c:a libopus -b:a 96k -f webm ${filename_wo_ext}.webm
+  }
+
+  stabilize_video () {
+    filename=${1}
+    filename_wo_ext=$(echo ${filename} | rev | cut -d"." -f2- | rev)
+    filename_ext=$(echo ${filename} | rev | cut -d"." -f1 | rev)
+    shakiness=${2:-5}
+    accuracy=${3:-15}
+    smoothing=${4:-30}
+
+    # First pass
+    ffmpeg -i ${filename} -vf vidstabdetect=shakiness=${shakiness}:accuracy=${accuracy} -f null -
+
+    # Second pass
+    ffmpeg -i ${filename} -vf vidstabtransform=smoothing=${smoothing}:input="transforms.trf" ${filename_wo_ext}.stabilized.${filename_ext}
+  }
+  if cmds_exist flac; then
+    convert_flac_to_mp3 () {
+      filename=${1}
+      filename_wo_ext=$(echo ${filename} | rev | cut -d"." -f2- | rev)
+
+      flac --silent --decode --stdout "${filename}" | ffmpeg -i - -map 0:a:0 -b:a 320k -v 0 -f mp3 "${filename_wo_ext}.mp3"
+    }
+  fi
+fi
+
+if cmds_exist mkvpropedit; then
+  function mkv_disable_subtitles () {
+    for mkv_file in *.mkv; do
+      mkvpropedit "${mkv_file}" --edit track:s1 --set flag-default=0 --set flag-forced=0
+    done
+  }
+fi
+
+function kill_hung_vlc_instances () {
+  vlc_instances_with_window=$(wmctrl -lp | grep [V]LC | awk '{print $3}' | tr -s '\n' '|' | tr -d '|$')
+  vlc_instances_without_window=$(ps aux | grep [v]lc | awk '{print $2}' | grep -Pv "^${vlc_instances_with_window}$")
+  if [ -n "${vlc_instances_without_window}" ]; then
+    kill -9 ${vlc_instances_without_window}
+  fi
+}
+
+if cmds_exist docker; then
+  alias whipper="docker run -ti --rm --device=/dev/cdrom \
+      --mount type=bind,source=${HOME}/.config/whipper,target=${HOME}/.config/whipper \
+      --mount type=bind,source=${PWD}/output,target=/output \
+      whipperteam/whipper"
+fi
+
+alias video-to-server="rsync --progress -avh -e 'ssh -o ControlMaster=No -o ControlPath=None'"

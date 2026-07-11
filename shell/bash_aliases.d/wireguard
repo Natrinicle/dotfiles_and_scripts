@@ -1,0 +1,19 @@
+if cmds_exist sudo; then
+  if [ -f /usr/bin/wg ]; then
+    alias wg="sudo /usr/bin/wg"
+  fi
+  if [ -f /usr/bin/wg-quick ]; then
+    alias wg-quick="sudo /usr/bin/wg-quick"
+  fi
+fi
+
+if [ -f /usr/bin/wg ]; then
+  function wg-genkey () {
+    local name=${1}
+    if [[ -n ${name} ]]; then
+      wg genkey | tee "${name}.priv" | wg pubkey >"${name}.pub"
+    else
+      echo "Usage: wg-genkey <name>"
+    fi
+  }
+fi

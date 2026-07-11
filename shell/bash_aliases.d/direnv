@@ -1,0 +1,30 @@
+# direnv is an environment switcher for the shell.
+# It knows how to hook into bash, zsh, tcsh, fish
+# shell and elvish to load or unload environment
+# variables depending on the current directory.
+# This allows project-specific environment variables
+# without cluttering the ~/.profile file.
+
+# Before each prompt, direnv checks for the existence
+# of a ".envrc" file in the current and parent
+# directories. If the file exists (and is authorized),
+# it is loaded into a bash sub-shell and all exported
+# variables are then captured by direnv and then made
+# available to the current shell.
+
+# Because direnv is compiled into a single static
+# executable, it is fast enough to be unnoticeable on
+# each prompt. It is also language-agnostic and can be
+# used to build solutions similar to rbenv, pyenv and
+# phpenv.
+
+# https://direnv.net/
+
+# To install, install Go (golang-go on Debian) and then run
+# go get -u github.com/direnv/direnv
+
+if cmds_exist direnv; then
+  if [[ $(type -t _direnv_hook) != function ]]; then
+    eval "$(direnv hook bash)"
+  fi
+fi

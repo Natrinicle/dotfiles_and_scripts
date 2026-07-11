@@ -1,0 +1,12 @@
+if [ -d /sys/devices/platform/applesmc.768 ]; then
+  function fanspeed () {
+    # Pulled from http://ubuntuforums.org/showthread.php?t=1645913&p=10246215#post10246215
+    # Requires applesmc-dkms package and modprobe applesmc
+    # Included in kernels >=2.6.27
+    service mbpfan stop
+    echo 1 | sudo tee /sys/devices/platform/applesmc.768/fan1_manual > /dev/null
+    echo 1 | sudo tee /sys/devices/platform/applesmc.768/fan2_manual > /dev/null
+    echo $1 | sudo tee /sys/devices/platform/applesmc.768/fan1_output > /dev/null
+    echo $1 | sudo tee /sys/devices/platform/applesmc.768/fan2_output > /dev/null
+  }
+fi

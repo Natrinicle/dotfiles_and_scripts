@@ -1,0 +1,77 @@
+if cmds_exist sudo; then
+  if cmds_exist iotop; then
+    alias iotop="sudo /usr/sbin/iotop"
+  fi
+fi
+
+if cmds_exist lsblk; then
+  alias lsblk="lsblk -o 'NAME,UUID,PARTUUID,SIZE,TYPE,SCHED,FSTYPE,LABEL,MOUNTPOINTS'"
+fi
+
+if cmds_exist smartctl; then
+  function failing_drive_serial_numbers () {
+    shopt -s nullglob
+    local drives=()
+    local nvme_devices ssd_devices hdd_devices
+    local arg drive
+
+    mapfile -t nvme_devices < <(lsblk -dno name,tran 2>/dev/null | awk '$2 == "nvme" {print "/dev/" $1}')
+    mapfile -t ssd_devices < <(lsblk -dno name,rota,tran 2>/dev/null | awk '$2 == "0" && $3 != "nvme" {print "/dev/" $1}')
+    mapfile -t hdd_devices < <(lsblk -dno name,rota 2>/dev/null | awk '$2 == "1" {print "/dev/" $1}')
+
+    if [ "$#" -eq 0 ]; then
+      set -- "all"
+    fi
+
+    for arg in "$@"; do
+      # "all" must be its own pattern — all|nvme would match "all" first and skip ssd/hdd
+      case "$arg" in
+        all)
+          drives+=("${nvme_devices[@]}" "${ssd_devices[@]}" "${hdd_devices[@]}")
+          ;;
+        nvme)
+          drives+=("${nvme_devices[@]}")
+          ;;
+        ssd)
+          drives+=("${ssd_devices[@]}")
+          ;;
+        hdd)
+          drives+=("${hdd_devices[@]}")
+          ;;
+        *)
+          # For non-keywords, add directly (user's shell likely already expanded wildcards like /dev/sd?)
+          drives+=("$arg")
+          ;;
+      esac
+    done
+
+    # Deduplicate drives
+    if ((${#drives[@]} > 0)); then
+      mapfile -t drives < <(printf '%s\n' "${drives[@]}" | sort -u)
+    fi
+
+    for drive in "${drives[@]}"; do
+      if sudo smartctl -a "${drive}" | grep -q "Drive failure expected in less than 24"; then
+        sudo smartctl -a "${drive}" | grep "Serial Number"
+      fi
+    done
+  }
+
+  function failing_nvme_serial_numbers () {
+    failing_drive_serial_numbers nvme
+  }
+
+  function failing_ssd_serial_numbers () {
+    failing_drive_serial_numbers ssd
+  }
+
+  function failing_hdd_serial_numbers () {
+    failing_drive_serial_numbers hdd
+  }
+fi
+
+if cmds_exist pv dd; then
+  function dd-progress () {
+    sudo dd if="${1}" "${@:3}" | pv -tpreb | sudo dd of="${2}" "${@:3}"
+  }
+fi

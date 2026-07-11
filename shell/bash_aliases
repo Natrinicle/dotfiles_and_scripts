@@ -1,0 +1,95 @@
+# see if which can find the command in the PATH
+# defined before other aliases so they don't get
+# added if the command they use isn't installed.
+#
+# Persist across re-sources of this file (e.g. DEBUG trap or
+# manual reload). Only create maps if missing; never reassign
+# with =() which would wipe prior lookups.
+#
+# Cache policy:
+#   present (1)  — kept for the whole session (until reset_cmds_cache)
+#   missing (0)  — kept for CMDS_NEG_TTL seconds (default 300), then
+#                  re-checked so mid-session installs are picked up
+# Override: export CMDS_NEG_TTL=60
+# Reset:    reset_cmds_cache
+: "${CMDS_NEG_TTL:=300}"
+
+if ! declare -p CMDS_CACHE &>/dev/null; then
+  declare -A CMDS_CACHE
+fi
+if ! declare -p CMDS_CACHE_TS &>/dev/null; then
+  declare -A CMDS_CACHE_TS
+fi
+
+# Ensure global assoc maps exist (after unset / first use in-function).
+_cmds_cache_init () {
+  if ! declare -p CMDS_CACHE &>/dev/null; then
+    declare -gA CMDS_CACHE
+  fi
+  if ! declare -p CMDS_CACHE_TS &>/dev/null; then
+    declare -gA CMDS_CACHE_TS
+  fi
+}
+
+_cmds_cache_now () {
+  # bash 5+ has EPOCHSECONDS; fall back for older shells
+  if [[ -n ${EPOCHSECONDS+x} ]]; then
+    printf '%s' "$EPOCHSECONDS"
+  else
+    date +%s
+  fi
+}
+
+cmds_exist () {
+  local cmd now
+  _cmds_cache_init
+  now=$(_cmds_cache_now)
+  for cmd in "${@}"; do
+    # Expired negative entry → drop and re-probe
+    if [[ ${CMDS_CACHE["$cmd"]-_} == 0 ]]; then
+      if (( now - ${CMDS_CACHE_TS["$cmd"]:-0} >= CMDS_NEG_TTL )); then
+        unset "CMDS_CACHE[$cmd]" "CMDS_CACHE_TS[$cmd]"
+      fi
+    fi
+
+    if [[ -z ${CMDS_CACHE["$cmd"]+_} ]]; then
+      if PATH="${PATH}:/usr/local/sbin:/usr/sbin:/sbin" command -v "$cmd" &>/dev/null; then
+        CMDS_CACHE["$cmd"]=1
+        unset "CMDS_CACHE_TS[$cmd]"
+      else
+        CMDS_CACHE["$cmd"]=0
+        CMDS_CACHE_TS["$cmd"]=$now
+      fi
+    fi
+
+    if [[ ${CMDS_CACHE["$cmd"]} -eq 0 ]]; then
+      return 1
+    fi
+  done
+  return 0
+}
+
+# Add a path to $PATH if it's not already in there
+# pathmunge /path/to/add
+pathmunge () {
+  if ! echo "$PATH" | grep -Eq "(^|:)$1($|:)"; then
+    if [ "$2" = "after" ]; then
+      PATH=$PATH:$1
+    else
+      PATH=$1:$PATH
+    fi
+  fi
+}
+
+# Category fragments (skip non-files and editor/sync junk).
+if [ -d ~/.bash_aliases.d ]; then
+  for bash_alias_d_file in ~/.bash_aliases.d/*; do
+    # Skip if glob matched nothing, or not a regular file
+    [[ -f ${bash_alias_d_file} ]] || continue
+    # Skip backup / conflict debris if ever not dot-prefixed
+    case ${bash_alias_d_file} in
+      *.swp|*.bak|*~|*.sync-conflict-*) continue ;;
+    esac
+    source "${bash_alias_d_file}"
+  done
+fi

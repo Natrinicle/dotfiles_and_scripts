@@ -1,0 +1,12 @@
+if cmds_exist ufw; then
+  function ufw_clear_iptables () {
+    sudo ufw disable
+    sudo iptables -F
+    sudo ip6tables -F
+    sudo iptables -t nat -F
+    sudo ip6tables -t nat -F
+    sudo iptables -nvL | grep "Chain ufw" | awk '{print $2}' | xargs -I {} sudo iptables -X {}
+    sudo ip6tables -nvL | grep "Chain ufw" | awk '{print $2}' | xargs -I {} sudo ip6tables -X {}
+    sudo ufw enable
+  }
+fi

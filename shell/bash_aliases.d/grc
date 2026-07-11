@@ -1,0 +1,5 @@
+if cmds_exist grc; then
+  alias mtr="grc mtr --curses"
+  alias ping="grc ping"
+  alias dig="grc dig"
+fi

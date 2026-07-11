@@ -1,0 +1,54 @@
+function dedup_text () {
+  # Can use inline or with a filename
+  # echo -e "Test\nTest\nTest\nTest2\nTest" | dedup_text
+  # dedup_text /var/log/badly_duplicated_log > /var/log/deduplicated_log
+
+  # Stolen from https://stackoverflow.com/questions/1444406/how-can-i-delete-duplicate-lines-in-a-file-in-unix
+  # seen is an associative-array that Awk will pass every line of the file to.
+  # If a line isn't in the array then seen[$0] will evaluate to false.
+  # The ! is a logical NOT operator and will invert the false to true.
+  # Awk will print the lines where the expression evaluates to true.
+  # The ++ increments seen so that seen[$0] == 1 after the first time a
+  # line is found and then seen[$0] == 2, and so on.
+  # Awk evaluates everything but 0 and "" (empty string) to true.
+  # If a duplicate line is placed in seen then !seen[$0] will evaluate to
+  # false and the line will not be written to the output.
+  awk '!seen[$0]++'
+}
+
+function escape_string () {
+  printf "%q" "${@}"
+}
+
+# Uses round() from python category (sourced earlier alphabetically).
+function percent_change () {
+  local old_number=${1}
+  local new_number=${2}
+  local percent_decrease percent_increase
+
+  if [[ $(echo "${new_number} < ${old_number}" | bc -l) -eq 1 ]]; then
+    percent_decrease=$(round "$(echo "((${old_number} - ${new_number}) / ${old_number}) * 100" | bc -l)" 2)
+    echo "${old_number} -> ${new_number} is a ${percent_decrease}% decrease"
+  else
+    percent_increase=$(round "$(echo "((${new_number} - ${old_number}) / ${old_number}) * 100" | bc -l)" 2)
+    echo "${old_number} -> ${new_number} is a ${percent_increase}% increase"
+  fi
+}
+
+# https://stackoverflow.com/questions/4023830/how-to-compare-two-strings-in-dot-separated-version-format-in-bash
+function vercomp () {
+  if [[ $1 == "$2" ]]; then echo "eq"; return 0; fi
+  local IFS=.
+  # shellcheck disable=SC2206 # intentional IFS=. split of version strings
+  local i ver1=($1) ver2=($2)
+  # fill empty fields in ver1 with zeros
+  for ((i=${#ver1[@]}; i<${#ver2[@]}; i++)); do ver1[i]=0; done
+  for ((i=0; i<${#ver1[@]}; i++)); do
+    # fill empty fields in ver2 with zeros
+    if [[ -z ${ver2[i]} ]]; then ver2[i]=0; fi
+    if ((10#${ver1[i]} > 10#${ver2[i]})); then echo "gt"; return 1; fi
+    if ((10#${ver1[i]} < 10#${ver2[i]})); then echo "lt"; return 2; fi
+  done
+  echo "eq"
+  return 0
+}

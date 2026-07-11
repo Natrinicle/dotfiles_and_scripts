@@ -1,0 +1,35 @@
+# Example replacement map for package-toolkit scripts/sanitize-copy.py
+# Copy to sanitize-map.local.yaml for private source-machine strings (do not commit).
+
+replacements:
+  # identity
+  - find: "alice"
+    replace: "{user}"
+  - find: "Alice Example"
+    replace: "{full_name}"
+  # organization
+  - find: "acme.com"
+    replace: "{company_domain}"
+  - find: "Acme Corp"
+    replace: "{Company}"
+  - find: "acme"
+    replace: "{company}"
+    ignore_case: true
+  - find: "SECBUGS"
+    replace: "{SECURITY_TICKET_PROJECT}"
+  # monorepo
+  - find: "packages/webapp"
+    replace: "{app_package}"
+  - find: "packages/api-server"
+    replace: "{server_package}"
+  # hosts / profiles
+  - find: "gw.home.example"
+    replace: "{default_route_host}"
+  - find: "xxxxxxxx.default-release"
+    replace: "{firefox_profile}"
+
+drop_substrings:
+  - "BEGIN OPENSSH PRIVATE KEY"
+  - "BEGIN RSA PRIVATE KEY"
+  - "BORG_PASSPHRASE"
+  - "AKIA"

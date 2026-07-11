@@ -1,0 +1,174 @@
+#!/usr/bin/env bash
+# Inventory block devices and summarize SMART / pool health as a table.
+# Exit 1 when any PROBLEM row is present.
+#
+# Columns: KERNEL TYPE WWN MODEL SN SMART FS [ZFS] [BTRFS] STATUS
+
+set -uo pipefail
+
+have() { command -v "$1" >/dev/null 2>&1; }
+
+issues=0
+declare -a rows=()
+declare -A seen_kernel=()
+
+zfs_txt=""
+btrfs_txt=""
+use_zfs=0
+use_btrfs=0
+
+if have zpool; then
+  zfs_txt=$(zpool status -vvv 2>/dev/null || true)
+  [[ -n $zfs_txt ]] && use_zfs=1
+fi
+if have btrfs; then
+  btrfs_txt=$(sudo btrfs filesystem show 2>/dev/null || true)
+fi
+
+smart_field() {
+  # $1=blob $2=regex after label
+  printf '%s\n' "$1" | grep -m1 -E "$2" | sed 's/.*:[[:space:]]*//' | xargs 2>/dev/null || true
+}
+
+classify_media() {
+  local kernel=$1 model=$2
+  if [[ $kernel == nvme* ]]; then
+    echo NVMe
+  elif [[ $model == *SSD* || $model == *Solid* ]]; then
+    echo SSD
+  else
+    echo HDD
+  fi
+}
+
+zfs_for_wwn() {
+  local wwn=$1
+  [[ $use_zfs -eq 1 ]] || {
+    echo N/A
+    return
+  }
+  printf '%s\n' "$zfs_txt" | grep -q "$wwn" || {
+    echo N/A
+    return
+  }
+  if printf '%s\n' "$zfs_txt" | grep -q "${wwn}.*FAULTED"; then
+    echo FAULTED
+  elif printf '%s\n' "$zfs_txt" | grep -q "${wwn}.*UNAVAIL"; then
+    echo UNAVAIL
+  elif printf '%s\n' "$zfs_txt" | grep -A25 replacing | grep -q "${wwn}.*(resilvering)"; then
+    echo REBUILDING
+  else
+    echo OK
+  fi
+}
+
+btrfs_for() {
+  local wwn=$1 kernel=$2
+  have btrfs || {
+    echo N/A
+    return
+  }
+  if printf '%s\n' "$btrfs_txt" | grep -Eq "${wwn}|${kernel}"; then
+    use_btrfs=1
+    if printf '%s\n' "$btrfs_txt" | grep -Eqi 'degraded|missing|failed'; then
+      echo DEGRADED
+    else
+      echo OK
+    fi
+  else
+    echo N/A
+  fi
+}
+
+add_row() {
+  local kernel=$1 type=$2 wwn=$3 model=$4 serial=$5 health=$6 fs=$7 zfs=$8 btrfs=$9
+  local status=OK
+  if [[ $health != PASSED && $health != OK ]]; then
+    # SMART wording varies; treat PASSED as healthy, UNKNOWN without other faults is still OK-ish
+    if [[ $health == FAILED || $health == FAILING_NOW ]]; then
+      status=PROBLEM
+    fi
+  fi
+  if [[ $zfs =~ FAULTED|UNAVAIL|REBUILDING ]]; then status=PROBLEM; fi
+  if [[ $btrfs == DEGRADED ]]; then status=PROBLEM; fi
+  if [[ $status == PROBLEM ]]; then ((issues++)) || true; fi
+
+  local line="/dev/${kernel}|${type}|${wwn}|${model}|${serial}|${health}|${fs}"
+  ((use_zfs)) && line+="|${zfs}"
+  ((use_btrfs)) && line+="|${btrfs}"
+  line+="|${status}"
+  rows+=("$line")
+}
+
+# Discover candidates from by-id and nvme nodes
+shopt -s nullglob
+candidates=(/dev/disk/by-id/wwn-* /dev/disk/by-id/ata-* /dev/nvme*n1)
+shopt -u nullglob
+
+for path in "${candidates[@]}"; do
+  [[ $path == *-part* ]] && continue
+  [[ -b $path ]] || continue
+
+  kernel=$(lsblk -dno NAME "$path" 2>/dev/null | head -1)
+  [[ -z $kernel ]] && continue
+  [[ -n ${seen_kernel[$kernel]+x} ]] && continue
+  seen_kernel[$kernel]=1
+
+  smart=$(sudo smartctl -a "$path" 2>/dev/null || true)
+  serial=$(smart_field "$smart" 'Serial Number:')
+  [[ -z $serial ]] && serial=N/A
+  model=$(smart_field "$smart" 'Device Model:|Model Number:')
+  [[ -z $model ]] && model=N/A
+
+  wwn=N/A
+  base=$(basename "$path")
+  if [[ $base == wwn-* ]]; then
+    wwn=$base
+  fi
+
+  health=$(printf '%s\n' "$smart" | grep -oP 'SMART .*health.*: \K\S+' | head -1 || true)
+  [[ -z $health ]] && health=$(printf '%s\n' "$smart" | grep -oP 'self-assessment test result: \K\S+' | head -1 || true)
+  [[ -z $health ]] && health=UNKNOWN
+
+  type=$(classify_media "$kernel" "$model")
+  fs=$(lsblk -no FSTYPE "/dev/${kernel}" 2>/dev/null | awk 'NF{print; exit}')
+  [[ -z $fs ]] && fs=N/A
+
+  zstat=$(zfs_for_wwn "$wwn")
+  if [[ $zstat != N/A ]]; then
+    fs=zfs_member
+  fi
+  bstat=$(btrfs_for "$wwn" "$kernel")
+
+  add_row "$kernel" "$type" "$wwn" "$model" "$serial" "$health" "$fs" "$zstat" "$bstat"
+done
+
+# Surface ZFS members that vanished from the OS device tree
+if ((use_zfs)); then
+  while read -r line; do
+    [[ $line =~ FAULTED|UNAVAIL ]] || continue
+    mw=$(printf '%s\n' "$line" | grep -oE 'wwn-0x[0-9a-fA-F]+' | head -1 || true)
+    [[ -z $mw ]] && continue
+    printf '%s\n' "${rows[@]}" | grep -q "$mw" && continue
+    use_zfs=1
+    add_row "MISSING" "MISSING" "$mw" "UNKNOWN" "UNKNOWN" "N/A" "N/A" "UNAVAIL" "N/A"
+  done < <(printf '%s\n' "$zfs_txt")
+fi
+
+header="KERNEL|TYPE|WWN|MODEL|SN|SMARTCTL|FS"
+((use_zfs)) && header+="|ZFS"
+((use_btrfs)) && header+="|BTRFS"
+header+="|STATUS"
+
+{
+  printf '%s\n' "$header"
+  printf '%s\n' "${rows[@]}" | grep -v '^/dev/MISSING\|^MISSING' | sort -t'|' -k1,1V
+  printf '%s\n' "${rows[@]}" | grep -E '^MISSING|/dev/MISSING' || true
+} | column -t -s '|'
+
+if ((issues > 0)); then
+  printf '\nOVERALL: %s issue(s) detected.\n' "$issues"
+  exit 1
+fi
+printf '\nAll checked drives look healthy.\n'
+exit 0
