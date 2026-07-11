@@ -1,0 +1,91 @@
+if cmds_exist sudo; then
+  if [ -f /sbin/iwconfig ]; then
+    alias iwconfig="sudo /sbin/iwconfig"
+  fi
+
+  if [ -f /sbin/iw ]; then
+    alias iw="sudo /sbin/iw"
+  fi
+
+  if [ -f /sbin/ip ]; then
+    alias ip="sudo /sbin/ip"
+  fi
+
+  if [ -f /sbin/iptables ]; then
+    alias iptables="sudo /sbin/iptables"
+  fi
+
+  if [ -f /sbin/ip6tables ]; then
+    alias ip6tables="sudo /sbin/ip6tables"
+  fi
+
+  if [ -f /usr/sbin/tcpdump ]; then
+    alias tcpdump="sudo /usr/sbin/tcpdump"
+  fi
+
+  if [ -f /usr/sbin/iftop ]; then
+    alias iftop="sudo /usr/sbin/iftop"
+  fi
+
+  if [ -f /usr/sbin/nethogs ]; then
+    alias nethogs="sudo /usr/sbin/nethogs"
+  fi
+
+  if [ -f /usr/bin/mtr ]; then
+    alias mtr="mtr -t"
+  fi
+fi
+
+alias keep_network_up='while true; do if ! ping -c 1 {default_route_host} > /dev/null 2>&1; then echo "Bouncing network at $(date)"; nmcli connection down {nm_connection_name} > /dev/null 2>&1; nmcli connection up {nm_connection_name} > /dev/null 2>&1; echo; fi; sleep 10; done'
+
+function route_port_to_host () {
+  local port=${1}
+  local remote_host=${2}
+  local local_host=${3}
+  if [[ -z ${port} || -z ${remote_host} || -z ${local_host} ]]; then
+    echo "Usage: route_port_to_host <portnum> <remote_host> <local_IP>"
+  else
+    iptables -t nat -A PREROUTING -p tcp --dport "${port}" -j DNAT --to-destination "${remote_host}:${port}"
+    iptables -t nat -A POSTROUTING -p tcp -d "${remote_host}" --dport "${port}" -j SNAT --to-source "${local_host}"
+  fi
+}
+
+curl_override_dns () {
+    url="${1}"
+    override_ip="${2}"
+    if echo "${url}" | grep -q "https://"; then
+      port="${3:-443}"
+      hostname="$(echo "${url}" | grep -Po "(?<=https://)[^/]+" )"
+    else
+      port="${3:-80}"
+      hostname="$(echo "${url}" | grep -Po "(?<=http://)[^/]+" )"
+    fi
+    curl "${url}" --resolve "${hostname}:${port}:${override_ip}"
+}
+
+if cmds_exist curl; then
+  alias headers="curl -I"
+fi
+
+if cmds_exist dig; then
+  alias dig-short="dig +short"
+fi
+
+if cmds_exist sudo && cmds_exist unbound-control; then
+  alias unbound-control="sudo /usr/sbin/unbound-control"
+fi
+
+if cmds_exist curl; then
+  function test_redirect () {
+    local port domain
+    if [[ $(echo "$2" | cut -d":" -f1) == "https" ]]; then
+      port=443
+    else
+      port=80
+    fi
+    domain=$(echo "$2" | cut -d"/" -f3)
+    echo "Testing $2 against $1:$port"
+
+    curl --resolve "${domain}:${port}:$1" "$2" --progress-bar --insecure -sL -w "%{http_code} %{url_effective}\\n" -o /dev/null
+  }
+fi

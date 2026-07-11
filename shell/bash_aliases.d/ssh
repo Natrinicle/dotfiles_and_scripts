@@ -1,0 +1,11 @@
+alias ssh-remove-host-key='ssh-keygen -f "${HOME}/.ssh/known_hosts" -R'
+alias ssh-stop-multiplex="ssh -O stop"
+
+function scp_home_rc () {
+  local host=${1}
+  shift
+  scp "$@" .bashrc "${host}:~"
+  scp "$@" .bash_aliases "${host}:~"
+  scp -r "$@" .bash_aliases.d "${host}:~"
+  scp "$@" .vimrc "${host}:~"
+}

@@ -1,0 +1,21 @@
+# Active map used for re-exports from THIS checkout (keep generic in git).
+# Add private find/replace pairs in sanitize-map.local.yaml (gitignored) if needed.
+
+replacements:
+  - find: "acme.com"
+    replace: "{company_domain}"
+  - find: "Acme"
+    replace: "{Company}"
+  - find: "acme"
+    replace: "{company}"
+    ignore_case: true
+  - find: "packages/app"
+    replace: "{app_package}"
+  - find: "SECURITY"
+    replace: "{SECURITY_TICKET_PROJECT}"
+
+drop_substrings:
+  - "BEGIN OPENSSH PRIVATE KEY"
+  - "BEGIN RSA PRIVATE KEY"
+  - "BORG_PASSPHRASE"
+  - "AKIA"

@@ -1,0 +1,23 @@
+if cmds_exist ipmitool; then
+  : "${IPMI_USER:=ADMIN}"
+  : "${IPMI_PASS:=ADMIN}"
+  export IPMI_USER IPMI_PASS
+
+  # Set boot device on next boot to pxe
+  function ipmipxe () {
+    ipmitool -I lanplus -H "${1}" -U "${IPMI_USER}" -P "${IPMI_PASS}" chassis bootdev pxe
+  }
+  # Reset a hung bmc
+  function ipmiresetbmc () {
+    ipmitool -I lanplus -H "${1}" -U "${IPMI_USER}" -P "${IPMI_PASS}" mc reset cold
+  }
+  # Power cycle a server from its bmc
+  function ipmipowercycle () {
+    ipmitool -I lanplus -H "${1}" -U "${IPMI_USER}" -P "${IPMI_PASS}" chassis power cycle
+  }
+  # Ipmi wrapper with username/password for any other commands
+  function ipmi () {
+    # "${@:2}" pulls in all argv from 2 to the end of the line
+    ipmitool -I lanplus -H "${1}" -U "${IPMI_USER}" -P "${IPMI_PASS}" "${@:2}"
+  }
+fi

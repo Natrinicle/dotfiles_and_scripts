@@ -1,0 +1,44 @@
+alias pip="/usr/bin/env pip"
+alias pip3="/usr/bin/env pip3"
+
+function round () {
+  round_float=${1}
+  round_places=${2:-2}
+
+  python -c "print(round(float(${round_float}), ${round_places}))"
+}
+
+# Nuitka converts Python source into C
+if cmds_exist nuitka; then
+  # Convert and compile all .py files in current directory to modules
+  function nuitka_compile_all_as_modules() {
+    for py_file in *.py; do
+      # Ignore things like __init__.py that tend to break
+      if echo ${py_file} | grep -qv "^__"; then
+        nuitka --module ${py_file} --recurse-none --show-progress
+      fi
+    done
+  }
+
+  # Undo Nuitka module conversion and compilation
+  function nuitka_remove_all_compiled_modules() {
+    rm -r *.build
+    rm *.so
+    rm *.pyi
+  }
+fi
+
+function virtualenv_relocatable_python3 () {
+  venv_path=${1}
+  venv_dir=$(echo ${venv_path} | rev | cut -d"/" -f1 | rev)
+  python3 -m virtualenv --python python3 ${venv_path}
+  python3 -m virtualenv --relocatable --python python3 ${venv_path}
+
+  if [ ! -f ${venv_path}/../.envrc ]; then
+    echo "source ${venv_dir}/bin/activate" > ${venv_path}/../.envrc
+  fi
+
+  if cmds_exist direnv; then
+    direnv allow ${venv_path}/..
+  fi
+}

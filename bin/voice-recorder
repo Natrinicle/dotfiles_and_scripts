@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""Ambient microphone capture with Silero VAD → WAV segments for downstream ASR.
+
+Intended as a PATH tool (`voice-recorder`). Configure via environment variables
+(see load_settings). Optional deps: torch, silero-vad, sounddevice, numpy.
+"""
+
+from __future__ import annotations
+
+import os
+import queue
+import shutil
+import signal
+import sys
+import time
+import wave
+from collections import deque
+from datetime import datetime
+from pathlib import Path
+
+import numpy as np
+
+_stop = False
+
+
+def _log(msg: str) -> None:
+    print(f"[{datetime.now():%Y-%m-%d %H:%M:%S}] {msg}", flush=True)
+
+
+def _on_signal(signum, _frame) -> None:
+    global _stop
+    _log(f"signal {signum}: shutting down")
+    _stop = True
+
+
+signal.signal(signal.SIGTERM, _on_signal)
+signal.signal(signal.SIGINT, _on_signal)
+
+
+def load_settings() -> dict:
+    raw_dev = os.environ.get("VR_AUDIO_DEVICE")
+    device: int | str | None
+    if raw_dev is None or raw_dev == "":
+        device = None
+    else:
+        try:
+            device = int(raw_dev)
+        except ValueError:
+            device = raw_dev
+
+    return {
+        "device": device,
+        "output_dir": os.environ.get("VR_OUTPUT_DIR", str(Path.cwd() / "recordings")),
+        "vad_threshold": float(os.environ.get("VR_VAD_THRESHOLD", "0.5")),
+        "silence_s": float(os.environ.get("VR_SILENCE_DURATION", "3.0")),
+        "min_s": float(os.environ.get("VR_MIN_SEGMENT", "2.0")),
+        "pre_roll_s": float(os.environ.get("VR_PRE_ROLL", "0.5")),
+        "sample_rate": int(os.environ.get("VR_SAMPLE_RATE", "16000")),
+        "max_s": int(os.environ.get("VR_MAX_SEGMENT", "1800")),
+        "frame": 512,
+    }
+
+
+class SpeechSegmenter:
+    """IDLE → SPEAKING → TRAILING silence → emit buffer (or force at max length)."""
+
+    IDLE, SPEAKING, TRAILING = range(3)
+
+    def __init__(self, cfg: dict) -> None:
+        self.thr = cfg["vad_threshold"]
+        self.sr = cfg["sample_rate"]
+        self.silence_need = cfg["silence_s"]
+        self.min_need = cfg["min_s"]
+        self.max_need = cfg["max_s"]
+        self.frame_s = cfg["frame"] / self.sr
+        n_pre = max(1, int(cfg["pre_roll_s"] / self.frame_s))
+        self.pre = deque(maxlen=n_pre)
+        self.mode = self.IDLE
+        self.buf: list[np.ndarray] = []
+        self.dur = 0.0
+        self.silent_for = 0.0
+
+    def push(self, frame: np.ndarray, p_speech: float) -> np.ndarray | None:
+        talking = p_speech >= self.thr
+
+        if self.mode == self.IDLE:
+            self.pre.append(frame.copy())
+            if talking:
+                self._begin()
+                self.buf.append(frame.copy())
+                self.dur += self.frame_s
+            return None
+
+        if self.mode == self.SPEAKING:
+            self.buf.append(frame.copy())
+            self.dur += self.frame_s
+            if not talking:
+                self.mode = self.TRAILING
+                self.silent_for = self.frame_s
+            if self.dur >= self.max_need:
+                return self._emit(force=True)
+            return None
+
+        # TRAILING
+        self.buf.append(frame.copy())
+        self.dur += self.frame_s
+        if talking:
+            self.mode = self.SPEAKING
+            self.silent_for = 0.0
+        else:
+            self.silent_for += self.frame_s
+            if self.silent_for >= self.silence_need:
+                return self._emit(force=False)
+        if self.dur >= self.max_need:
+            return self._emit(force=True)
+        return None
+
+    def _begin(self) -> None:
+        self.mode = self.SPEAKING
+        self.buf = list(self.pre)
+        self.dur = len(self.buf) * self.frame_s
+        self.silent_for = 0.0
+        self.pre.clear()
+
+    def _emit(self, force: bool) -> np.ndarray | None:
+        audio = np.concatenate(self.buf) if self.buf else np.array([], dtype=np.float32)
+        length = self.dur
+        self.buf = []
+        self.dur = 0.0
+        self.silent_for = 0.0
+        if not force:
+            self.mode = self.IDLE
+        if length < self.min_need:
+            return None
+        return audio
+
+    def drain(self) -> np.ndarray | None:
+        if self.buf and self.dur >= self.min_need:
+            audio = np.concatenate(self.buf)
+        else:
+            audio = None
+        self.mode = self.IDLE
+        self.buf = []
+        self.dur = 0.0
+        return audio
+
+
+_WARN_FREE = 500_000_000
+_STOP_FREE = 100_000_000
+
+
+def save_wav(samples: np.ndarray, directory: str, rate: int) -> str | None:
+    Path(directory).mkdir(parents=True, exist_ok=True)
+    free = shutil.disk_usage(directory).free
+    if free < _STOP_FREE:
+        _log(f"disk almost full ({free // 1_000_000} MB free); skip write")
+        return None
+    if free < _WARN_FREE:
+        _log(f"disk space low: {free // 1_000_000} MB free")
+
+    name = f"auto-voice-{datetime.now():%Y-%m-%d-%H%M%S}.wav"
+    path = str(Path(directory) / name)
+    pcm = (samples * 32767.0).clip(-32768, 32767).astype(np.int16)
+    with wave.open(path, "wb") as wf:
+        wf.setnchannels(1)
+        wf.setsampwidth(2)
+        wf.setframerate(rate)
+        wf.writeframes(pcm.tobytes())
+    _log(f"wrote {name} ({len(samples) / rate:.1f}s, {Path(path).stat().st_size // 1024} KB)")
+    return path
+
+
+def open_mic(cfg: dict, q: queue.Queue) -> object:
+    import sounddevice as sd
+
+    def callback(indata, _frames, _time, status) -> None:
+        if status:
+            _log(f"audio status: {status}")
+        q.put(indata[:, 0].copy())
+
+    return sd.InputStream(
+        samplerate=cfg["sample_rate"],
+        channels=1,
+        dtype="float32",
+        blocksize=cfg["frame"],
+        device=cfg["device"],
+        callback=callback,
+    )
+
+
+def capture_loop(cfg: dict, model, seg: SpeechSegmenter, stream, q: queue.Queue) -> int:
+    import torch
+
+    written = 0
+    with stream:
+        _log("listening for speech…")
+        while not _stop:
+            try:
+                frame = q.get(timeout=1.0)
+            except queue.Empty:
+                continue
+            with torch.no_grad():
+                prob = model(torch.from_numpy(frame), cfg["sample_rate"]).item()
+            chunk = seg.push(frame, prob)
+            if chunk is not None and save_wav(chunk, cfg["output_dir"], cfg["sample_rate"]):
+                written += 1
+
+    leftover = seg.drain()
+    if leftover is not None and save_wav(leftover, cfg["output_dir"], cfg["sample_rate"]):
+        written += 1
+    return written
+
+
+def main() -> None:
+    import sounddevice as sd
+    from silero_vad import load_silero_vad
+
+    cfg = load_settings()
+    _log("voice-recorder start")
+    for key in ("output_dir", "device", "vad_threshold", "silence_s", "min_s", "max_s", "pre_roll_s"):
+        _log(f"  {key}={cfg[key] if key != 'device' else (cfg['device'] or 'default')}")
+
+    Path(cfg["output_dir"]).mkdir(parents=True, exist_ok=True)
+    _log("loading Silero VAD…")
+    model = load_silero_vad()
+    seg = SpeechSegmenter(cfg)
+    audio_q: queue.Queue = queue.Queue(maxsize=100)
+
+    stream = None
+    while not _stop:
+        try:
+            stream = open_mic(cfg, audio_q)
+            break
+        except sd.PortAudioError as exc:
+            _log(f"mic open failed: {exc}; retry in 10s")
+            time.sleep(10)
+
+    if _stop or stream is None:
+        _log("exit before capture started")
+        return
+
+    n = capture_loop(cfg, model, seg, stream, audio_q)
+    _log(f"exit after {n} segment(s)")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except ImportError as exc:
+        sys.stderr.write(
+            "voice-recorder: missing dependency (%s). Install: "
+            "pip install 'torch>=2' 'silero-vad>=5' 'sounddevice>=0.4' 'numpy>=1.20'\n"
+            % exc
+        )
+        raise SystemExit(1) from exc

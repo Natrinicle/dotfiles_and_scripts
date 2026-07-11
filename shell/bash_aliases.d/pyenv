@@ -1,0 +1,22 @@
+if [ -z $PYENV_SHELL ]; then
+  export PYENV_SHELL=bash
+fi
+
+if [ -f ~/.pyenv/completions/pyenv.bash ]; then
+  source ~/.pyenv/completions/pyenv.bash
+fi
+
+pyenv() {
+  local command
+  command="${1:-}"
+  if [ "$#" -gt 0 ]; then
+    shift
+  fi
+
+  case "$command" in
+  rehash|shell)
+    eval "$(pyenv "sh-$command" "$@")";;
+  *)
+    command pyenv "$command" "$@";;
+  esac
+}

@@ -1,0 +1,39 @@
+if cmds_exist sudo; then
+  alias fsck="sudo /sbin/fsck"
+
+  function check_open_files () {
+    alert_percent=${1:-0.75}
+    for running_pid in $(sudo ps aux | awk '{print $2}' | tail -n+2); do
+      if sudo test -d /proc/${running_pid}/fd && sudo test -f /proc/${running_pid}/limits; then
+        open_files=$(sudo ls -l /proc/${running_pid}/fd | wc -l)
+        open_limit=$(sudo grep "open files" /proc/${running_pid}/limits | awk '{print $4}')
+        alert_limit=$(echo "((${open_limit} * ${alert_percent}) + 0.5) / 1" | bc)
+        if [ ${open_files} -gt ${alert_limit} ]; then
+          echo "PID ${running_pid} has ${open_files} open files with a limit of ${open_limit} max"
+        fi
+      fi
+    done
+  }
+fi
+
+if cmds_exist zfs; then
+  function zfs_snapshots_by_size () {
+    root_dataset=${1}
+    zfs list -r -t snapshot -o name,used,creation ${root_dataset} | sort -k 2,2h
+  }
+fi
+
+
+function ps_io_wait () {
+  watch -n 1 "(ps aux | awk '\$8 ~ /D/  { print \$0 }')"
+}
+
+if cmds_exist rsync; then
+  alias cpv='rsync -ah --info=progress2'
+fi
+
+alias dig-holes="fallocate --dig-holes"
+
+if cmds_exist sfs; then
+  alias organize_downloads="sfs ~/.config/sfs/Dowloads.yaml ~/Downloads"
+fi

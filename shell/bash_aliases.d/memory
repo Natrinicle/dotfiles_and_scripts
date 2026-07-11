@@ -1,0 +1,66 @@
+function memused () {
+  # Get ram total, free, and used without cached/buffers then calculate the percentage used to the nearest whole number
+  local mem_total mem_free mem_used percent_used mem_free_k mem_cached_k
+  mem_total=$(grep -E "^MemTotal:" /proc/meminfo | grep -Eo "[0-9]+")
+  mem_free_k=$(grep -E "^MemFree:" /proc/meminfo | grep -Eo "[0-9]+")
+  mem_cached_k=$(grep -E "^Cached:" /proc/meminfo | grep -Eo "[0-9]+")
+  mem_free=$(echo "${mem_free_k} + ${mem_cached_k}" | bc)
+  mem_used=$(echo "${mem_total} - ${mem_free}" | bc)
+  percent_used=$(awk "BEGIN { pc=${mem_used}/${mem_total}*100; i=int(pc); print (pc-i<0.5)?i:i+1 }")
+
+  # Output as used/total (percent%)
+  echo -e "${mem_used}/${mem_total} (${percent_used}%)"
+}
+
+function swapused () {
+  # Get swap total, free, and used then calculate the percentage used to the nearest whole number
+  local swap_total swap_free swap_used percent_used
+  swap_total=$(grep -E "^SwapTotal:" /proc/meminfo | grep -Eo "[0-9]+")
+  swap_free=$(grep -E "^SwapFree:" /proc/meminfo | grep -Eo "[0-9]+")
+  swap_used=$(echo "${swap_total} - ${swap_free}" | bc)
+  percent_used=$(awk "BEGIN { pc=${swap_used}/${swap_total}*100; i=int(pc); print (pc-i<0.5)?i:i+1 }")
+
+  # Output as used/total (percent%)
+  echo -e "${swap_used}/${swap_total} (${percent_used}%)"
+}
+
+function zram_stat () {
+  for i in /sys/block/zram*; do
+    if [ -f "$i/compr_data_size" ] && [ -f "$i/orig_data_size" ]; then
+      compr=$(< "$i/compr_data_size")
+      orig=$(< "$i/orig_data_size")
+      ratio=0
+      if [ "$compr" -gt 0 ]; then
+        ratio=$(echo "scale=2; $orig*100/$compr" | bc -q)
+      fi
+      echo -e "/dev/${i/*\/}:\t$ratio% ($orig -> $compr)"
+    fi
+  done
+}
+
+function ksm_stat () {
+  # offered = pages_sharing + pages_shared + pages_unshared + pages_volatile;
+  # saved = pages_sharing - pages_shared;
+  # savings (ksm_ratios) = saved / offered;
+
+  page_size=$(getconf PAGE_SIZE)
+
+  pages_shared=$(cat /sys/kernel/mm/ksm/pages_shared)
+  pages_sharing=$(cat /sys/kernel/mm/ksm/pages_sharing)
+  pages_unshared=$(cat /sys/kernel/mm/ksm/pages_unshared)
+  pages_volatile=$(cat /sys/kernel/mm/ksm/pages_volatile)
+
+  offered=$(echo "${pages_sharing} + ${pages_shared} + ${pages_unshared} + ${pages_volatile}" | bc -l)
+  offered_bytes=$(echo "${offered} * ${page_size}" | bc -l)
+  offered_human="$(echo "${offered_bytes}" | numfmt --to=iec-i)B"
+  saved=$(echo "${pages_sharing} - ${pages_shared}" | bc -l)
+  saved_bytes=$(echo "${saved} * ${page_size}" | bc -l)
+  saved_human="$(echo "${saved_bytes}" | numfmt --to=iec-i)B"
+  saved_percent="0.00"
+
+  if [ "${offered}" -gt 0 ]; then
+    saved_percent=$(python -c "print(round(float($(echo "${saved} / ${offered} * 100" | bc -l)), 2))")
+  fi
+
+  echo -e "${saved_human}/${offered_human} (${saved_percent}%)"
+}

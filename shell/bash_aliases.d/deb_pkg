@@ -1,0 +1,57 @@
+if cmds_exist sudo; then
+  # Determine preferred apt command and add sudo
+  # before any that exist.
+
+  ## apt-fast
+  if cmds_exist apt-fast; then
+    alias apt-fast="sudo apt-fast"
+    if [ -z "${APT_CMD}" ]; then APT_CMD="sudo apt-fast"; fi
+  fi
+
+  ## apt-metalink
+  if [ -f "/usr/local/sbin/apt-metalink" ]; then
+    alias apt-metalink="sudo /usr/local/sbin/apt-metalink"
+    if [ -z "${APT_CMD}" ]; then APT_CMD="sudo /usr/local/sbin/apt-metalink"; fi
+  fi
+
+  ## apt
+  if cmds_exist apt; then
+    alias apt="sudo apt"
+    if [ -z "${APT_CMD}" ]; then APT_CMD="sudo apt"; fi
+  fi
+
+  ## apt-get
+  if cmds_exist apt-get; then
+    alias apt-get="sudo apt-get"
+    if [ -z "${APT_CMD}" ]; then APT_CMD="sudo apt-get"; fi
+  fi
+
+  if [ -n "${APT_CMD}" ]; then
+    # If an apt command exists then add some aliases
+    # and functions related to it using it.
+
+    alias dist-upgrade="${APT_CMD} update -qq --allow-releaseinfo-change && ${APT_CMD} dist-upgrade"
+    alias upgrade="${APT_CMD} update -qq --allow-releaseinfo-change && ${APT_CMD} upgrade --with-new-pkgs"
+    alias apt-quiet-upgrade="DEBIAN_FRONTEND=noninteractive ${APT_CMD} -y -o Dpkg::Options::='--force-confdef' -o Dpkg::Options::='--force-confold' upgrade"
+
+    function apt-get-update-repo () {
+      options="-o Dir::Etc::sourcelist=sources.list.d/${1}.list -o Dir::Etc::sourceparts='-' -o APT::Get::List-Cleanup='0'"
+      ${APT_CMD} ${options} update --allow-releaseinfo-change
+    }
+  fi
+
+  # Add sudo before add-apt-repository.
+  if cmds_exist add-apt-repository; then
+    alias add-apt-repository="sudo add-apt-repository"
+  fi
+
+  # Add apt-recv-key if apt-key and sudo exist.
+  if cmds_exist apt-key; then
+    alias apt-recv-key="sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys"
+  fi
+
+  # Add sudo before dpkg.
+  if cmds_exist dpkg; then
+    alias dpkg="sudo dpkg"
+  fi
+fi
