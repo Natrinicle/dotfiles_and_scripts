@@ -1,0 +1,22 @@
+[Unit]
+Description=Voice recorder (Silero VAD ambient capture)
+After=pipewire.service pipewire-pulse.service
+Wants=pipewire-pulse.service
+
+[Service]
+Type=simple
+# Install bin/ to ~/.local/bin first, then:
+ExecStart=%h/.local/bin/run-voice-recorder.sh
+Restart=on-failure
+RestartSec=5
+# Point output at Speakr auto-process (or any folder you watch):
+Environment=VR_OUTPUT_DIR=%h/recordings/auto-voice
+Environment=VR_VAD_THRESHOLD=0.5
+Environment=VR_SILENCE_DURATION=3.0
+Environment=VR_MIN_SEGMENT=2.0
+Environment=VR_PRE_ROLL=0.5
+Environment=VR_MAX_SEGMENT=1800
+# Optional: Environment=VR_PYTHON=%h/.venvs/voice-recorder/bin/python3
+
+[Install]
+WantedBy=default.target

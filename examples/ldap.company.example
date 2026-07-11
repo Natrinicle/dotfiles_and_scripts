@@ -1,0 +1,50 @@
+# Example company LDAP helpers — not installed by default.
+# Copy to ~/.bash_aliases.d/ldap and replace placeholders before use.
+#
+# Placeholders:
+#   {company_domain}   e.g. example.com
+#   {ldap_users_ou}    e.g. People
+#   {ldap_base_dn}     e.g. dc=example,dc=com
+#   {company_ldap_host} e.g. ldap.example.com
+
+if cmds_exist ldapsearch; then
+  function ldapmultisearch () {
+    if [ -z "${LDAP_USER:-}" ]; then
+      read -p "Username: " LDAP_USER
+      export LDAP_USER
+    fi
+    read -s -p "${LDAP_USER}'s Password: " LDAP_PASSWORD
+    echo ""
+    for uid in "${@}"; do
+      ldapsearch -x -ZZ \
+        -D "${LDAP_USER}@{company_domain}" \
+        -b "ou={ldap_users_ou},{ldap_base_dn}" \
+        -h "{company_ldap_host}" \
+        -w "${LDAP_PASSWORD}" \
+        "uid=${uid}"
+      if [ ${?} != 0 ]; then
+        echo "ldapsearch had an error"
+        unset LDAP_PASSWORD
+        break
+      fi
+    done
+    export LDAP_PASSWORD
+  }
+
+  function ldapfindteam () {
+    LDAP_SEARCH="$(ldapmultisearch "${1}")"
+    MANAGER_DN=$(echo "${LDAP_SEARCH}" | grep -Po "(?<=^manager: ).*$")
+    MANAGER_NAME=$(echo "${LDAP_SEARCH}" | grep -Po "(?<=^name: ).*$")
+    MANAGER_TITLE=$(echo "${LDAP_SEARCH}" | grep -Po "(?<=^title: ).*$")
+    TEAM_UIDS=$(ldapsearch -x -ZZ \
+      -D "${LDAP_USER}@{company_domain}" \
+      -b "ou={ldap_users_ou},{ldap_base_dn}" \
+      -h "{company_ldap_host}" \
+      -w "${LDAP_PASSWORD}" \
+      "manager=${MANAGER_DN}" | grep -Po "(?<=^uid: ).*")
+    echo "Manager: ${MANAGER_NAME} - ${MANAGER_TITLE}"
+    for character in $(echo "Manager: ${MANAGER_NAME} - ${MANAGER_TITLE}" | wc -c); do echo -e "-"; done
+    # shellcheck disable=SC2086 # TEAM_UIDS is intentionally multi-word
+    ldapmultisearch ${TEAM_UIDS} | grep -Po "(?<=^name: ).*$"
+  }
+fi

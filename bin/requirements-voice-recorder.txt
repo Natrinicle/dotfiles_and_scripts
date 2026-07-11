@@ -1,0 +1,5 @@
+# Optional deps for bin/voice-recorder (ambient VAD capture).
+torch>=2.0
+silero-vad>=5.0
+sounddevice>=0.4
+numpy>=1.20

@@ -1,0 +1,45 @@
+if cmds_exist git; then
+  alias git-reset-hard="git fetch origin; git reset --hard origin/master; git clean -f"
+fi
+
+alias git_repo_contributors="git log --format='%aN' | sort -u"
+alias git_stats_commits_by_author="git shortlog -sn"
+alias git_stats_commits_by_author_no_merges="git shortlog -sn --no-merges"
+
+alias git_checkout_latest_tag='git checkout $(git describe --tags $(git rev-list --tags --max-count=1))'
+
+function git_stats_file_change_by_author () {
+  author=${1}
+  git log --shortstat --author="${author}" | grep -E "fil(e|es) changed" | awk '{files+=$1; inserted+=$4; deleted+=$6; delta+=$4-$6; ratio=deleted/inserted} END {printf "Commit stats:\n- Files changed (total)..  %s\n- Lines added (total)....  %s\n- Lines deleted (total)..  %s\n- Total lines (delta)....  %s\n- Add./Del. ratio (1:n)..  1 : %s\n", files, inserted, deleted, delta, ratio }' -
+}
+
+function git_stats_file_change_by_author_no_merges () {
+  author=${1}
+  git log --shortstat --author="${author}" --no-merges | grep -E "fil(e|es) changed" | awk '{files+=$1; inserted+=$4; deleted+=$6; delta+=$4-$6; ratio=deleted/inserted} END {printf "Commit stats:\n- Files changed (total)..  %s\n- Lines added (total)....  %s\n- Lines deleted (total)..  %s\n- Total lines (delta)....  %s\n- Add./Del. ratio (1:n)..  1 : %s\n", files, inserted, deleted, delta, ratio }' -
+}
+
+function git_up_recursive () {
+  find . -name ".git" -type d | rev | cut -d "/" -f2- | rev | xargs -I {} bash -c "echo {}; cd {}; git up; echo"
+}
+
+function git-recent() {
+    local status git
+    git=/usr/bin/git
+    if [[ ! -x "$git" ]]; then
+        echo "git is not installed"
+        return 1
+    fi
+    status=$($git status -s 2>/dev/null)
+    if [[ $? -ne 0 ]]; then
+        echo "not in a git repository"
+        return 2
+    fi
+    if ! pgrep -f 'git fetch'; then
+        ($git fetch --all --prune &) &>/dev/null
+    fi
+    if [[ -n "$status" ]]; then
+        $git status -s 2>/dev/null
+        echo
+    fi
+    $git log --oneline -5 --no-color | sed -re 's/\s+/    /'
+}

@@ -1,0 +1,33 @@
+function psgrep () {
+  ps auxw | grep "$(echo "$*" | sed 's/^\(.\)/[\1]/')"
+}
+
+function ps_forest_pid () {
+  ps --forest -o user,pid,pcpu,pmem,vsz,rss,tty,stat,start,time,cmd -g "$(ps -o sid= -p "${1}")"
+}
+
+function psmem () {
+  # Print the number of processes matching name given, memory per process, and total memory usage
+  ps -C "$1" -O rss | gawk '{ count ++; sum += $2 }; END {count --; print "Number of processes =",count; print "Memory usage per process =",sum/1024/count, "MB"; print "Total memory usage =", sum/1024, "MB" ;};'
+}
+
+function suspend_process_soft () {
+  local pid
+  for pid in $(psgrep "$1" | awk '{print $2}'); do
+    kill -TSTP "${pid}"
+  done
+}
+
+function suspend_process_hard () {
+  local pid
+  for pid in $(psgrep "$1" | awk '{print $2}'); do
+    kill -STOP "${pid}"
+  done
+}
+
+function unsuspend_process () {
+  local pid
+  for pid in $(psgrep "$1" | grep -P " Tl? " | awk '{print $2}'); do
+    kill -CONT "${pid}"
+  done
+}

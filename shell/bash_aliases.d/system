@@ -1,0 +1,42 @@
+# Used with device like /dev/sda1 and shows all UDEV info fields for that device
+alias udevadm_all_dev_info="udevadm info -q all -n"
+
+function systemctl_as_user () {
+  local user=${1}
+  shift
+  # shellcheck disable=SC2029 # remote string intentionally built for remote shell
+  sudo machinectl shell "${user}@" /bin/sh -c "systemctl $*"
+
+  # Can also use
+  # sudo systemd-run --quiet --pipe --wait --user --machine=${user}@ "systemctl ${@}"
+}
+
+# Drop cached command lookups (hits and misses) next cmds_exist rebuilds.
+function reset_cmds_cache () {
+  unset CMDS_CACHE CMDS_CACHE_TS
+  # shellcheck disable=SC2034 # maps are read by cmds_exist in parent shell
+  declare -gA CMDS_CACHE CMDS_CACHE_TS
+}
+
+if cmds_exist sudo; then
+  alias service="sudo /usr/sbin/service"
+fi
+
+alias load="uptime | grep -Eo '([0-9]+\.[0-9]+,? ?){3}'"
+
+if cmds_exist dkms; then
+  if cmds_exist sudo; then
+    DKMS_CMD="sudo dkms"
+  else
+    DKMS_CMD="dkms"
+  fi
+
+  function dkms-buildall () {
+    local line
+    $DKMS_CMD status | sed 's/,//g' | awk '{print "-m",$1,"-v",$2}' | while read -r line; do
+      # shellcheck disable=SC2086 # line is intentional multi-arg "-m name -v ver"
+      find /var/lib/initramfs-tools -mindepth 1 -maxdepth 1 -printf '%f\n' 2>/dev/null \
+        | xargs -r -n 1 $DKMS_CMD install $line -k
+    done
+  }
+fi

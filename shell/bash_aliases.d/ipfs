@@ -1,0 +1,24 @@
+if cmds_exist ipfs; then
+  function ipfs_unpin_all_content () {
+    ipfs pin ls --type recursive | cut -d' ' -f1 | xargs -n1 ipfs pin rm
+    ipfs repo gc
+  }
+
+  function ipfs_garbage_collect () {
+    ipfs repo gc
+  }
+
+  if cmds_exist youtube-dl; then
+    function youtube-dl-best-to-ipfs () {
+      # Make a temporary directory to store the video file
+      mkdir /tmp/youtube-ipfs
+
+      # Download and add the video to IPFS
+      youtube-dl -f bestvideo+bestaudio "${@}" -o '/tmp/youtube-ipfs/%(title)s-%(id)s.%(ext)s'
+      ipfs add /tmp/youtube-ipfs/*
+
+      # Change back to previous directory and cleanup
+      rm -r /tmp/youtube-ipfs
+    }
+  fi
+fi

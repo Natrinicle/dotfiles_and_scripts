@@ -1,0 +1,21 @@
+#if cmds_exist sudo; then
+  #if [ -f /usr/bin/lxc-start ]; then
+  #  alias lxc-start="sudo /usr/bin/lxc-start"
+  #fi
+
+  #if [ -f /usr/bin/lxc-stop ]; then
+  #  alias lxc-stop="sudo /usr/bin/lxc-stop"
+  #fi
+
+  #if [ -f /usr/bin/lxc-attach ]; then
+  #  alias lxc-attach="sudo /usr/bin/lxc-attach"
+  #fi
+
+  #if [ -f /usr/bin/lxc-ls ]; then
+  #  alias lxc-ls="sudo /usr/bin/lxc-ls"
+  #fi
+#fi
+
+if cmds_exist lxc-start ksm-wrapper; then
+  alias lxc-start="ksm-wrapper lxc-start"
+fi

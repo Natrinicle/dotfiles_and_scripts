@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# Wrapper so `morning-data-gather` resolves next to this script.
+set -euo pipefail
+here=$(cd "$(dirname "$0")" && pwd)
+exec "$here/morning-data-gather.sh" "$@"
