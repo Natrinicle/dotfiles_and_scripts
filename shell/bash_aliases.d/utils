@@ -61,3 +61,16 @@ calc() {
 	fi
 	printf "\\n"
 }
+
+# Make a temporary directory and enter it
+# Shamelessly stolen from
+# https://github.com/jessfraz/dotfiles/blob/main/.functions
+tmpd() {
+	local dir
+	if [ $# -eq 0 ]; then
+		dir=$(mktemp -d)
+	else
+		dir=$(mktemp -d -t "${1}.XXXXXXXXXX")
+	fi
+	cd "$dir" || exit
+}
