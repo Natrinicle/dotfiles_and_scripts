@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+
+# Hostname without trailing newline
+HOSTNAME=$(hostname | tr -d '[:space:]')
+
+# Generate MD5Sum of hostname
+HN_MD5=$(echo -n $HOSTNAME | md5sum)
+
+# hex digits from md5sum (min 0, max 30)
+# 7c351fd96f5dd0c91dd3fbf83c2e080c with 0-4 would yield 7c351
+for I in $(seq 0 4); do
+
+  # Hex digit
+  D=${HN_MD5:$I:1}
+
+  # Decimal number
+  N=$((16#$D))
+
+  # Low 3 bits
+  L=$(($N%8))
+
+  # Use darker colors
+  echo -n "\[\e[4"$L"m\] "
+
+  # Use lighter colors
+  # echo -n "\[\e[10"$L"m\] "
+
+done
+
+# Unset prompt colors
+echo "\[\e[0m\]"
