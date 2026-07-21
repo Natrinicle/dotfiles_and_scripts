@@ -160,7 +160,7 @@ Return this exact JSON:
               max_tokens: $tokens
              }' | curl -s -X POST "$LLM_SERVER_URL" \
             -H "Content-Type: application/json" \
-            -d @- || echo "{}") #2>/dev/null || echo "{}")
+            -d @- || echo "{}" 2>/dev/null || echo "{}")
 
         ai_json=$(echo "$response" | jq -r '.choices[0].message.content' 2>/dev/null || echo "{}")
         # Remove ```json from the beginning and ``` from the end of the response
