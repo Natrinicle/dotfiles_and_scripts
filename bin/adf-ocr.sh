@@ -1,167 +1,200 @@
 #!/usr/bin/env bash
-# Continuous ADF capture → blank-page filter → OCR PDF → optional local LLM title.
-# Tuned for SANE-accessible document scanners (EPSON ES-C320W among others).
-#
-# Dependencies (typical):
-#   sane-utils tesseract-ocr imagemagick img2pdf ocrmypdf poppler-utils
-#   curl jq exiftool (optional LLM + metadata)
-#
-# Env overrides:
-#   ADF_DEVICE_MATCH   grep pattern for scanimage -L (default: EPSON|ADF)
-#   LLM_SERVER_URL     OpenAI-compatible chat completions URL
-#   LLM_MODEL          model name
+# =============================================================================
+# EPSON ES-C320W ADF Scanner → Multi-Load + Local LLM + Robust Naming + Full Cleanup
+# =============================================================================
 
 set -euo pipefail
 
-SCAN_MODE=${SCAN_MODE:-Color}
-SCAN_RESOLUTION=${SCAN_RESOLUTION:-300}
-SCAN_FORMAT=${SCAN_FORMAT:-png}
-IDLE_SECONDS=${MULTI_LOAD_TIMEOUT:-30}
-DEVICE_MATCH=${ADF_DEVICE_MATCH:-'EPSON|ES-C320W|ADF'}
+# -------------------------- Required packages --------------------------
+# sudo apt update && sudo apt install -y \
+#     sane-utils tesseract-ocr tesseract-ocr-eng imagemagick \
+#     img2pdf ocrmypdf bc poppler-utils exiftool jq
 
-LLM_URL=${LLM_SERVER_URL:-http://127.0.0.1:8080/v1/chat/completions}
-LLM_MODEL=${LLM_MODEL:-gemma-3-12b-it}
+# -------------------------- User Settings --------------------------
+SCAN_MODE="Color"
+SCAN_RESOLUTION=300
+SCAN_FORMAT="png"
 
-pick_device() {
-  local listing line
-  listing=$(scanimage -L 2>/dev/null || true)
-  while IFS= read -r line; do
-    if printf '%s\n' "$line" | grep -Eqi "$DEVICE_MATCH"; then
-      # device id is the backtick-quoted token
-      printf '%s\n' "$line" | grep -oP '`\K[^`]+' | head -1
-      return 0
-    fi
-  done <<<"$listing"
-  return 1
+MULTI_LOAD_TIMEOUT=30
+
+# Blank page removal (forgiving for uneven pages)
+MARGIN_TO_SHAVE=80
+BLUR_RADIUS=12
+FUZZ_PERCENT=20%
+MIN_CONTENT_WIDTH=120
+MIN_CONTENT_HEIGHT=80
+
+DEBUG_BLANK=false
+
+# -------------------------- LLM Settings --------------------------
+LLM_SERVER_URL="http://127.0.0.1:11434/v1/chat/completions"
+LLM_MODEL="gemma4:e2b"
+LLM_TEMPERATURE=0.3
+LLM_MAX_TOKENS=2000
+# =============================================================================
+
+find_epson_device() {
+    local device
+    device=$(scanimage -L 2>/dev/null | grep -o 'escl:https\?://[^ ]*EPSON ES-C320W' | head -n1 || echo "")
+    [ -n "$device" ] && { echo "$device"; return 0; }
+    device=$(scanimage -L 2>/dev/null | grep -o 'airscan:[^:]*:EPSON ES-C320W' | head -n1 || echo "")
+    [ -n "$device" ] && { echo "$device"; return 0; }
+    device=$(scanimage -L 2>/dev/null | grep -o 'escl:[^ ]*EPSON ES-C320W' | head -n1 || echo "")
+    echo "$device"
 }
 
-page_count() {
-  ls page_*."${SCAN_FORMAT}" 2>/dev/null | wc -l | tr -d ' '
+count_pages() {
+    ls page_*."${SCAN_FORMAT}" 2>/dev/null | wc -l | tr -d '[:space:]' || echo 0
 }
 
-is_mostly_blank() {
-  local img=$1 dims
-  dims=$(
-    convert "$img" -shave 80x80 -virtual-pixel White -blur 0x12 -fuzz 20% -trim \
-      -format '%w %h' info: 2>/dev/null || echo "0 0"
-  )
-  # shellcheck disable=SC2086
-  set -- $dims
-  local w=${1:-0} h=${2:-0}
-  ((w < 120 || h < 80))
-}
+# -------------------------- Main Script --------------------------
+echo "=== EPSON ES-C320W Continuous Multi-Load Scanner with AI Naming ==="
 
-echo "ADF scan → OCR pipeline"
+WORK_DIR="$(pwd)/scan_$(date +%Y%m%d_%H%M%S)"
+mkdir -p "$WORK_DIR"
+cd "$WORK_DIR"
 
-work=$(pwd)/scan_$(date +%Y%m%d_%H%M%S)
-mkdir -p "$work"
-cd "$work"
+if command -v curl >/dev/null 2>&1; then
+    echo "=== Preloading ${LLM_MODEL} LLM ==="
+    curl -s -X POST "$LLM_SERVER_URL" -H "Content-Type: application/json" -d '{"model": "'"$LLM_MODEL"'"}' >/dev/null 2>&1
+fi
 
-last_ok=$(date +%s)
+echo "=== Starting continuous ADF scan ==="
+
+last_successful_scan=$(date +%s)
 
 while true; do
-  dev=$(pick_device || true)
-  if [[ -z ${dev:-} ]]; then
-    echo "error: no scanner matching /${DEVICE_MATCH}/ from scanimage -L" >&2
-    exit 1
-  fi
-
-  source_help=$(scanimage -d "$dev" --help 2>/dev/null || true)
-  source_arg="Automatic Document Feeder"
-  if printf '%s' "$source_help" | grep -q -- '--source'; then
-    if printf '%s' "$source_help" | grep -qi duplex; then
-      source_arg=$(printf '%s' "$source_help" | grep -oP -- '--source.*?\|?\K[^| ]*[Dd]uplex[^| ]*' | head -1 || true)
+    SCAN_DEVICE=$(find_epson_device)
+    if [ -z "$SCAN_DEVICE" ]; then
+        echo "ERROR: Could not find EPSON ES-C320W."
+        exit 1
     fi
-    if [[ -z ${source_arg:-} ]] || [[ $source_arg == "Automatic Document Feeder" ]]; then
-      source_arg=$(printf '%s' "$source_help" | grep -oP -- '--source *\K[^ ]+' | head -1 || echo "ADF")
+
+    SOURCE_OUTPUT=$(scanimage -d "$SCAN_DEVICE" --help 2>/dev/null | grep -i -- --source || echo "")
+    if [ -z "$SOURCE_OUTPUT" ]; then
+        SELECTED_SOURCE="Automatic Document Feeder"
+    else
+        POSSIBLE_SOURCES=$(echo "$SOURCE_OUTPUT" | sed 's/.*--source *//' | tr '|' '\n' | sed 's/ *\[[^]]*\].*//; s/^[[:space:]]*//; s/[[:space:]]*$//')
+        SELECTED_SOURCE=$(echo "$POSSIBLE_SOURCES" | grep -i "duplex" | head -n1 || echo "")
+        [ -z "$SELECTED_SOURCE" ] && SELECTED_SOURCE=$(echo "$POSSIBLE_SOURCES" | grep -i "ADF" | head -n1 || echo "Automatic Document Feeder")
     fi
-  fi
 
-  before=$(page_count)
-  scanimage --batch="page_%04d.${SCAN_FORMAT}" --format="$SCAN_FORMAT" \
-    --mode="$SCAN_MODE" --resolution="$SCAN_RESOLUTION" --batch-count=0 \
-    --batch-start=$((before + 1)) -d "$dev" --source="$source_arg" 2>&1 || true
-  after=$(page_count)
-  gained=$((after - before))
+    old_count=$(count_pages)
 
-  if ((gained > 0)); then
-    echo "  captured ${gained} page(s) (device ${dev})"
-    last_ok=$(date +%s)
-  else
-    echo "  feeder empty or no new pages"
-  fi
+    scanimage --batch=page_%04d.${SCAN_FORMAT} --format=${SCAN_FORMAT} \
+        --mode=${SCAN_MODE} --resolution=${SCAN_RESOLUTION} --batch-count=0 \
+        --batch-start=$((old_count + 1)) -d "$SCAN_DEVICE" --source="${SELECTED_SOURCE}" 2>&1 || true
 
-  now=$(date +%s)
-  if (((now - last_ok) >= IDLE_SECONDS)); then
-    echo "  idle ${IDLE_SECONDS}s — finishing capture loop"
-    break
-  fi
-  sleep 5
+    new_count=$(count_pages)
+    scanned_this_batch=$((new_count - old_count))
+
+    if [ "$scanned_this_batch" -gt 0 ]; then
+        echo "   ✓ Scanned ${scanned_this_batch} page(s)"
+        last_successful_scan=$(date +%s)
+    else
+        echo "   ADF appears empty."
+    fi
+
+    current_time=$(date +%s)
+    if [ $((current_time - last_successful_scan)) -ge $MULTI_LOAD_TIMEOUT ]; then
+        echo "   Timeout reached. Proceeding..."
+        break
+    fi
+    sleep 5
 done
 
+# -------------------------- Processing --------------------------
 mapfile -t pages < <(printf '%s\n' page_*."${SCAN_FORMAT}" 2>/dev/null | sort -V)
-keep=()
-for page in "${pages[@]:-}"; do
-  [[ -f $page ]] || continue
-  if is_mostly_blank "$page"; then
-    echo "  drop blank: $page"
-    rm -f "$page"
-    continue
-  fi
-  keep+=("$page")
+
+processed=()
+for img in "${pages[@]}"; do
+    if convert "$img" -shave 80x80 -virtual-pixel White -blur 0x12 -fuzz 20% -trim -format "%wx%h" info: 2>/dev/null | \
+       awk -F'x' '{if($1<120 || $2<80) exit 0; else exit 1}'; then
+        echo "→ Removing blank page: $img"
+        rm -f "$img"
+        continue
+    fi
+    processed+=("$img")
 done
 
-if ((${#keep[@]} == 0)); then
-  echo "error: no non-blank pages" >&2
-  cd ..
-  rm -rf "$work"
-  exit 1
-fi
+img2pdf "${processed[@]}" -o intermediate.pdf
+ocrmypdf --language eng --rotate-pages --deskew --clean --optimize 1 --force-ocr intermediate.pdf "temp_ocr.pdf"
 
-img2pdf "${keep[@]}" -o intermediate.pdf
-ocrmypdf --language eng --rotate-pages --deskew --clean --optimize 1 --force-ocr \
-  intermediate.pdf ocr.pdf
+# -------------------------- AI Filename + Full Cleanup --------------------------
+echo "=== Generating smart filename and metadata ==="
 
-base_name=document
-today=$(date +%Y-%m-%d)
-stamp=$(date +%H-%M-%S)
+TODAY=$(date +%Y-%m-%d)
+NOW=$(date +%H-%M-%S)
+base_name="document"
+title="Scanned Document"
+author="Unknown"
+subject="Scanned Document"
+keywords="scanned"
 
-if command -v pdftotext curl jq >/dev/null 2>&1; then
-  pdftotext ocr.pdf text_excerpt.txt 2>/dev/null || true
-  if [[ -s text_excerpt.txt ]]; then
-    excerpt=$(head -c 4000 text_excerpt.txt | tr '\n' ' ')
-    payload=$(jq -n \
-      --arg model "$LLM_MODEL" \
-      --arg excerpt "$excerpt" \
-      '{
-        model: $model,
-        temperature: 0.3,
-        messages: [
-          {role: "system", content: "Reply with JSON only: {\"base_name\": \"short_snake_case_title\"}. No punctuation except underscores."},
-          {role: "user", content: ("Suggest a short filename stem for this document:\n" + $excerpt)}
-        ]
-      }')
-    if resp=$(curl -sS "$LLM_URL" -H 'Content-Type: application/json' -d "$payload" 2>/dev/null); then
-      content=$(printf '%s' "$resp" | jq -r '.choices[0].message.content // empty' 2>/dev/null || true)
-      if [[ -n $content ]]; then
-        # tolerate fenced JSON
-        json_bit=$(printf '%s' "$content" | sed -n '/{/,/}/p' | tr '\n' ' ')
-        stem=$(printf '%s' "$json_bit" | jq -r '.base_name // empty' 2>/dev/null || true)
-        if [[ -n $stem && $stem != null ]]; then
-          base_name=$(printf '%s' "$stem" | tr -cd '[:alnum:]_ -' | tr ' ' '_' | cut -c1-60)
-        fi
-      fi
+if [ -s "temp_ocr.pdf" ] && command -v pdftotext curl jq >/dev/null 2>&1; then
+    pdftotext "temp_ocr.pdf" extracted_text.txt 2>/dev/null || true
+    if [ -s extracted_text.txt ]; then
+        prompt="You are an expert document archivist. Analyze the text below and return **only** valid JSON.
+
+Text:
+$(head -c 15000 extracted_text.txt)
+
+Return this exact JSON:
+{
+  \"base_name\": \"descriptive-filename-using-key-info\",
+  \"title\": \"Full clear title\",
+  \"author\": \"Company or person or Unknown\",
+  \"subject\": \"Document type or short description\",
+  \"keywords\": \"comma,separated,keywords\"
+}"
+
+        response=$(jq -n \
+            --arg model "${LLM_MODEL}" \
+            --arg content "${prompt}" \
+            --argjson temp ${LLM_TEMPERATURE} \
+            --argjson tokens ${LLM_MAX_TOKENS} \
+            '{
+              model: $model,
+              messages: [{role: "user", content: $content}],
+              temperature: $temp,
+              max_tokens: $tokens
+             }' | curl -s -X POST "$LLM_SERVER_URL" \
+            -H "Content-Type: application/json" \
+            -d @- || echo "{}") #2>/dev/null || echo "{}")
+
+        ai_json=$(echo "$response" | jq -r '.choices[0].message.content' 2>/dev/null || echo "{}")
+        # Remove ```json from the beginning and ``` from the end of the response
+        ai_json=$(echo "${ai_json}" | sed -e 's/^```json//' -e 's/^```//' -e 's/```$//')
+
+        base_name=$(echo "$ai_json" | jq -r '.base_name // "document"' 2>/dev/null | tr -cd '[:alnum:][:space:]_-' | tr ' ' '_' || echo "document")
+        title=$(echo "$ai_json" | jq -r '.title // "Scanned Document"' 2>/dev/null | tr -cd '[:alnum:][:space:]_-' || echo "Scanned Document")
+        author=$(echo "$ai_json" | jq -r '.author // "Unknown"' 2>/dev/null | tr -cd '[:alnum:][:space:]_-' || echo "Unknown")
+        subject=$(echo "$ai_json" | jq -r '.subject // "Scanned Document"' 2>/dev/null | tr -cd '[:alnum:][:space:]_-' || echo "Scanned Document")
+        keywords=$(echo "$ai_json" | jq -r '.keywords // "scanned"' 2>/dev/null | tr -cd '[:alnum:][:space:]_-' || echo "scanned")
     fi
-  fi
 fi
 
-[[ -z $base_name ]] && base_name=document
-final_name="${today}_${stamp}_${base_name}.pdf"
-dest="../${final_name}"
-mv -f ocr.pdf "$dest"
-command -v exiftool >/dev/null 2>&1 &&
-  exiftool -overwrite_original -Title="Scanned Document" -Author="Scanner" "$dest" >/dev/null 2>&1 || true
+FINAL_FILENAME="${TODAY}_${NOW}_${base_name}.pdf"
+FINAL_PDF="../${FINAL_FILENAME}"
 
+echo "→ Moving final PDF to: $FINAL_FILENAME"
+
+if mv -f "temp_ocr.pdf" "$FINAL_PDF"; then
+    echo "→ Successfully created final PDF"
+else
+    echo "ERROR: Failed to move final PDF!"
+    exit 1
+fi
+
+# Optional: embed metadata with exiftool
+exiftool -overwrite_original -Title="${title}" -Author="${author}" -Subject "${subject}" -Keywords "${keywords}" "$FINAL_PDF" 2>/dev/null || true
+
+# Full cleanup
+echo "=== Cleaning up temporary directory ==="
 cd ..
-rm -rf "$work"
-echo "done: $(realpath "$dest" 2>/dev/null || echo "$dest")"
+rm -rf "$WORK_DIR" 2>/dev/null || true
+
+echo "======================================================================"
+echo "✅ DONE!"
+echo "   Final PDF: $(realpath "$FINAL_PDF" 2>/dev/null || echo "$FINAL_PDF")"
+echo "======================================================================"
