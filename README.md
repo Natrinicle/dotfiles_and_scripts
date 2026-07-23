@@ -108,6 +108,13 @@ and verification helpers such as `check-work` / `code-review`
 Memory paths: resolve `~/.claude/memory` or `~/.grok/memory` (often one
 symlinked tree).
 
+[!WARNING] I did not copy these from other employers but had my own AI generate
+them based on some of the ideas I came into contact with or based on my own
+personal use case. Some of them might not be fully fleshed out because I fed in
+ideas and gotchas that I hit to my own but don't have access to these tools
+to test them against personally. You might need to iterate a few times and PRs
+are definitely welcome!
+
 See `agent/examples/EXCLUDED.md` for large or non-portable items left out of this pack.
 
 ## Placeholders
