@@ -1,3 +1,29 @@
+# Shared prefix helper (rootful vs rootless)
+_docker_overlay_prefix() {
+    if [ "$(id -u)" -eq 0 ]; then
+        echo "/var/lib"
+    else
+        echo "${HOME}/.local/share"
+    fi
+}
+
+# Human-readable size helper
+_hr() {
+    if command -v numfmt >/dev/null 2>&1; then
+        numfmt --to=iec-i --suffix=B "$1" 2>/dev/null || echo "${1}B"
+    else
+        local b=${1:-0}
+        if   [ "$b" -ge 1073741824 ]; then printf "%.1fGiB" "$(echo "scale=1; $b/1073741824" | bc)"
+        elif [ "$b" -ge 1048576 ];    then printf "%.1fMiB" "$(echo "scale=1; $b/1048576"    | bc)"
+        elif [ "$b" -ge 1024 ];       then printf "%.1fKiB" "$(echo "scale=1; $b/1024"       | bc)"
+        else echo "${b}B"
+        fi
+    fi
+}
+
+# Collect and show the sizes of all the layers
+# in a Docker container image using the manifest
+# from the registry.
 dockersize ()
 {
     docker manifest inspect -v "$1" | jq -c 'if type == "array" then .[] else . end | select(.Descriptor.platform.architecture != "unknown")' | jq -r '[ ( .Descriptor.platform | [ .os, .architecture, .variant, ."os.version" ] | del(..|nulls) | join("/") ), ( [ ( .OCIManifest // .SchemaV2Manifest ).layers[].size ] | add ) ] | join(" ")' | numfmt --to iec --format '%.2f' --field 2 | sort | column -t
@@ -11,3 +37,153 @@ if cmds_exist curl; then
     curl -s "https://${docker_reg}/v2/${docker_image}/tags/list" | jq --raw-output '."tags"'
   }
 fi
+
+# Main list: Name | Merged Size | Upper Size | Lower Size | Base Path
+docker_overlays() {
+    docker inspect $(docker ps -qa) 2>/dev/null | jq -r '
+        map(select(.GraphDriver.Data != null)) |
+        .[] |
+        [
+            (.Name | ltrimstr("/")),
+            .GraphDriver.Data.UpperDir,
+            .GraphDriver.Data.LowerDir,
+            (.GraphDriver.Data.MergedDir | sub("/merged$"; ""))
+        ] | @tsv
+    ' | while IFS=$'\t' read -r name upper lower base; do
+        # Upper size (always a single directory)
+        u_bytes=$(du -sb "$upper" 2>/dev/null | cut -f1 || echo 0)
+
+        # Lower size – may be colon-separated list of layers
+        l_bytes=0
+        if [[ "$lower" == *:* ]]; then
+            IFS=':' read -ra parts <<< "$lower"
+            for p in "${parts[@]}"; do
+                [ -e "$p" ] || continue
+                s=$(du -sb "$p" 2>/dev/null | cut -f1)
+                l_bytes=$((l_bytes + ${s:-0}))
+            done
+        else
+            l_bytes=$(du -sb "$lower" 2>/dev/null | cut -f1 || echo 0)
+        fi
+
+        m_bytes=$((u_bytes + l_bytes))
+
+        printf "%-30s  %-10s  %-10s  %-10s  %s\n" \
+            "$name" \
+            "$(_hr "$m_bytes")" \
+            "$(_hr "$u_bytes")" \
+            "$(_hr "$l_bytes")" \
+            "$base"
+    done | {
+        # header
+        printf "%-30s  %-10s  %-10s  %-10s  %s\n" \
+            "Name" "Merged" "Upper (RW)" "Lower (RO)" "Path"
+        printf "%-30s  %-10s  %-10s  %-10s  %s\n" \
+            "----" "------" "----------" "----------" "----"
+        cat
+    }
+}
+
+# Single container version
+# Usage: docker_overlay ai-stack-open-webui-1
+docker_overlay() {
+    if [ -z "$1" ]; then
+        echo "Usage: docker_overlay <container_name_or_id>" >&2
+        return 1
+    fi
+
+    docker inspect "$1" 2>/dev/null | jq -r '
+        .[0] |
+        select(.GraphDriver.Data != null) |
+        [
+            (.Name | ltrimstr("/")),
+            .GraphDriver.Data.UpperDir,
+            .GraphDriver.Data.LowerDir,
+            (.GraphDriver.Data.MergedDir | sub("/merged$"; ""))
+        ] | @tsv
+    ' | while IFS=$'\t' read -r name upper lower base; do
+        u_bytes=$(du -sb "$upper"  2>/dev/null | cut -f1 || echo 0)
+
+        l_bytes=0
+        if [[ "$lower" == *:* ]]; then
+            IFS=':' read -ra parts <<< "$lower"
+            for p in "${parts[@]}"; do
+                [ -e "$p" ] || continue
+                s=$(du -sb "$p" 2>/dev/null | cut -f1)
+                l_bytes=$((l_bytes + ${s:-0}))
+            done
+        else
+            l_bytes=$(du -sb "$lower" 2>/dev/null | cut -f1 || echo 0)
+        fi
+
+        m_bytes=$((u_bytes + l_bytes))
+
+        printf "Name:        %s\n" "$name"
+        printf "Merged:      %s\n" "$(_hr "$m_bytes")"
+        printf "Upper (RW):  %s\n" "$(_hr "$u_bytes")"
+        printf "Lower (RO):  %s\n" "$(_hr "$l_bytes")"
+        printf "Base path:   %s\n" "$base"
+    done
+}
+
+# Optional: sort the table by one of the size columns
+# Usage:
+#   docker_overlays_by_size_of          # default = upper
+#   docker_overlays_by_size_of merged
+#   docker_overlays_by_size_of upper
+#   docker_overlays_by_size_of lower
+docker_overlays_by_size_of() {
+    local which="${1:-upper}"
+    case "$which" in
+        merged|upper|lower) ;;
+        *)
+            echo "Usage: docker_overlays_by_size_of [merged|upper|lower]  (default: upper)" >&2
+            return 1
+            ;;
+    esac
+
+    # Re-use the same logic but collect + sort
+    docker inspect $(docker ps -qa) 2>/dev/null | jq -r '
+        map(select(.GraphDriver.Data != null)) |
+        .[] |
+        [
+            (.Name | ltrimstr("/")),
+            .GraphDriver.Data.UpperDir,
+            .GraphDriver.Data.LowerDir,
+            (.GraphDriver.Data.MergedDir | sub("/merged$"; ""))
+        ] | @tsv
+    ' | while IFS=$'\t' read -r name upper lower base; do
+        u_bytes=$(du -sb "$upper"  2>/dev/null | cut -f1 || echo 0)
+
+        l_bytes=0
+        if [[ "$lower" == *:* ]]; then
+            IFS=':' read -ra parts <<< "$lower"
+            for p in "${parts[@]}"; do
+                [ -e "$p" ] || continue
+                s=$(du -sb "$p" 2>/dev/null | cut -f1)
+                l_bytes=$((l_bytes + ${s:-0}))
+            done
+        else
+            l_bytes=$(du -sb "$lower" 2>/dev/null | cut -f1 || echo 0)
+        fi
+
+        m_bytes=$((u_bytes + l_bytes))
+
+        case "$which" in
+            merged) key=$m_bytes ;;
+            upper)  key=$u_bytes ;;
+            lower)  key=$l_bytes ;;
+        esac
+
+        printf "%s\t%s\t%s\t%s\t%s\t%s\n" \
+            "$key" "$name" "$(_hr "$m_bytes")" "$(_hr "$u_bytes")" "$(_hr "$l_bytes")" "$base"
+    done | sort -n | while IFS=$'\t' read -r _ name m u l path; do
+        printf "%-30s  %-10s  %-10s  %-10s  %s\n" "$name" "$m" "$u" "$l" "$path"
+    done | {
+        printf "%-30s  %-10s  %-10s  %-10s  %s\n" \
+            "Name" "Merged" "Upper (RW)" "Lower (RO)" "Path"
+        printf "%-30s  %-10s  %-10s  %-10s  %s\n" \
+            "----" "------" "----------" "----------" "----"
+        cat
+    }
+}
