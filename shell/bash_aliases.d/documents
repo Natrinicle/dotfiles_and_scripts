@@ -1,0 +1,11 @@
+if cmds_exist pandoc; then
+  md2pdf() {
+    if [[ -z "$1" ]]; then
+      echo "Usage: md2pdf <file.md>"
+      return 1
+    fi
+    local input="$1"
+    local output="${input%.md}.pdf"
+    pandoc "$input" -o "$output" --pdf-engine=xelatex
+  }
+fi
