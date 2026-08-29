@@ -33,7 +33,7 @@ identity out of exports via `${HOME}` / `{…}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # ~18 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # ~32 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # ~34 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -100,8 +100,9 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 `model-routing`, `message-scanning`, `readme-freshness`,
 `memory-scope-review`, `lazy-load-data` (`{MEMORY_ROOT}`), etc.
 
-**Skills** (~32) include packaging, scanners, PII detection, MemPalace, Tofu
+**Skills** (~34) include packaging, scanners, PII detection, MemPalace, Tofu
 plan review, Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
+Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
 and verification helpers such as `check-work` / `code-review`
 (usable on either platform).
 
