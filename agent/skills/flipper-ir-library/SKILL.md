@@ -14,8 +14,9 @@ photos, a README at every directory, and `.ir` files that actually load on the
 Flipper. Discrete label text (FCC, model, serial) is transcribed and verified;
 it is never trusted to an image model.
 
-If the `.ir` is raw / unparsed / AC-state (not NEC, NECext, Samsung32, RC5, RC6),
-load **decoding-ir-protocols** before writing the unit README.
+If the `.ir` is raw / unparsed / AC-state (not NEC, NECext, Samsung32, RC5, RC6,
+SIRC, SIRC15, SIRC20), load **decoding-ir-protocols** before writing the unit
+README. Parsed SIRC is a button map, same as NEC.
 
 ## Pack root
 
@@ -42,8 +43,10 @@ New folders: `Air_V` not `Air V`. Leave existing spaced names; encode spaces as
 1. Place the capture and photos in `Infrared/<Type>/<Brand>/<Model>/`.
 2. If Flipper saved `type: raw` (or the remote is HVAC/AC/state-based), decode
    with **decoding-ir-protocols** first. Do not invent buttons.
-3. Clean photos per `references/photos.md`. Transcribe the rating plate **before**
-   any AI edit. Lookup FCC. Strip GPS. Rename `IMG*.jpg`.
+3. Clean photos per `references/photos.md` (cutout procedure for dense I/O).
+   Transcribe the rating plate **before** any AI edit. Lookup FCC. Strip GPS.
+   Keep camera originals in the unit folder as `Name.ignore.jpg` (gitignored
+   via `*.ignore.*`). Do not delete them.
 4. Write the unit README (button map, protocol, IDs). If an encode script is
    required, say so and that Flipper cannot send it as parsed NEC.
 5. Ensure a README exists at **every** ancestor (`Infrared/`, type, brand, model)
@@ -56,7 +59,17 @@ New folders: `Air_V` not `Air V`. Leave existing spaced names; encode spaces as
 - Redraw button icons or rating-plate glyphs with an image model.
 - Composite tiny stickers (QC ovals, round seals) onto an AI-cleaned body —
   that produces ghosted/duplicated labels. Omit them; transcribe in the README.
-- Commit camera originals with GPS EXIF.
+- Warp an oblique camera original onto a straight-on cleaned body. Screws,
+  ear corners, and plate baselines will not line up (duplicate screws, dropped
+  labels). Ask for a matching-angle shot instead.
+- Paint over screws or chassis edges to hide a hand or background. That
+  pixelates the hardware. Recut the mask; leave a sliver of hand if needed.
+- Trace a dense I/O bottom (HDMI / DIGITAL OUT) per-column by luminance.
+  That punches white holes in the legends. Use a smooth polyline under the lip.
+- Erode (`MinFilter`) a chassis mask. It chews ear screws and corners.
+- Put TV-only keys (TV input, TV power, volume on SIRC address `01`) in a
+  player `.ir`. They are not the Blu-ray. Leave them unmapped.
+- Commit camera originals with GPS EXIF. Keep them as `*.ignore.*` instead.
 - Leave a new folder without a README, or a parent README that still points at
   the old path.
 - Synthesize IR codes unless **decoding-ir-protocols** proved the field. Mark
@@ -70,7 +83,8 @@ personal names into new files.
 
 ## Additional resources
 
-- `references/photos.md` — deskew, background, dirt, FCC, GPS, QC ghosting
+- `references/photos.md` — deskew, background, dirt, FCC, GPS, QC ghosting,
+  source-angle match, overlay hallucinations
 - `references/readme-tree.md` — index README templates and 404 rules
 - `scripts/check_readme_links.py` — relative Markdown link checker
 - **decoding-ir-protocols** — raw capture bit maps and encode scripts
