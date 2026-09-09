@@ -6,26 +6,129 @@ if cmds_exist xz; then
   alias xz="xz -T0"
 fi
 
-extract () {
-  if [ -f $1 ] ; then
-    case $1 in
-      *.tar.bz2)   tar xjf $1     ;;
-      *.tar.gz)    tar xzf $1     ;;
-      *.tar.xz)    tar xf $1      ;;
-      *.tar.zst)   unzstd $1      ;;
-      *.bz2)       bunzip2 $1     ;;
-      *.deb)       ar x $1        ;;
-      *.rar)       unrar e $1     ;;
-      *.gz)        gunzip $1      ;;
-      *.tar)       tar xf $1      ;;
-      *.tbz2)      tar xjf $1     ;;
-      *.tgz)       tar xzf $1     ;;
-      *.zip)       unzip $1       ;;
-      *.Z)         uncompress $1  ;;
-      *.7z)        7z x $1        ;;
-      *)     echo "'$1' cannot be extracted via extract()" ;;
-    esac
-  else
-    echo "'$1' is not a valid file"
+# extract — unpack an archive using magic bytes first, then the filename.
+# Usage: extract ARCHIVE
+extract() {
+  if [ "$#" -lt 1 ]; then
+    echo "usage: extract FILE" >&2
+    return 2
   fi
+
+  local f="$1"
+  if [ ! -f "$f" ]; then
+    echo "'$f' is not a valid file" >&2
+    return 1
+  fi
+
+  # mime of the bytes on disk; inner mime if file can look through compression
+  local mime inner_mime desc
+  mime=$(file -b --mime-type -- "$f" 2>/dev/null || true)
+  inner_mime=$(file -bz --mime-type -- "$f" 2>/dev/null || true)
+  desc=$(file -b -- "$f" 2>/dev/null || true)
+
+  _extract_by_kind() {
+    local kind="$1"
+    case "$kind" in
+      tar.bz2|tbz2) tar xjf -- "$f" ;;
+      tar.gz|tgz)   tar xzf -- "$f" ;;
+      tar.xz)       tar xf  -- "$f" ;;
+      tar.zst)      tar --use-compress-program=unzstd -xf -- "$f" ;;
+      tar)          tar xf  -- "$f" ;;
+      bz2)          bunzip2 -- "$f" ;;
+      gz)           gunzip  -- "$f" ;;
+      xz)           unxz    -- "$f" ;;
+      zst)          unzstd  -- "$f" ;;
+      zip)          unzip   -- "$f" ;;
+      rar)          unrar e -- "$f" ;;
+      7z)           7z x -- "$f" ;;
+      Z)            uncompress -- "$f" ;;
+      deb)          ar x -- "$f" ;;
+      *)            return 1 ;;
+    esac
+  }
+
+  _kind_from_mime() {
+    local m="$1" inner="$2"
+    case "$m" in
+      application/gzip|application/x-gzip)
+        case "$inner" in
+          application/x-tar|application/x-gtar) echo tar.gz ;;
+          *) echo gz ;;
+        esac
+        ;;
+      application/x-bzip2|application/bzip2)
+        case "$inner" in
+          application/x-tar|application/x-gtar) echo tar.bz2 ;;
+          *) echo bz2 ;;
+        esac
+        ;;
+      application/x-xz|application/xz)
+        case "$inner" in
+          application/x-tar|application/x-gtar) echo tar.xz ;;
+          *) echo xz ;;
+        esac
+        ;;
+      application/zstd|application/x-zstd)
+        case "$inner" in
+          application/x-tar|application/x-gtar) echo tar.zst ;;
+          *) echo zst ;;
+        esac
+        ;;
+      application/x-tar|application/x-gtar) echo tar ;;
+      application/zip|application/x-zip-compressed) echo zip ;;
+      application/x-rar|application/vnd.rar|application/x-rar-compressed) echo rar ;;
+      application/x-7z-compressed) echo 7z ;;
+      application/x-compress|application/x-compressed) echo Z ;;
+      application/vnd.debian.binary-package|application/x-debian-package) echo deb ;;
+      *)
+        # some `file` builds only put the inner type in the description
+        case "$desc" in
+          *'tar archive'*)
+            case "$m" in
+              application/gzip|application/x-gzip) echo tar.gz ;;
+              application/x-bzip2|application/bzip2) echo tar.bz2 ;;
+              application/x-xz|application/xz) echo tar.xz ;;
+              application/zstd|application/x-zstd) echo tar.zst ;;
+              *) echo tar ;;
+            esac
+            ;;
+          *) return 1 ;;
+        esac
+        ;;
+    esac
+  }
+
+  _kind_from_name() {
+    case "$f" in
+      *.tar.bz2|*.tbz2) echo tar.bz2 ;;
+      *.tar.gz|*.tgz)   echo tar.gz ;;
+      *.tar.xz)         echo tar.xz ;;
+      *.tar.zst)        echo tar.zst ;;
+      *.tar)            echo tar ;;
+      *.bz2)            echo bz2 ;;
+      *.gz)             echo gz ;;
+      *.xz)             echo xz ;;
+      *.zst)            echo zst ;;
+      *.zip)            echo zip ;;
+      *.rar)            echo rar ;;
+      *.7z)             echo 7z ;;
+      *.Z)              echo Z ;;
+      *.deb)            echo deb ;;
+      *)                return 1 ;;
+    esac
+  }
+
+  local kind
+  kind=$(_kind_from_mime "$mime" "$inner_mime") || kind=""
+  if [ -n "$kind" ] && _extract_by_kind "$kind"; then
+    return 0
+  fi
+
+  kind=$(_kind_from_name) || kind=""
+  if [ -n "$kind" ] && _extract_by_kind "$kind"; then
+    return 0
+  fi
+
+  echo "'$f' cannot be extracted via extract() (mime=${mime:-unknown})" >&2
+  return 1
 }
