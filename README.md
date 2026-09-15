@@ -6,7 +6,7 @@ Portable toolkit with two layers:
 2. **Agent** — Claude/Grok **rules** and **skills** with portable path placeholders  
 
 Optional packaging helpers (`package-toolkit`) keep absolute homes and local
-identity out of exports via `${HOME}` / `{…}` placeholders.
+identity out of exports via `${HOME}` / `{...}` placeholders.
 
 ## Benefits
 
@@ -33,7 +33,7 @@ identity out of exports via `${HOME}` / `{…}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # ~19 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # ~35 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # ~36 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -102,9 +102,10 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 `skill-toolkit-sync` (copy skill/rule edits into the current toolkit, then
 ask about other toolkit repos), etc.
 
-**Skills** (~35) include packaging, scanners, PII detection, MemPalace, Tofu
+**Skills** (~36) include packaging, scanners, PII detection, MemPalace, Tofu
 plan review, Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
+printable pages (`printable-webpage`),
 verification helpers such as `check-work` / `code-review`,
 and `decision-judge` (parent-as-judge, 2- or 4-advocate court)
 (usable on either platform).
