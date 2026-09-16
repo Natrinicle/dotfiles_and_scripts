@@ -69,6 +69,12 @@ html, body {
   min-width: 0;
 }
 
+.card.span {
+  grid-column: 1 / -1;
+  border: none;
+  padding: 1pt 0;
+}
+
 .card .step-label {
   font: 700 7.5pt/1.2 "Liberation Sans", Helvetica, Arial, sans-serif;
   letter-spacing: 0.04em;
@@ -77,7 +83,7 @@ html, body {
   margin: 0 0 4pt 0;
 }
 
-/* Photo well. Image is centered and clipped so it never paints the card border. */
+/* Photo well — image is centered and clipped so it never paints the card border. */
 .photo {
   display: flex;
   align-items: center;
