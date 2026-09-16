@@ -2,7 +2,7 @@
 name: printable-webpage
 description: Convert a webpage into a compact printable PDF. Use when asked for a printer-friendly page, to strip ads and menus, to pack how-to steps or recipes onto fewer pages, or to print a URL with a clean title and source citation. Comments are omitted unless the user asks to include them.
 metadata:
-  version: "1.0"
+  version: "1.1"
   type: workflow
 ---
 
@@ -35,7 +35,7 @@ python3 {AGENT_SKILLS}/printable-webpage/scripts/webpage_to_print.py \
 
 Add `--comments` only when requested. `--page-size a4` if asked. `--html-out path.html` keeps the intermediate print HTML for inspection.
 
-3. If the script reports a weak extraction (few blocks, no images on an image-heavy page, title equals the site name), fall back to a live browser extract:
+3. The script already retries JS-heavy or blocked pages with Chrome `--dump-dom`. If it still reports a weak extraction (few blocks, no images on an image-heavy page, title equals the site name), fall back to a live browser extract:
    - Open the URL in a browser tool.
    - Run the snippet in `references/browser-extract.js`.
    - Write the JSON to a temp file.
@@ -65,7 +65,7 @@ Details and CSS knobs live in `references/extraction-and-layout.md`.
 ## Runtime dependencies (not vendored)
 
 - Python: stdlib plus `requests`, `bs4`, `lxml`, `Pillow`
-- `google-chrome` or `chromium` on PATH for `--print-to-pdf`
+- `google-chrome` or `chromium` on PATH for `--print-to-pdf` and JS-shell `--dump-dom`
 
 Do not install new Python packages for a normal run.
 

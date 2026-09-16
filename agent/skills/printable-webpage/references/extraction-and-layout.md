@@ -5,19 +5,21 @@ Loaded when the converter produced a weak PDF or the user wants a layout change.
 ## Extraction order
 
 1. `requests` GET with a desktop UA, 25s timeout, size cap 8 MiB.
-2. `lxml` / `bs4` parse.
-3. Drop `script`, `style`, `noscript`, `iframe`, `form`, `button`, `input`, `nav`, `footer`, `aside`, `[role=navigation]`, `[role=banner]`, `[role=complementary]`.
-4. Drop nodes whose `id`/`class` match (case-insensitive):
+2. If the response is blocked (401/403/429), empty, or a JS app shell (almost no `<p>`/`<img>`, several `<script>` tags), retry with Chrome `--headless --dump-dom --virtual-time-budget=20000`.
+3. `lxml` / `bs4` parse.
+4. Drop `script`, `style`, `noscript`, `iframe`, `form`, `button`, `input`, `nav`, `footer`, `aside`, `[role=navigation]`, `[role=banner]`, `[role=complementary]`.
+5. Drop nodes whose `id`/`class` match (case-insensitive):
 
-   `nav`, `menu`, `sidebar`, `advert`, `adsbygoogle`, `cookie`, `social`, `share`, `related`, `popular`, `recommend`, `subscribe`, `newsletter`, `popup`, `modal`, `breadcrumb`, `header-wrap`, `sitenav`, `translate`.
+   `nav`, `menu`, `sidebar`, `advert`, `adsbygoogle`, `cookie`, `social`, `share`, `related`, `popular`, `recommend`, `subscribe`, `newsletter`, `popup`, `modal`, `breadcrumb`, `header-wrap`, `sitenav`, `translate`, `comment`, `consent`, `onetrust`.
 
-5. Score remaining containers (`article`, `main`, `#content`, `.post`, `.entry`, `#main`, body descendants) by:
+   Keep large wrappers (lots of paragraphs) even if a hashed class happens to contain `nav`/`menu`.
+6. Score remaining containers (`article`, `main`, `#content`, `.post`, `.entry`, `#main`, news body selectors, body descendants) by:
 
    `text_chars + 400*images + 80*paragraphs - 3*link_chars`
 
-   Reject nodes with link-density above 0.55 unless they also have several large images.
-6. Walk the winning container in document order into blocks — `heading`, `para`, `figure` (img + nearest caption / preceding step sentence), `list`.
-7. Comments are a separate pass over `#comments`, `.comments`, `.comment-list`, `#disqus_thread` clones that already rendered as HTML. Default discarded.
+   Reject nodes with link-density above 0.55 unless they also have several large images. Zero-score cookie/consent dialogs.
+7. Walk the winning container in document order into blocks — `heading`, `para`, `figure` (img + nearest caption / preceding step sentence), `list`.
+8. Comments are a separate pass over `#comments`, `.comments`, `.comment-list`, `#disqus_thread` clones that already rendered as HTML. Default discarded.
 
 ## Image keep / drop
 
@@ -33,6 +35,7 @@ Drop when:
 - Host looks like an ad network
 - File is a sidebar 100px "most popular" thumb while larger article images exist
 - Duplicate of an already-kept URL (ignore query-cache-busters)
+- Share-button art (`share_face`, `/img/share`)
 
 Upgrade `/thumbnails/foo.jpg` → `/foo.jpg` when the larger sibling returns 200 and is an image.
 
@@ -53,10 +56,10 @@ Page size is set with `@page { size: letter; }` or `a4`. Chrome `--print-to-pdf`
 
 ## Weak-extraction fallback
 
-Use `references/browser-extract.js` in a live browser tool when:
+`--dump-dom` covers most client-rendered how-tos. Use `references/browser-extract.js` in a live browser tool when dump-dom is still thin:
 
-- requests is blocked / returns a cookie wall
-- the article is client-rendered
+- cookie / station-picker / Cloudflare interstitial
+- comments-only leftover after chrome strip
 - the script kept fewer than 2 content images on a page that visibly has a step gallery
 
 Save the returned JSON and run:
