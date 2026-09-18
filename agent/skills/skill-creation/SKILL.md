@@ -19,5 +19,8 @@ description: Write lean skills with strong triggers and only non-obvious project
 
 ## Structure
 
-Frontmatter (`name`, `description`), overview, decision rules, anti-patterns unique
-to this environment, references. Register discoverability where the host expects it.
+Required frontmatter is `name` and `description` (include trigger phrases).
+`applies-to` is optional. Overview, decision rules, environment-specific
+anti-patterns, references. Do not register skills in `packages/ide/AGENTS.md`;
+discoverability is the description. Follow bundled `skill-design-principles`
+when the host provides it.
