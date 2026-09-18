@@ -33,7 +33,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # ~19 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # ~36 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # ~37 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -53,6 +53,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 | `deb_pkg` | apt/dpkg wrappers |
 | `direnv` | direnv hook |
 | `docker` | image size / registry tags |
+| `documents` | `md2pdf` (pandoc + XeLaTeX) |
 | `filesystem` | fsck, open-files, dig-holes, `cpv` |
 | `firewall` | ufw cleanup |
 | `git` | stats + reset helper |
@@ -102,10 +103,11 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 `skill-toolkit-sync` (copy skill/rule edits into the current toolkit, then
 ask about other toolkit repos), etc.
 
-**Skills** (~36) include packaging, scanners, PII detection, MemPalace, Tofu
+**Skills** (~37) include packaging, scanners, PII detection, MemPalace, Tofu
 plan review, Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
 printable pages (`printable-webpage`),
+resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
 and `decision-judge` (parent-as-judge, 2- or 4-advocate court)
 (usable on either platform).
