@@ -15,7 +15,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 | **Modular aliases** | `shell/bash_aliases.d/*` by concern |
 | **Agent portability** | Rules + skills load under `~/.claude` and `~/.grok` |
 | **Safe to share** | Secrets and machine-local paths kept out; optional LDAP is example-only |
-| **Installable** | `install.sh --shell` / `--agent` / `--all` with backups |
+| **Installable** | `install.sh --shell` / `--agent` / `--all`; skips existing files unless `--force`; Grok links to Claude |
 | **Reusable packager** | Ship `package-toolkit` so others can re-export their own trees |
 
 ## What's where
@@ -92,8 +92,8 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 
 | Pack path | Installs to |
 |-----------|-------------|
-| `agent/rules/*` | `~/.claude/rules/` **and** `~/.grok/rules/` |
-| `agent/skills/*` | `~/.claude/skills/` **and** `~/.grok/skills/` |
+| `agent/rules/*` | `~/.claude/rules/` (Grok `~/.grok/rules` is a symlink to that tree) |
+| `agent/skills/*` | `~/.claude/skills/<name>/` (each Grok skill is a symlink to the Claude copy) |
 
 **Rules** include: `code-quality`, `security`, `shell`, `python`, `ansible`,
 `terraform`, `helm-k8s`, `iac-plan-analysis`, `otel-instrumentation`,
@@ -151,13 +151,20 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 ```bash
 cd /path/to/dotfiles_and_scripts
 ./install.sh --dry-run
-./install.sh --all              # shell + bin + agent
+./install.sh --all              # shell + bin + agent; skip files that already exist
+./install.sh --agent            # add missing skills/rules only
+./install.sh --agent --force    # replace live files (backs up first; will clobber expanded skills with pack stubs)
 # or selectively:
 ./install.sh --shell --bin
-./install.sh --agent
 source ~/.bashrc                # after shell install
 # restart Claude Code / Grok after --agent
 ```
+
+Default install **does not overwrite**. Live Claude/Grok skills are often longer
+than the sanitized pack stubs; `--force` is required to replace them. Grok
+never gets a second copy of a skill — only a symlink to `~/.claude`. Pack stubs
+that would hide a Grok bundled skill of the same name (`imagine`, `create-skill`,
+`code-review`, …) are skipped unless `--force`.
 
 Optional directory helpers:
 
