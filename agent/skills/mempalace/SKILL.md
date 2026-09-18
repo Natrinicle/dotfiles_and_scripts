@@ -1,6 +1,10 @@
 ---
 name: mempalace
-description: Mine projects and conversations into a local searchable memory palace.
+description: >
+  Mine projects and conversations into a local searchable memory palace.
+  Also use when asked to save all findings to MemPalace, save relevant details
+  to MemPalace, save findings into MemPalace, update MemPalace with any
+  relevant findings, or save all these findings to MemPalace.
 ---
 
 # MemPalace
