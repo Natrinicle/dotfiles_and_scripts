@@ -10,3 +10,6 @@ These examples are designed to work with the `md2pdf` helper defined in `shell/b
 
 ```bash
 md2pdf <file.md>
+```
+
+`resume.md` here uses the same XeLaTeX header as `agent/skills/resume-tailor`. Fill `references/facts.md` from that skill's `facts.example.md` before tailoring a real resume. The helper needs `pandoc` and XeLaTeX on PATH.
