@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Classify a compiled APK/XAPK/IPA/ELF/firmware blob and print likely
+# protocol sources. Wrapper around reverse-engineering-protocols unpack_artifact.py
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+candidates=(
+	"${HOME}/.claude/skills/reverse-engineering-protocols/scripts/unpack_artifact.py"
+	"${here}/../agent/skills/reverse-engineering-protocols/scripts/unpack_artifact.py"
+)
+
+for script in "${candidates[@]}"; do
+	if [[ -f $script ]]; then
+		exec python3 "$script" "$@"
+	fi
+done
+
+echo "unpack_artifact.py not found (install reverse-engineering-protocols)" >&2
+exit 1
