@@ -29,11 +29,11 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # Authored scripts (+ voice-recorder)
+├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # ~19 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # ~37 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # ~20 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # ~40 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -83,6 +83,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 | `speakr-api` / `speakr-poll` / `speakr-notes-append` | Speakr recording API helpers |
 | `slack-auth-check` | Messaging auth preflight |
 | `docker-service-check.sh` | Docker service health check |
+| `unpack-artifact` | Classify APK/XAPK/IPA/ELF/firmware and print likely protocol sources |
 
 Skills reference these as **PATH commands**, not a vendor-specific scripts directory.
 See `agent/PATHS.md` for `{MEMORY_ROOT}`, `{AGENT_HOME}`, etc.
@@ -101,11 +102,14 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 `model-routing`, `message-scanning`, `readme-freshness`,
 `memory-scope-review`, `lazy-load-data` (`{MEMORY_ROOT}`),
 `skill-toolkit-sync` (copy skill/rule edits into the current toolkit, then
-ask about other toolkit repos), etc.
+ask about other toolkit repos), `skill-composition` (sub-skills, do not
+broaden one skill across IR vs APK vs firmware), etc.
 
-**Skills** (~37) include packaging, scanners, PII detection, MemPalace, Tofu
+**Skills** (~40) include packaging, scanners, PII detection, MemPalace, Tofu
 plan review, Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
+compiled-app unpack (`reverse-engineering-protocols`, then
+`decompile-mobile-app` / `decompile-firmware`),
 printable pages (`printable-webpage`),
 resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,

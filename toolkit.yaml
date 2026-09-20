@@ -1,5 +1,5 @@
 name: dotfiles_and_scripts
-version: "0.6.6"
+version: "0.6.7"
 description: >
   Portable shell environment and shared agent rules/skills for Claude Code and Grok,
   written generically with path placeholders and no employer-specific playbooks.
@@ -23,5 +23,5 @@ install:
   backup: true
   overwrite: false
 
-agent_skills_included: 37
-agent_rules_included: 19
+agent_skills_included: 40
+agent_rules_included: 20
