@@ -1,21 +1,25 @@
 ---
 name: decoding-ir-protocols
 description: >
-  Use when Flipper saved a raw .ir that is not parsed NEC/Samsung/RC5/RC6; when
-  decoding AC, HVAC, ceiling cassette, or other state-based infrared remotes;
+  Use when Flipper saved a raw .ir that is not parsed NEC/NECext/Samsung32/RC5/RC6/SIRC/SIRC15/SIRC20; when
+  decoding AC, HVAC, ceiling cassette, Carrier-style, or other state-based infrared remotes;
   when temperature, fan, mode, or timer captures need a bit map; or when writing
-  an encode script for custom Flipper IR codes.
+  an encode script for custom Flipper IR codes. Not for parsed NEC pack layout
+  (flipper-ir-library) or APK/firmware unpack.
 ---
 
 # Decoding IR protocols
+
+**Parsed / basic NEC (and pack layout, photos, README tree):**
+**flipper-ir-library**. This skill is **raw / state / advanced** (Carrier-style
+36-bit, invert-middle triples, timers). Do not fold APK unpack into this file.
 
 State-based remotes (HVAC, many projectors with long frames) send a **snapshot**
 of the whole UI, not “temp up.” Flipper stores them as `type: raw`. Decode the
 bit map from captures; do not guess NEC address/command.
 
-Packaging photos and the README tree is **flipper-ir-library**. This skill
-stops at: payloads, field map, encode script, which buttons are learned vs
-synthesized.
+This skill stops at: payloads, field map, encode script, which buttons are
+learned vs synthesized.
 
 ## Workflow
 
