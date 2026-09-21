@@ -34,6 +34,206 @@ if cmds_exist sudo; then
     alias upgrade="${APT_CMD} update -qq --allow-releaseinfo-change && ${APT_CMD} upgrade --with-new-pkgs"
     alias apt-quiet-upgrade="DEBIAN_FRONTEND=noninteractive ${APT_CMD} -y -o Dpkg::Options::='--force-confdef' -o Dpkg::Options::='--force-confold' upgrade"
 
+    # Name the installed packages that keep dist-upgrade from moving.
+    # Apt 3's default solver lists the whole dependency cluster as
+    # "Not upgrading" and does not say which package blocks it. A
+    # read-only simulation with the classic resolver prints the packages
+    # it would remove. Uses command apt-get so the sudo alias is not applied.
+    function apt-why-held () {
+      local out err parsed summary kind name why sim
+      local -a removed_manual removed_auto kept
+      out=$(mktemp)
+      err=$(mktemp)
+
+      if ! LC_ALL=C command apt-get -s \
+        -o Debug::NoLocking=1 \
+        -o APT::Get::Show-User-Simulation-Note=false \
+        -o APT::Solver=internal \
+        -o Debug::pkgProblemResolver=true \
+        dist-upgrade >"$out" 2>"$err"
+      then
+        echo "apt-why-held: apt-get simulation failed" >&2
+        cat "$err" >&2
+        rm -f "$out" "$err"
+        return 1
+      fi
+
+      parsed=$(
+        awk '
+          function strip_arch(name) {
+            sub(/:.*/, "", name)
+            return name
+          }
+          function clean_why(line, cand, notinst) {
+            cand = ""
+            notinst = (line ~ /< none /)
+            if (match(line, /-> [^ @]+/)) {
+              cand = substr(line, RSTART + 3, RLENGTH - 3)
+            }
+            sub(/^Broken [^ ]+ /, "", line)
+            gsub(/:(amd64|i386|arm64|armhf|all|any)/, "", line)
+            # State brackets look like "< 1.2 -> 1.3 @ii mK >".
+            # The "->" contains ">", so "<[^>]*>" stops too early.
+            gsub(/ <[^@]*@[^>]*>/, "", line)
+            gsub(/[[:space:]]+/, " ", line)
+            sub(/^ /, "", line)
+            sub(/ $/, "", line)
+            if (notinst) {
+              line = line " (not installable)"
+            } else if (cand != "") {
+              line = line " (upgrade wants " cand ")"
+            }
+            return line
+          }
+          NR == FNR {
+            if ($1 == "Broken") {
+              last_pkg = strip_arch($2)
+              last_why = clean_why($0)
+            } else if ($1 == "Removing" && $0 ~ / rather than change /) {
+              pkg = strip_arch($2)
+              if (last_pkg == pkg && last_why != "") {
+                why[pkg] = last_why
+              } else {
+                why[pkg] = "blocks " strip_arch($NF)
+              }
+            } else if ($0 ~ / via remove of /) {
+              newpkg = strip_arch($2)
+              old = strip_arch($NF)
+              if (!(old in why)) {
+                if (last_pkg == newpkg && last_why != "") {
+                  why[old] = newpkg " " last_why
+                } else {
+                  why[old] = "removed so " newpkg " can be installed"
+                }
+              }
+            }
+            next
+          }
+          /^The following packages will be REMOVED:/ {
+            mode = "REMOVE"
+            next
+          }
+          /^The following packages have been kept back:/ {
+            mode = "KEPT"
+            next
+          }
+          /^The following / {
+            mode = "SKIP"
+            next
+          }
+          /^[0-9]+ upgraded,/ {
+            mode = ""
+            summary = $0
+            next
+          }
+          mode == "REMOVE" || mode == "KEPT" {
+            n = split($0, parts, /[[:space:]]+/)
+            for (i = 1; i <= n; i++) {
+              if (parts[i] == "") {
+                continue
+              }
+              if (mode == "REMOVE") {
+                if (!(parts[i] in seen_r)) {
+                  seen_r[parts[i]] = 1
+                  reason = (parts[i] in why ? why[parts[i]] : "removed to complete the upgrade")
+                  print "REMOVE\t" parts[i] "\t" reason
+                }
+              } else if (!(parts[i] in seen_k)) {
+                seen_k[parts[i]] = 1
+                print "KEPT\t" parts[i] "\t"
+              }
+            }
+            next
+          }
+          END {
+            if (summary != "") {
+              print "SUMMARY\t" summary "\t"
+            }
+          }
+        ' "$err" "$out"
+      )
+      rm -f "$out" "$err"
+
+      summary=$(printf '%s\n' "$parsed" | awk -F '\t' '$1 == "SUMMARY" { print $2; exit }')
+      removed_manual=()
+      removed_auto=()
+      kept=()
+
+      while IFS=$'\t' read -r kind name why; do
+        [[ -n $kind ]] || continue
+        case "$kind" in
+          REMOVE)
+            if command apt-mark showmanual "$name" 2>/dev/null | grep -Fqx -- "$name"; then
+              removed_manual+=("$name"$'\t'"$why")
+            else
+              removed_auto+=("$name"$'\t'"$why")
+            fi
+            ;;
+          KEPT)
+            kept+=("$name")
+            ;;
+          SUMMARY) ;;
+          *) ;;
+        esac
+      done <<<"$parsed"
+
+      if [[ -n $summary ]]; then
+        printf 'Classic solver, simulation only: %s\n' "$summary"
+      else
+        echo "Classic solver, simulation only: no upgrade summary."
+      fi
+      echo "The default solver (3.0) lists the whole dependency group as not upgrading and does not name the conflict."
+      echo
+
+      if ((${#removed_manual[@]} == 0 && ${#removed_auto[@]} == 0 && ${#kept[@]} == 0)); then
+        echo "Nothing is held back."
+        return 0
+      fi
+
+      if ((${#removed_manual[@]})); then
+        echo "Manually installed packages the upgrade cannot keep:"
+        printf '%s\n' "${removed_manual[@]}" | sort -t $'\t' -k1,1 | while IFS=$'\t' read -r name why; do
+          printf '  %s\n    %s\n' "$name" "$why"
+        done
+        echo
+      fi
+      if ((${#removed_auto[@]})); then
+        echo "Automatically installed packages it would drop or replace:"
+        printf '%s\n' "${removed_auto[@]}" | sort -t $'\t' -k1,1 | while IFS=$'\t' read -r name why; do
+          printf '  %s\n    %s\n' "$name" "$why"
+        done
+        echo
+      fi
+
+      if ((${#kept[@]})); then
+        echo "Still not upgraded after those removals:"
+        sim=$(
+          LC_ALL=C command apt-get -s \
+            -o Debug::NoLocking=1 \
+            -o APT::Get::Show-User-Simulation-Note=false \
+            -o APT::Solver=internal \
+            install "${kept[@]}" 2>&1 || true
+        )
+        printf '%s\n' "$sim" | awk '
+          /^[[:space:]]*[A-Za-z0-9][A-Za-z0-9+.-]* : / {
+            show = 1
+            sub(/^[[:space:]]+/, "")
+            print "  " $0
+            next
+          }
+          show && /^[[:space:]]{8,}/ {
+            sub(/^[[:space:]]+/, "")
+            print "    " $0
+            next
+          }
+          show {
+            show = 0
+          }
+        '
+        echo
+      fi
+    }
+
     function apt-get-update-repo () {
       options="-o Dir::Etc::sourcelist=sources.list.d/${1}.list -o Dir::Etc::sourceparts='-' -o APT::Get::List-Cleanup='0'"
       ${APT_CMD} ${options} update --allow-releaseinfo-change
