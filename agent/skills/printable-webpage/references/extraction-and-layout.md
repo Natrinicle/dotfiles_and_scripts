@@ -1,71 +1,43 @@
 # Extraction and layout
 
-Loaded when the converter produced a weak PDF or the user wants a layout change.
+Generic first-pass notes. Do not add site names here.
 
-## Extraction order
+## Fetch
 
-1. `requests` GET with a desktop UA, 25s timeout, size cap 8 MiB.
-2. If the response is blocked (401/403/429), empty, or a JS app shell (almost no `<p>`/`<img>`, several `<script>` tags), retry with Chrome `--headless --dump-dom --virtual-time-budget=20000`.
-3. `lxml` / `bs4` parse.
-4. Drop `script`, `style`, `noscript`, `iframe`, `form`, `button`, `input`, `nav`, `footer`, `aside`, `[role=navigation]`, `[role=banner]`, `[role=complementary]`.
-5. Drop nodes whose `id`/`class` match (case-insensitive):
+1. `requests` GET, desktop UA, ~25s, cap ~8 MiB.
+2. If blocked (401/403/429), empty, or a JS shell (almost no `<p>`/`<img>`, several `<script>`s), Chrome `--headless --dump-dom --virtual-time-budget=20000`.
+3. Still thin → `browser-extract.js` + `--from-json`.
 
-   `nav`, `menu`, `sidebar`, `advert`, `adsbygoogle`, `cookie`, `social`, `share`, `related`, `popular`, `recommend`, `subscribe`, `newsletter`, `popup`, `modal`, `breadcrumb`, `header-wrap`, `sitenav`, `translate`, `comment`, `consent`, `onetrust`.
+## Strip
 
-   Keep large wrappers (lots of paragraphs) even if a hashed class happens to contain `nav`/`menu`.
-6. Score remaining containers (`article`, `main`, `#content`, `.post`, `.entry`, `#main`, news body selectors, body descendants) by:
+Drop `script style noscript iframe form button input nav footer aside` and roles `navigation banner complementary contentinfo search`.
 
-   `text_chars + 400*images + 80*paragraphs - 3*link_chars`
+Drop nodes whose id/class/role look like: nav, menu, sidebar, advert, cookie, social, share, related, popular, recommend, subscribe, newsletter, popup, modal, breadcrumb, comment.
 
-   Reject nodes with link-density above 0.55 unless they also have several large images. Zero-score cookie/consent dialogs.
-7. Walk the winning container in document order into blocks — `heading`, `para`, `figure` (img + nearest caption / preceding step sentence), `list`.
-8. Comments are a separate pass over `#comments`, `.comments`, `.comment-list`, `#disqus_thread` clones that already rendered as HTML. Default discarded.
+Keep a large `article`/`main` wrapper even if a hashed class contains one of those tokens.
 
-## Image keep / drop
+## Choose the article
 
-Keep when any of:
+Score candidates (`article`, `main`, `[role=main]`, `#content`, `.post`, `.entry-content`, large descendants):
 
-- Intrinsic or attribute width ≥ 80px and the URL is not a sprite/icon path
-- `alt` looks like a step (`step 3`, `fold`, `diagram`)
-- Path sits under the same directory as other large content images
+`text_chars + 400*content_images + 80*paragraphs - 3*link_chars`
 
-Drop when:
+Penalize link-density > 0.55 unless there are several real images.
 
-- `1x1`, `pixel`, `cleardot`, `poweredby`, `sprite`, `icon`, `logo` (unless it is the only branding and we already have a title)
-- Host looks like an ad network
-- File is a sidebar 100px "most popular" thumb while larger article images exist
-- Duplicate of an already-kept URL (ignore query-cache-busters)
-- Share-button art (`share_face`, `/img/share`)
+## Blocks
 
-Upgrade `/thumbnails/foo.jpg` → `/foo.jpg` when the larger sibling returns 200 and is an image.
+Walk the winner in document order: heading, para, figure. Text matching `step N` starts a step; following images attach to it.
 
-Cap downloaded images at 40 per page. Re-encode to JPEG/PNG under ~1600px on the long side so print CSS can size them.
+Skip tracking pixels, sprites, and images under ~80px. Prefer the largest `srcset` URL. If a path contains `/thumbnails/`, try the sibling without that segment.
 
-## Print CSS knobs
+Cap downloads (~40). Re-encode long edge under ~1600px.
 
-Edit `assets/print.css` (copied into the generated HTML). Useful levers:
+## Layout
 
-| Goal | Change |
-|------|--------|
-| Fewer pages | raise grid to 3 columns, drop `img` max-height to ~140px, shrink `.intro` |
-| More readable | 1 column, `img` max-height 240px, body 11pt |
-| Photo-heavy how-to | 2 columns, `break-inside: avoid` on `.card` |
-| Comments included | `.comments { columns: 2; font-size: 8.5pt; }` |
+How-to (several numbered steps or many figures, little prose) → 2-column cards, `break-inside: avoid`, photos in a clipped `.photo` well.
 
-Page size is set with `@page { size: letter; }` or `a4`. Chrome `--print-to-pdf` honors that plus `--no-pdf-header-footer` so we own the footer.
+Prose → one column.
 
-## Weak-extraction fallback
+Comments → two-column small type, only with `--comments`.
 
-`--dump-dom` covers most client-rendered how-tos. Use `references/browser-extract.js` in a live browser tool when dump-dom is still thin:
-
-- cookie / station-picker / Cloudflare interstitial
-- comments-only leftover after chrome strip
-- the script kept fewer than 2 content images on a page that visibly has a step gallery
-
-Save the returned JSON and run:
-
-```bash
-python3 .../webpage_to_print.py --from-json extract.json --out out.pdf
-```
-
-The JSON shape is documented at the top of `scripts/webpage_to_print.py`.
+Knobs in `assets/print.css`: column count, `.photo` max-height, body point size, `@page` size.
