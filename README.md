@@ -77,7 +77,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 | Script | Benefit to others |
 |--------|-------------------|
 | `check_all_drives_health` | SMART + FS health table for all disks |
-| `adf-ocr.sh` | ADF scan → OCR / local LLM naming |
+| `adf-ocr.sh` | ADF scan → OCR / local LLM naming. Matches SANE *description* (escl IP ids). Override with `ADF_OCR_DEVICE`. `SCAN_DUPLEX=true` (default) prefers ADF Duplex when advertised. |
 | `voice-recorder` / `run-voice-recorder.sh` | Ambient mic capture (Silero VAD) → WAV segments; deps in `bin/requirements-voice-recorder.txt` |
 | `morning-data-gather` | Batch morning triage (PRs/tickets/IM; calendar if configured) |
 | `speakr-api` / `speakr-poll` / `speakr-notes-append` | Speakr recording API helpers |
