@@ -17,6 +17,16 @@ SCAN_FORMAT="png"
 
 MULTI_LOAD_TIMEOUT=30
 
+# Match SANE *description* (device ids are often just escl:https://IP:443).
+SCANNER_MATCH="${SCANNER_MATCH:-ES-C320W}"
+# Skip scanimage -L when set (exact SANE id, e.g. escl:https://192.168.49.2:443).
+ADF_OCR_DEVICE="${ADF_OCR_DEVICE:-}"
+# Prefer ADF Duplex when the backend advertises it; falls back to simplex escl.
+SCAN_DUPLEX="${SCAN_DUPLEX:-true}"
+# Tesseract OSD on this ADF often reports 11–17 on already-upright pages.
+# ocrmypdf default is 14; 12 still ignores the ~11 cluster and applies the 13+ cluster.
+OCR_ROTATE_THRESHOLD="${OCR_ROTATE_THRESHOLD:-12}"
+
 # Blank page removal (forgiving for uneven pages)
 MARGIN_TO_SHAVE=80
 BLUR_RADIUS=12
@@ -33,22 +43,151 @@ LLM_TEMPERATURE=0.3
 LLM_MAX_TOKENS=2000
 # =============================================================================
 
-find_epson_device() {
-    local device
-    device=$(scanimage -L 2>/dev/null | grep -o 'escl:https\?://[^ ]*EPSON ES-C320W' | head -n1 || echo "")
-    [ -n "$device" ] && { echo "$device"; return 0; }
-    device=$(scanimage -L 2>/dev/null | grep -o 'airscan:[^:]*:EPSON ES-C320W' | head -n1 || echo "")
-    [ -n "$device" ] && { echo "$device"; return 0; }
-    device=$(scanimage -L 2>/dev/null | grep -o 'escl:[^ ]*EPSON ES-C320W' | head -n1 || echo "")
-    echo "$device"
+SCAN_DEVICE=""
+SELECTED_SOURCE=""
+FAILED_DEVICES=()
+
+device_is_failed() {
+    local d
+    for d in "${FAILED_DEVICES[@]+"${FAILED_DEVICES[@]}"}"; do
+        [[ "$d" == "$1" ]] && return 0
+    done
+    return 1
+}
+
+list_sane_device_lines() {
+    # escl may dump the scanner HTML UI on stdout; only keep SANE device rows.
+    scanimage -L 2>/dev/null | grep -E "^device \`" || true
+}
+
+sane_id_from_line() {
+    sed -n "s/^device \`\\(.*\\)' is a .*/\\1/p"
+}
+
+sane_desc_from_line() {
+    sed -n "s/^device \`.*' is a \\(.*\\)/\\1/p"
+}
+
+backend_rank() {
+    case "$1" in
+    escl:*) echo 1 ;;
+    airscan:*) echo 2 ;;
+    epson2:*) echo 9 ;;
+    *) echo 5 ;;
+    esac
+}
+
+source_candidates() {
+    local help_line rest
+    help_line=$(scanimage -d "$1" --help 2>/dev/null | grep -E '^[[:space:]]*--source ' | head -n1 || true)
+    [[ -z "$help_line" ]] && return 0
+    rest=${help_line#*--source }
+    rest=${rest%%\[*}
+    printf '%s\n' "$rest" | tr '|' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' |
+        grep -v '^$' | grep -vi 'no_stringlist' || true
+}
+
+choose_source() {
+    local token duplex="" adf=""
+    while IFS= read -r token; do
+        [[ -z "$token" ]] && continue
+        case "$token" in
+        "ADF Duplex") duplex="$token" ;;
+        ADF) adf="$token" ;;
+        esac
+    done < <(source_candidates "$1")
+    if [[ "${SCAN_DUPLEX}" == true && -n "$duplex" ]]; then
+        printf '%s\n' "$duplex"
+        return 0
+    fi
+    if [[ -n "$adf" ]]; then
+        printf '%s\n' "$adf"
+        return 0
+    fi
+    # Do not invent "Automatic Document Feeder" — airscan rejects it (Invalid argument).
+}
+
+probe_scan_device() {
+    local device=$1 source=${2:-}
+    if [[ -n "$source" ]]; then
+        scanimage -n -d "$device" --source "$source" >/dev/null 2>&1
+    else
+        scanimage -n -d "$device" >/dev/null 2>&1
+    fi
+}
+
+pick_scanner() {
+    local line id desc source rank
+    local best_id="" best_source="" best_rank=99
+
+    if [[ -n "${ADF_OCR_DEVICE}" ]]; then
+        SCAN_DEVICE="${ADF_OCR_DEVICE}"
+        SELECTED_SOURCE=$(choose_source "$SCAN_DEVICE" || true)
+        if probe_scan_device "$SCAN_DEVICE" "$SELECTED_SOURCE"; then
+            echo "=== Using ${SCAN_DEVICE}${SELECTED_SOURCE:+ --source ${SELECTED_SOURCE}} ==="
+            return 0
+        fi
+        echo "ERROR: ADF_OCR_DEVICE=${ADF_OCR_DEVICE} failed a dry-run open."
+        return 1
+    fi
+
+    echo "=== Detecting ${SCANNER_MATCH} (one scanimage -L) ==="
+    while IFS= read -r line; do
+        [[ -z "$line" ]] && continue
+        desc=$(printf '%s\n' "$line" | sane_desc_from_line)
+        if ! grep -qi "${SCANNER_MATCH}" <<<"${desc}"; then
+            continue
+        fi
+        id=$(printf '%s\n' "$line" | sane_id_from_line)
+        [[ -z "$id" ]] && continue
+        if device_is_failed "$id"; then
+            echo "   skip ${id} (failed earlier this run)"
+            continue
+        fi
+        source=$(choose_source "$id" || true)
+        rank=$(backend_rank "$id")
+        if [[ "${SCAN_DUPLEX}" == true && "$source" == "ADF Duplex" ]]; then
+            rank=0
+        fi
+        if ! probe_scan_device "$id" "$source"; then
+            echo "   skip ${id}${source:+ --source ${source}} (dry-run failed)"
+            continue
+        fi
+        if ((rank < best_rank)); then
+            best_rank=$rank
+            best_id=$id
+            best_source=$source
+        fi
+    done < <(list_sane_device_lines)
+
+    if [[ -z "$best_id" ]]; then
+        echo "ERROR: Could not find a working ${SCANNER_MATCH} scanner."
+        return 1
+    fi
+    SCAN_DEVICE=$best_id
+    SELECTED_SOURCE=$best_source
+    echo "=== Using ${SCAN_DEVICE}${SELECTED_SOURCE:+ --source ${SELECTED_SOURCE}} ==="
 }
 
 count_pages() {
-    ls page_*."${SCAN_FORMAT}" 2>/dev/null | wc -l | tr -d '[:space:]' || echo 0
+    local files
+    shopt -s nullglob
+    files=(page_*."${SCAN_FORMAT}")
+    shopt -u nullglob
+    printf '%s\n' "${#files[@]}"
 }
 
 # -------------------------- Main Script --------------------------
 echo "=== EPSON ES-C320W Continuous Multi-Load Scanner with AI Naming ==="
+
+if ! command -v scanimage >/dev/null 2>&1; then
+    echo "ERROR: scanimage not found (install sane-utils)."
+    exit 1
+fi
+
+if ! pick_scanner; then
+    exit 1
+fi
 
 WORK_DIR="$(pwd)/scan_$(date +%Y%m%d_%H%M%S)"
 mkdir -p "$WORK_DIR"
@@ -61,42 +200,64 @@ fi
 
 echo "=== Starting continuous ADF scan ==="
 
-last_successful_scan=$(date +%s)
+last_successful_scan=""
 
 while true; do
-    SCAN_DEVICE=$(find_epson_device)
-    if [ -z "$SCAN_DEVICE" ]; then
-        echo "ERROR: Could not find EPSON ES-C320W."
-        exit 1
-    fi
-
-    SOURCE_OUTPUT=$(scanimage -d "$SCAN_DEVICE" --help 2>/dev/null | grep -i -- --source || echo "")
-    if [ -z "$SOURCE_OUTPUT" ]; then
-        SELECTED_SOURCE="Automatic Document Feeder"
-    else
-        POSSIBLE_SOURCES=$(echo "$SOURCE_OUTPUT" | sed 's/.*--source *//' | tr '|' '\n' | sed 's/ *\[[^]]*\].*//; s/^[[:space:]]*//; s/[[:space:]]*$//')
-        SELECTED_SOURCE=$(echo "$POSSIBLE_SOURCES" | grep -i "duplex" | head -n1 || echo "")
-        [ -z "$SELECTED_SOURCE" ] && SELECTED_SOURCE=$(echo "$POSSIBLE_SOURCES" | grep -i "ADF" | head -n1 || echo "Automatic Document Feeder")
+    if [[ -z "${SCAN_DEVICE}" ]]; then
+        if ! pick_scanner; then
+            echo "Retrying scanner detection in 2s..."
+            sleep 2
+            continue
+        fi
     fi
 
     old_count=$(count_pages)
 
-    scanimage --batch=page_%04d.${SCAN_FORMAT} --format=${SCAN_FORMAT} \
-        --mode=${SCAN_MODE} --resolution=${SCAN_RESOLUTION} --batch-count=0 \
-        --batch-start=$((old_count + 1)) -d "$SCAN_DEVICE" --source="${SELECTED_SOURCE}" 2>&1 || true
+    scan_cmd=(
+        scanimage
+        --batch="page_%04d.${SCAN_FORMAT}"
+        --format="${SCAN_FORMAT}"
+        --mode="${SCAN_MODE}"
+        --resolution="${SCAN_RESOLUTION}"
+        --batch-count=0
+        --batch-start="$((old_count + 1))"
+        -d "${SCAN_DEVICE}"
+    )
+    if [[ -n "${SELECTED_SOURCE}" ]]; then
+        scan_cmd+=(--source="${SELECTED_SOURCE}")
+    fi
+
+    scan_err=$(mktemp)
+    if ! "${scan_cmd[@]}" 2>"$scan_err"; then
+        if grep -qiE 'invalid argument|error during device i/o|device busy' "$scan_err"; then
+            echo "   Scan failed ($(tr '\n' ' ' <"$scan_err")). Re-detecting..."
+            FAILED_DEVICES+=("${SCAN_DEVICE}")
+            SCAN_DEVICE=""
+            SELECTED_SOURCE=""
+            rm -f "$scan_err"
+            sleep 2
+            continue
+        fi
+    fi
+    if [[ -s "$scan_err" ]]; then
+        # ADF empty / document-feeder out of documents is expected between loads.
+        grep -viE 'rounded value of br-' "$scan_err" || true
+    fi
+    rm -f "$scan_err"
 
     new_count=$(count_pages)
     scanned_this_batch=$((new_count - old_count))
 
-    if [ "$scanned_this_batch" -gt 0 ]; then
-        echo "   ✓ Scanned ${scanned_this_batch} page(s)"
+    if [[ "$scanned_this_batch" -gt 0 ]]; then
+        echo "   Scanned ${scanned_this_batch} page(s)"
         last_successful_scan=$(date +%s)
     else
         echo "   ADF appears empty."
     fi
 
     current_time=$(date +%s)
-    if [ $((current_time - last_successful_scan)) -ge $MULTI_LOAD_TIMEOUT ]; then
+    if [[ -n "$last_successful_scan" ]] &&
+        [[ $((current_time - last_successful_scan)) -ge $MULTI_LOAD_TIMEOUT ]]; then
         echo "   Timeout reached. Proceeding..."
         break
     fi
@@ -104,12 +265,23 @@ while true; do
 done
 
 # -------------------------- Processing --------------------------
-mapfile -t pages < <(printf '%s\n' page_*."${SCAN_FORMAT}" 2>/dev/null | sort -V)
+shopt -s nullglob
+mapfile -t pages < <(printf '%s\n' page_*."${SCAN_FORMAT}" | sort -V)
+shopt -u nullglob
+
+if [[ ${#pages[@]} -eq 0 ]]; then
+    echo "ERROR: No pages scanned (ADF stayed empty). Not calling img2pdf."
+    cd ..
+    rm -rf "$WORK_DIR" 2>/dev/null || true
+    exit 1
+fi
 
 processed=()
 for img in "${pages[@]}"; do
-    if convert "$img" -shave 80x80 -virtual-pixel White -blur 0x12 -fuzz 20% -trim -format "%wx%h" info: 2>/dev/null | \
-       awk -F'x' '{if($1<120 || $2<80) exit 0; else exit 1}'; then
+    if convert "$img" -shave "${MARGIN_TO_SHAVE}x${MARGIN_TO_SHAVE}" -virtual-pixel White \
+        -blur "0x${BLUR_RADIUS}" -fuzz "${FUZZ_PERCENT}" -trim -format "%wx%h" info: 2>/dev/null |
+        awk -F'x' -v minw="${MIN_CONTENT_WIDTH}" -v minh="${MIN_CONTENT_HEIGHT}" \
+            '{if($1<minw || $2<minh) exit 0; else exit 1}'; then
         echo "→ Removing blank page: $img"
         rm -f "$img"
         continue
@@ -117,8 +289,16 @@ for img in "${pages[@]}"; do
     processed+=("$img")
 done
 
+if [[ ${#processed[@]} -eq 0 ]]; then
+    echo "ERROR: All pages looked blank. Not calling img2pdf."
+    cd ..
+    rm -rf "$WORK_DIR" 2>/dev/null || true
+    exit 1
+fi
+
 img2pdf "${processed[@]}" -o intermediate.pdf
-ocrmypdf --language eng --rotate-pages --deskew --clean --optimize 1 --force-ocr intermediate.pdf "temp_ocr.pdf"
+ocrmypdf --language eng --rotate-pages --rotate-pages-threshold "${OCR_ROTATE_THRESHOLD}" \
+    --deskew --clean --optimize 1 --force-ocr intermediate.pdf "temp_ocr.pdf"
 
 # -------------------------- AI Filename + Full Cleanup --------------------------
 echo "=== Generating smart filename and metadata ==="
