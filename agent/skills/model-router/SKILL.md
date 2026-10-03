@@ -20,7 +20,9 @@ Skills declare a **task id**; this skill (or the host routing table) maps it to 
 
 Read `{MEMORY_ROOT}/model-routing-table.md` when assigning new tasks or auditing cost.
 On Grok, respect config pins for light subagents — do not re-read the whole table
-before every local spawn.
+before every local spawn. The `model-routing` rule requires that spawn
+**before** a parent discovery loop. Parent vs local (keep the interactive
+parent when tools are required): skill `skill-router`.
 
 ## Trust then verify
 
