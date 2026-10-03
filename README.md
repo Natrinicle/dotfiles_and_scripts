@@ -106,7 +106,8 @@ ask about other toolkit repos), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware), etc.
 
 **Skills** (~40) include packaging, scanners, PII detection, MemPalace, Tofu
-plan review, Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
+plan review, local-vs-cloud routing (`model-router`, `skill-router`),
+Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
 compiled-app unpack (`reverse-engineering-protocols`, then
 `decompile-mobile-app` / `decompile-firmware`),
