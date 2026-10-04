@@ -20,7 +20,6 @@ extract() {
     return 1
   fi
 
-  # mime of the bytes on disk; inner mime if file can look through compression
   local mime inner_mime desc
   mime=$(file -b --mime-type -- "$f" 2>/dev/null || true)
   inner_mime=$(file -bz --mime-type -- "$f" 2>/dev/null || true)
@@ -29,66 +28,65 @@ extract() {
   _extract_by_kind() {
     local kind="$1"
     case "$kind" in
-      tar.bz2|tbz2) tar xjf -- "$f" ;;
-      tar.gz|tgz)   tar xzf -- "$f" ;;
-      tar.xz)       tar xf  -- "$f" ;;
-      tar.zst)      tar --use-compress-program=unzstd -xf -- "$f" ;;
-      tar)          tar xf  -- "$f" ;;
-      bz2)          bunzip2 -- "$f" ;;
-      gz)           gunzip  -- "$f" ;;
-      xz)           unxz    -- "$f" ;;
-      zst)          unzstd  -- "$f" ;;
-      zip)          unzip   -- "$f" ;;
-      rar)          unrar e -- "$f" ;;
-      7z)           7z x -- "$f" ;;
-      Z)            uncompress -- "$f" ;;
-      deb)          ar x -- "$f" ;;
-      *)            return 1 ;;
+      tar.bz2 | tbz2) tar --extract --bzip2 --file "$f" ;;
+      tar.gz | tgz) tar --extract --gzip --file "$f" ;;
+      tar.xz) tar --extract --xz --file "$f" ;;
+      tar.zst) tar --extract --use-compress-program=unzstd --file "$f" ;;
+      tar) tar --extract --file "$f" ;;
+      bz2) bunzip2 -- "$f" ;;
+      gz) gunzip -- "$f" ;;
+      xz) unxz -- "$f" ;;
+      zst) unzstd -- "$f" ;;
+      zip) unzip -- "$f" ;;
+      rar) unrar e -- "$f" ;;
+      7z) 7z x "$f" ;;
+      Z) uncompress -- "$f" ;;
+      deb) ar x -- "$f" ;;
+      *) return 1 ;;
     esac
   }
 
   _kind_from_mime() {
     local m="$1" inner="$2"
     case "$m" in
-      application/gzip|application/x-gzip)
+      application/gzip | application/x-gzip)
         case "$inner" in
-          application/x-tar|application/x-gtar) echo tar.gz ;;
+          application/x-tar | application/x-gtar) echo tar.gz ;;
           *) echo gz ;;
         esac
         ;;
-      application/x-bzip2|application/bzip2)
+      application/x-bzip2 | application/bzip2)
         case "$inner" in
-          application/x-tar|application/x-gtar) echo tar.bz2 ;;
+          application/x-tar | application/x-gtar) echo tar.bz2 ;;
           *) echo bz2 ;;
         esac
         ;;
-      application/x-xz|application/xz)
+      application/x-xz | application/xz)
         case "$inner" in
-          application/x-tar|application/x-gtar) echo tar.xz ;;
+          application/x-tar | application/x-gtar) echo tar.xz ;;
           *) echo xz ;;
         esac
         ;;
-      application/zstd|application/x-zstd)
+      application/zstd | application/x-zstd)
         case "$inner" in
-          application/x-tar|application/x-gtar) echo tar.zst ;;
+          application/x-tar | application/x-gtar) echo tar.zst ;;
           *) echo zst ;;
         esac
         ;;
-      application/x-tar|application/x-gtar) echo tar ;;
-      application/zip|application/x-zip-compressed) echo zip ;;
-      application/x-rar|application/vnd.rar|application/x-rar-compressed) echo rar ;;
+      application/x-tar | application/x-gtar) echo tar ;;
+      application/zip | application/x-zip-compressed) echo zip ;;
+      application/x-rar | application/vnd.rar | application/x-rar-compressed) echo rar ;;
       application/x-7z-compressed) echo 7z ;;
-      application/x-compress|application/x-compressed) echo Z ;;
-      application/vnd.debian.binary-package|application/x-debian-package) echo deb ;;
+      application/x-compress | application/x-compressed) echo Z ;;
+      application/vnd.debian.binary-package | application/x-debian-package) echo deb ;;
       *)
-        # some `file` builds only put the inner type in the description
         case "$desc" in
           *'tar archive'*)
             case "$m" in
-              application/gzip|application/x-gzip) echo tar.gz ;;
-              application/x-bzip2|application/bzip2) echo tar.bz2 ;;
-              application/x-xz|application/xz) echo tar.xz ;;
-              application/zstd|application/x-zstd) echo tar.zst ;;
+              application/gzip | application/x-gzip) echo tar.gz ;;
+              application/x-bzip2 | application/bzip2) echo tar.bz2 ;;
+              application/x-xz | application/xz) echo tar.xz ;;
+              application/zstd | application/x-zstd) echo tar.zst ;;
               *) echo tar ;;
             esac
             ;;
@@ -100,21 +98,21 @@ extract() {
 
   _kind_from_name() {
     case "$f" in
-      *.tar.bz2|*.tbz2) echo tar.bz2 ;;
-      *.tar.gz|*.tgz)   echo tar.gz ;;
-      *.tar.xz)         echo tar.xz ;;
-      *.tar.zst)        echo tar.zst ;;
-      *.tar)            echo tar ;;
-      *.bz2)            echo bz2 ;;
-      *.gz)             echo gz ;;
-      *.xz)             echo xz ;;
-      *.zst)            echo zst ;;
-      *.zip)            echo zip ;;
-      *.rar)            echo rar ;;
-      *.7z)             echo 7z ;;
-      *.Z)              echo Z ;;
-      *.deb)            echo deb ;;
-      *)                return 1 ;;
+      *.tar.bz2 | *.tbz2) echo tar.bz2 ;;
+      *.tar.gz | *.tgz) echo tar.gz ;;
+      *.tar.xz) echo tar.xz ;;
+      *.tar.zst) echo tar.zst ;;
+      *.tar) echo tar ;;
+      *.bz2) echo bz2 ;;
+      *.gz) echo gz ;;
+      *.xz) echo xz ;;
+      *.zst) echo zst ;;
+      *.zip) echo zip ;;
+      *.rar) echo rar ;;
+      *.7z) echo 7z ;;
+      *.Z) echo Z ;;
+      *.deb) echo deb ;;
+      *) return 1 ;;
     esac
   }
 
@@ -131,4 +129,109 @@ extract() {
 
   echo "'$f' cannot be extracted via extract() (mime=${mime:-unknown})" >&2
   return 1
+}
+
+# compress — pack paths into an archive. Kind from the first argument when it is
+# a known format, else tar.zst (then tar.xz, then zip, based on tools present).
+# Usage: compress [KIND] PATH [PATH...]
+# KIND: tar.zst tar.xz tar.gz tgz tar.bz2 tbz2 tar zip 7z gz xz bz2 zst
+compress() {
+  if [ "$#" -lt 1 ]; then
+    echo "usage: compress [KIND] PATH [PATH...]" >&2
+    return 2
+  fi
+
+  local kind=""
+  case "$1" in
+    tar.zst | tar.xz | tar.gz | tgz | tar.bz2 | tbz2 | tar | zip | 7z | gz | xz | bz2 | zst)
+      kind="$1"
+      shift
+      ;;
+  esac
+
+  if [ "$#" -lt 1 ]; then
+    echo "usage: compress [KIND] PATH [PATH...]" >&2
+    return 2
+  fi
+
+  local path
+  for path in "$@"; do
+    if [ ! -e "$path" ]; then
+      echo "'$path' is not a valid path" >&2
+      return 1
+    fi
+  done
+
+  if [ -z "$kind" ]; then
+    if command -v zstd >/dev/null 2>&1; then
+      kind=tar.zst
+    elif command -v xz >/dev/null 2>&1; then
+      kind=tar.xz
+    else
+      kind=zip
+    fi
+  fi
+
+  case "$kind" in
+    tgz) kind=tar.gz ;;
+    tbz2) kind=tar.bz2 ;;
+  esac
+
+  # gzip/xz/bzip2/zstd only take a single regular file; wrap directories.
+  case "$kind" in
+    gz | xz | bz2 | zst)
+      if [ "$#" -ne 1 ] || [ ! -f "$1" ]; then
+        kind="tar.$kind"
+      fi
+      ;;
+  esac
+
+  local out base
+  base="${1%/}"
+  base="${base##*/}"
+  [ -n "$base" ] || base=archive
+
+  _compress_by_kind() {
+    local k="$1" dest="$2"
+    shift 2
+    case "$k" in
+      tar.zst) tar -I zstd -cf "$dest" -- "$@" ;;
+      tar.xz) tar -Jcf "$dest" -- "$@" ;;
+      tar.gz) tar -zcf "$dest" -- "$@" ;;
+      tar.bz2) tar -jcf "$dest" -- "$@" ;;
+      tar) tar -cf "$dest" -- "$@" ;;
+      zip) zip -r "$dest" -- "$@" ;;
+      7z) 7z a "$dest" -- "$@" ;;
+      gz) gzip -kc -- "$1" >"$dest" ;;
+      xz) xz -kc -- "$1" >"$dest" ;;
+      bz2) bzip2 -kc -- "$1" >"$dest" ;;
+      zst) zstd -c -- "$1" >"$dest" ;;
+      *) return 1 ;;
+    esac
+  }
+
+  case "$kind" in
+    tar.zst) out="${base}.tar.zst" ;;
+    tar.xz) out="${base}.tar.xz" ;;
+    tar.gz) out="${base}.tar.gz" ;;
+    tar.bz2) out="${base}.tar.bz2" ;;
+    tar) out="${base}.tar" ;;
+    zip) out="${base}.zip" ;;
+    7z) out="${base}.7z" ;;
+    gz) out="${base}.gz" ;;
+    xz) out="${base}.xz" ;;
+    bz2) out="${base}.bz2" ;;
+    zst) out="${base}.zst" ;;
+    *)
+      echo "compress: unknown kind '$kind'" >&2
+      return 1
+      ;;
+  esac
+
+  if [ -e "$out" ]; then
+    echo "compress: '$out' already exists" >&2
+    return 1
+  fi
+
+  _compress_by_kind "$kind" "$out" "$@"
 }

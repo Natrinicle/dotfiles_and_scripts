@@ -18,26 +18,42 @@ function fuck () {
   history -s "$TF_CMD"
 }
 
-# Normalize `open` across Linux, macOS, and Windows.
-# This is needed to make the `o` function (see below) cross-platform.
-if [ ! $(uname -s) = 'Darwin' ]; then
-	if grep -q Microsoft /proc/version; then
-		# Ubuntu on Windows using the Linux subsystem
-		alias _open='explorer.exe';
-	else
-		alias _open='xdg-open';
-	fi
-fi
+# Normalize `open` across Linux and Windows. Native Darwin `open` is left alone.
+# No arguments opens the current directory. Files go through gio/mimeopen so the
+# MIME type wins over a missing or wrong extension.
+if [ "$(uname -s)" != Darwin ]; then
+  if grep -q Microsoft /proc/version 2>/dev/null; then
+    _open() { explorer.exe "$@"; }
+  else
+    _open() { xdg-open "$@"; }
+  fi
 
-# `o` with no arguments opens the current directory, otherwise opens the given
-# location
-function open() {
-	if [ $# -eq 0 ]; then
-		_open .;
-	else
-		_open "$@";
-	fi;
-}
+  open() {
+    if [ $# -eq 0 ]; then
+      _open .
+      return
+    fi
+    local target="$1"
+    shift
+    case "$target" in
+      *://* | mailto:*)
+        _open "$target" "$@"
+        return
+        ;;
+    esac
+    if [ -e "$target" ]; then
+      if command -v gio >/dev/null 2>&1; then
+        gio open "$target" "$@"
+      elif command -v mimeopen >/dev/null 2>&1; then
+        mimeopen -n "$target" "$@"
+      else
+        _open "$target" "$@"
+      fi
+    else
+      _open "$target" "$@"
+    fi
+  }
+fi
 
 # Simple calculator
 # Shamelessly stolen from
