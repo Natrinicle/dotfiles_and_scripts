@@ -50,7 +50,7 @@ class SessionTunes:
             sheep,
             amplitude=float(cfg["busy_amplitude"]),
             sample_rate=int(cfg["sample_rate"]),
-            modem_amplitude=float(cfg.get("modem_amplitude") or 0.0068),
+            modem_amplitude=float(cfg.get("modem_amplitude") or 0.0051),
             wave=str(cfg.get("wave") or "triangle"),
         )
 

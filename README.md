@@ -84,7 +84,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 | `slack-auth-check` | Messaging auth preflight |
 | `docker-service-check.sh` | Docker service health check |
 | `unpack-artifact` | Classify APK/XAPK/IPA/ELF/firmware and print likely protocol sources |
-| `session-tunes` | Quiet evolving RTTTL flock while Grok/Claude work (`install`/`status`/`mute`/`test`) |
+| `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work (`install`/`status`/`mute`/`test`) |
 
 Skills reference these as **PATH commands**, not a vendor-specific scripts directory.
 See `agent/PATHS.md` for `{MEMORY_ROOT}`, `{AGENT_HOME}`, etc.
@@ -116,7 +116,7 @@ printable pages (`printable-webpage`),
 resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
 `decision-judge` (parent-as-judge, 2- or 4-advocate court),
-and `session-tunes` (quiet evolving RTTTL flock while the agent works),
+and `session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works),
 usable on either platform.
 
 Memory paths: resolve `~/.claude/memory` or `~/.grok/memory` (often one

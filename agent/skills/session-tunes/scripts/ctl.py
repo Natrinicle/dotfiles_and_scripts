@@ -87,14 +87,14 @@ def cmd_test(kind: str) -> int:
     vol = int(cfg["pulse_volume"])
     flock = get_flock()
     if kind == "modem":
-        amp = float(cfg.get("modem_amplitude") or 0.0068)
+        amp = float(cfg.get("modem_amplitude") or 0.0051)
         pcm = render_modem(
             sample_rate=sr,
             amplitude=amp,
             seed=int(time.time()) & 0x7FFFFFFF,
         )
         dur = len(pcm) / (2 * sr)
-        label = f"bell103-modem ({dur:.1f}s, amp={amp})"
+        label = f"computer-room ({dur:.1f}s, amp={amp})"
     else:
         if kind == "busy":
             sheep = flock.breed_busy(cfg)
@@ -108,7 +108,7 @@ def cmd_test(kind: str) -> int:
             sheep,
             amplitude=amp,
             sample_rate=sr,
-            modem_amplitude=float(cfg.get("modem_amplitude") or 0.0068),
+            modem_amplitude=float(cfg.get("modem_amplitude") or 0.0051),
             wave=str(cfg.get("wave") or "triangle"),
         )
         dur = len(pcm) / (2 * sr)

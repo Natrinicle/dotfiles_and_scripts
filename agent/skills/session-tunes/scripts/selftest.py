@@ -48,7 +48,7 @@ def run() -> list[str]:
     if modem_s < 4.0 or modem_s > 16.0:
         errors.append(f"modem duration {modem_s:.2f}s out of range")
     else:
-        print(f"ok {'bell103-modem':24} {modem_s:5.2f}s  pcm={len(modem)} bytes")
+        print(f"ok {'computer-room':24} {modem_s:5.2f}s  pcm={len(modem)} bytes")
     tmp = Path("/tmp/session-tunes-selftest-flock")
     if tmp.exists():
         for child in tmp.glob("*"):
