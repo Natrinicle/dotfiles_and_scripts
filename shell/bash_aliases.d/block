@@ -9,7 +9,7 @@ if cmds_exist lsblk; then
 fi
 
 if cmds_exist smartctl; then
-  function failing_drive_serial_numbers () {
+  function failing_drive_serial_numbers() {
     shopt -s nullglob
     local drives=()
     local nvme_devices ssd_devices hdd_devices
@@ -50,28 +50,83 @@ if cmds_exist smartctl; then
       mapfile -t drives < <(printf '%s\n' "${drives[@]}" | sort -u)
     fi
 
+    _drive_failure_reasons() {
+      local out="$1"
+      local reasons=()
+      local cw raw spare thresh spare_n thresh_n media
+
+      if grep -q "Drive failure expected in less than 24" <<<"$out"; then
+        reasons+=("24h failure prediction")
+      fi
+      if echo "$out" | grep -Ei 'SMART (overall-health self-assessment test result|Health Status)' | grep -Eqi 'FAILED|FAILING'; then
+        reasons+=("overall-health FAILED")
+      fi
+
+      cw=$(echo "$out" | awk -F: '/Critical Warning/ {gsub(/[[:space:]]/, "", $2); print $2; exit}')
+      if [ -n "$cw" ] && [[ "$cw" != 0x0 && "$cw" != 0x00 && "$cw" != 0x0000 && "$cw" != 0 ]]; then
+        reasons+=("NVMe critical warning $cw")
+      fi
+
+      media=$(echo "$out" | awk -F: '/Media and Data Integrity Errors/ {gsub(/[[:space:]]/, "", $2); print $2; exit}')
+      if [ -n "$media" ] && [ "$media" != 0 ]; then
+        reasons+=("media integrity errors $media")
+      fi
+
+      spare=$(echo "$out" | awk -F: '/^Available Spare:/ {gsub(/[%[:space:]]/, "", $2); print $2; exit}')
+      thresh=$(echo "$out" | awk -F: '/Available Spare Threshold/ {gsub(/[%[:space:]]/, "", $2); print $2; exit}')
+      spare_n="${spare%%[^0-9]*}"
+      thresh_n="${thresh%%[^0-9]*}"
+      if [ -n "$spare_n" ] && [ -n "$thresh_n" ] && [ "$spare_n" -le "$thresh_n" ]; then
+        reasons+=("available spare ${spare_n}% <= threshold ${thresh_n}%")
+      fi
+
+      while IFS= read -r raw; do
+        [ -n "$raw" ] && reasons+=("$raw")
+      done < <(echo "$out" | awk '
+        $2 ~ /^(Reallocated_Sector_Ct|Current_Pending_Sector|Offline_Uncorrectable|UDMA_CRC_Error_Count|Reported_Uncorrect)$/ {
+          val=$NF
+          gsub(/[^0-9]/, "", val)
+          if (val+0 > 0) print $2 "=" val
+        }')
+
+      if [ "${#reasons[@]}" -gt 0 ]; then
+        printf '%s\n' "${reasons[@]}"
+        return 0
+      fi
+      return 1
+    }
+
+    local out serial reasons
     for drive in "${drives[@]}"; do
-      if sudo smartctl -a "${drive}" | grep -q "Drive failure expected in less than 24"; then
-        sudo smartctl -a "${drive}" | grep "Serial Number"
+      out=$(sudo smartctl -a "${drive}" 2>/dev/null) || true
+      if reasons=$(_drive_failure_reasons "$out"); then
+        serial=$(echo "$out" | grep -i -m1 -E '^(Serial Number|serial_number)' || true)
+        if [ -z "$serial" ]; then
+          serial="Serial Number: (none) [${drive}]"
+        fi
+        echo "${serial}  [${drive}]"
+        while IFS= read -r line; do
+          echo "  $line"
+        done <<<"$reasons"
       fi
     done
   }
 
-  function failing_nvme_serial_numbers () {
+  function failing_nvme_serial_numbers() {
     failing_drive_serial_numbers nvme
   }
 
-  function failing_ssd_serial_numbers () {
+  function failing_ssd_serial_numbers() {
     failing_drive_serial_numbers ssd
   }
 
-  function failing_hdd_serial_numbers () {
+  function failing_hdd_serial_numbers() {
     failing_drive_serial_numbers hdd
   }
 fi
 
 if cmds_exist pv dd; then
-  function dd-progress () {
+  function dd-progress() {
     sudo dd if="${1}" "${@:3}" | pv -tpreb | sudo dd of="${2}" "${@:3}"
   }
 fi

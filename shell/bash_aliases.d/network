@@ -36,18 +36,52 @@ if cmds_exist sudo; then
   fi
 fi
 
-alias keep_network_up='while true; do if ! ping -c 1 {default_route_host} > /dev/null 2>&1; then echo "Bouncing network at $(date)"; nmcli connection down {nm_connection_name} > /dev/null 2>&1; nmcli connection up {nm_connection_name} > /dev/null 2>&1; echo; fi; sleep 10; done'
+alias keep_network_up='while true; do if ! ping -c 1 fa-300.natrinicle.com > /dev/null 2>&1; then echo "Bouncing network at $(date)"; nmcli connection down Home\ Wired\ connection > /dev/null 2>&1; nmcli connection up Home\ Wired\ connection > /dev/null 2>&1; echo; fi; sleep 10; done'
 
-function route_port_to_host () {
-  local port=${1}
-  local remote_host=${2}
-  local local_host=${3}
+# route_port_to_host — DNAT a TCP port to a remote host, SNAT replies back.
+# Prefers nftables (Debian current), falls back to iptables.
+# Usage: route_port_to_host <portnum> <remote_host> <local_IP>
+route_port_to_host() {
+  local port="${1:-}"
+  local remote_host="${2:-}"
+  local local_host="${3:-}"
   if [[ -z ${port} || -z ${remote_host} || -z ${local_host} ]]; then
-    echo "Usage: route_port_to_host <portnum> <remote_host> <local_IP>"
-  else
-    iptables -t nat -A PREROUTING -p tcp --dport "${port}" -j DNAT --to-destination "${remote_host}:${port}"
-    iptables -t nat -A POSTROUTING -p tcp -d "${remote_host}" --dport "${port}" -j SNAT --to-source "${local_host}"
+    echo "Usage: route_port_to_host <portnum> <remote_host> <local_IP>" >&2
+    return 1
   fi
+
+  local nftbin=""
+  if command -v nft >/dev/null 2>&1; then
+    nftbin=$(command -v nft)
+  elif [ -x /usr/sbin/nft ]; then
+    nftbin=/usr/sbin/nft
+  elif [ -x /sbin/nft ]; then
+    nftbin=/sbin/nft
+  fi
+
+  if [ -n "$nftbin" ]; then
+    sudo "$nftbin" list table ip nat >/dev/null 2>&1 || sudo "$nftbin" add table ip nat
+    sudo "$nftbin" list chain ip nat prerouting >/dev/null 2>&1 ||       sudo "$nftbin" add chain ip nat prerouting '{ type nat hook prerouting priority dstnat; policy accept; }'
+    sudo "$nftbin" list chain ip nat postrouting >/dev/null 2>&1 ||       sudo "$nftbin" add chain ip nat postrouting '{ type nat hook postrouting priority srcnat; policy accept; }'
+    sudo "$nftbin" add rule ip nat prerouting tcp dport "$port" dnat to "${remote_host}:${port}"
+    sudo "$nftbin" add rule ip nat postrouting ip daddr "$remote_host" tcp dport "$port" snat to "$local_host"
+    return
+  fi
+
+  local iptbin=""
+  if command -v iptables >/dev/null 2>&1; then
+    iptbin=$(command -v iptables)
+  elif [ -x /usr/sbin/iptables ]; then
+    iptbin=/usr/sbin/iptables
+  elif [ -x /sbin/iptables ]; then
+    iptbin=/sbin/iptables
+  fi
+  if [ -z "$iptbin" ]; then
+    echo "route_port_to_host: need nft or iptables" >&2
+    return 1
+  fi
+  sudo "$iptbin" -t nat -A PREROUTING -p tcp --dport "${port}" -j DNAT --to-destination "${remote_host}:${port}"
+  sudo "$iptbin" -t nat -A POSTROUTING -p tcp -d "${remote_host}" --dport "${port}" -j SNAT --to-source "${local_host}"
 }
 
 curl_override_dns () {
@@ -89,3 +123,151 @@ if cmds_exist curl; then
     curl --resolve "${domain}:${port}:$1" "$2" --progress-bar --insecure -sL -w "%{http_code} %{url_effective}\\n" -o /dev/null
   }
 fi
+
+# Show CN, SANs, and expiry for a TLS certificate.
+# Usage: getcertnames [--starttls PROTO] [scheme://]HOST[:PORT]
+# Ports 25/587 → smtp STARTTLS, 143 → imap, 110 → pop3, 21 → ftp.
+# SNI is always sent. Default port is 443.
+getcertnames() {
+  if [ -z "${1:-}" ]; then
+    echo "ERROR: No domain specified." >&2
+    return 1
+  fi
+
+  local starttls="" host="" port="" spec
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      --starttls)
+        if [ -z "${2:-}" ]; then
+          echo "Usage: getcertnames [--starttls PROTO] [scheme://]HOST[:PORT]" >&2
+          return 2
+        fi
+        starttls="$2"
+        shift 2
+        ;;
+      -p | --port)
+        if [ -z "${2:-}" ]; then
+          echo "Usage: getcertnames [--starttls PROTO] [scheme://]HOST[:PORT]" >&2
+          return 2
+        fi
+        port="$2"
+        shift 2
+        ;;
+      --)
+        shift
+        break
+        ;;
+      -*)
+        echo "Usage: getcertnames [--starttls PROTO] [scheme://]HOST[:PORT]" >&2
+        return 2
+        ;;
+      *)
+        break
+        ;;
+    esac
+  done
+
+  spec="${1:-}"
+  spec="${spec#https://}"
+  spec="${spec#http://}"
+  spec="${spec#ssl://}"
+  spec="${spec#tls://}"
+  spec="${spec%%/*}"
+
+  if [[ "$spec" == \[*\]* ]]; then
+    host="${spec#\[}"
+    host="${host%%]*}"
+    local rest="${spec#*\]}"
+    if [[ "$rest" == :* ]]; then
+      port="${port:-${rest#:}}"
+    fi
+  elif [[ "$spec" == *:* ]]; then
+    host="${spec%%:*}"
+    port="${port:-${spec#*:}}"
+  else
+    host="$spec"
+  fi
+
+  if [ -z "$host" ]; then
+    echo "ERROR: No domain specified." >&2
+    return 1
+  fi
+  port="${port:-443}"
+
+  if [ -z "$starttls" ]; then
+    case "$port" in
+      25 | 587) starttls=smtp ;;
+      143) starttls=imap ;;
+      110) starttls=pop3 ;;
+      21) starttls=ftp ;;
+    esac
+  fi
+
+  echo "Testing ${host}:${port}${starttls:+ (STARTTLS $starttls)}…"
+  echo ""
+
+  local args=(-connect "${host}:${port}" -servername "${host}")
+  if [ -n "$starttls" ]; then
+    args+=(-starttls "$starttls")
+  fi
+
+  local tmp
+  tmp=$(echo | openssl s_client "${args[@]}" 2>&1)
+
+  if [[ "${tmp}" != *"-----BEGIN CERTIFICATE-----"* ]]; then
+    echo "ERROR: Certificate not found." >&2
+    printf '%s\n' "${tmp}" | grep -Ei 'error|connect|errno|unable' | tail -n 5 >&2
+    return 1
+  fi
+
+  local cert
+  cert=$(printf '%s\n' "${tmp}" | openssl x509 -noout -subject -ext subjectAltName -dates 2>/dev/null)
+
+  echo "Common Name:"
+  echo ""
+  printf '%s\n' "${cert}" | awk -F'subject=' '
+    /^subject=/ {
+      s=$2
+      if (match(s, /CN[[:space:]]*=[[:space:]]*[^,/]+/)) {
+        cn=substr(s, RSTART, RLENGTH)
+        sub(/^CN[[:space:]]*=[[:space:]]*/, "", cn)
+        print cn
+      } else {
+        print s
+      }
+    }'
+  echo ""
+  echo "Subject Alternative Name(s):"
+  echo ""
+  printf '%s\n' "${cert}" | awk '
+    /X509v3 Subject Alternative Name/ {flag=1; next}
+    flag && /DNS:|IP Address:/ {
+      gsub(/[[:space:]]/, "")
+      n=split($0, a, ",")
+      for (i=1; i<=n; i++) {
+        gsub(/^DNS:/, "", a[i])
+        gsub(/^IPAddress:/, "", a[i])
+        if (length(a[i])) print a[i]
+      }
+      flag=0
+    }'
+  echo ""
+  echo "Validity:"
+  echo ""
+  printf '%s\n' "${cert}" | awk '/^not(Before|After)=/ {print}'
+  local not_after epoch_exp now left
+  not_after=$(printf '%s\n' "${cert}" | awk -F= '/^notAfter=/ {print substr($0, index($0,"=")+1)}')
+  if [ -n "$not_after" ]; then
+    epoch_exp=$(date -d "$not_after" +%s 2>/dev/null || true)
+    now=$(date +%s)
+    if [ -n "$epoch_exp" ]; then
+      left=$(( (epoch_exp - now) / 86400 ))
+      if [ "$left" -lt 0 ]; then
+        echo "Expired $(( -left )) day(s) ago."
+      else
+        echo "Expires in ${left} day(s)."
+      fi
+    fi
+  fi
+  return 0
+}
