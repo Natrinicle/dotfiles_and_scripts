@@ -1,41 +1,66 @@
 alias pip="/usr/bin/env pip"
 alias pip3="/usr/bin/env pip3"
 
-function round () {
+function round() {
   round_float=${1}
   round_places=${2:-2}
 
   python -c "print(round(float(${round_float}), ${round_places}))"
 }
 
+# pyclean — remove __pycache__ directories and leftover .pyc/.pyo files.
+# Usage: pyclean [DIR...]
+pyclean() {
+  local root
+  if [ "$#" -eq 0 ]; then
+    set -- .
+  fi
+  local rc=0
+  for root in "$@"; do
+    if [ ! -d "$root" ]; then
+      echo "pyclean: '$root' is not a directory" >&2
+      rc=1
+      continue
+    fi
+    find "$root" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete
+    find "$root" -type d -name '__pycache__' -print0 | xargs -0r rm -rf
+  done
+  return "$rc"
+}
+
 # Nuitka converts Python source into C
 if cmds_exist nuitka; then
   # Convert and compile all .py files in current directory to modules
   function nuitka_compile_all_as_modules() {
+    local py_file
+    shopt -s nullglob
     for py_file in *.py; do
       # Ignore things like __init__.py that tend to break
-      if echo ${py_file} | grep -qv "^__"; then
-        nuitka --module ${py_file} --recurse-none --show-progress
+      if echo "${py_file}" | grep -qv "^__"; then
+        nuitka --module "${py_file}" --recurse-none --show-progress
       fi
     done
+    shopt -u nullglob
   }
 
   # Undo Nuitka module conversion and compilation
   function nuitka_remove_all_compiled_modules() {
-    rm -r *.build
-    rm *.so
-    rm *.pyi
+    shopt -s nullglob
+    rm -rf -- *.build
+    rm -f -- *.so *.pyi
+    shopt -u nullglob
+    pyclean .
   }
 fi
 
-function virtualenv_relocatable_python3 () {
+function virtualenv_relocatable_python3() {
   venv_path=${1}
   venv_dir=$(echo ${venv_path} | rev | cut -d"/" -f1 | rev)
   python3 -m virtualenv --python python3 ${venv_path}
   python3 -m virtualenv --relocatable --python python3 ${venv_path}
 
   if [ ! -f ${venv_path}/../.envrc ]; then
-    echo "source ${venv_dir}/bin/activate" > ${venv_path}/../.envrc
+    echo "source ${venv_dir}/bin/activate" >${venv_path}/../.envrc
   fi
 
   if cmds_exist direnv; then

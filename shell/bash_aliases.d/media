@@ -1,68 +1,357 @@
 if cmds_exist exiftool; then
-  alias extract-jpg-from-dngs="for file in *.dng; do exiftool -b -JpgFromRaw $file > $file.jpg; done"
+  _is_camera_raw() {
+    local f="$1" mime desc lower
+    mime=$(file -b --mime-type -- "$f" 2>/dev/null || true)
+    desc=$(file -b -- "$f" 2>/dev/null || true)
+    lower="${f,,}"
+    case "$mime" in
+      image/x-adobe-dng | image/x-canon-cr2 | image/x-canon-cr3 | image/x-nikon-nef | image/x-sony-arw | image/x-olympus-orf | image/x-panasonic-rw2 | image/x-fuji-raf | image/x-pentax-pef | image/x-raw | image/x-dcraw)
+        return 0
+        ;;
+    esac
+    case "$desc" in
+      *DNG* | *CR2* | *CR3* | *NEF* | *ARW* | *ORF* | *RW2* | *RAF* | *PEF*)
+        return 0
+        ;;
+    esac
+    case "$lower" in
+      *.dng | *.cr2 | *.cr3 | *.nef | *.arw | *.orf | *.rw2 | *.raf | *.pef | *.raw)
+        return 0
+        ;;
+    esac
+    return 1
+  }
+
+  # extract_preview_from_raw — pull the embedded JPEG from camera RAW.
+  # Usage: extract_preview_from_raw [FILE...]
+  # No args: every magic-detected RAW in the current directory.
+  extract_preview_from_raw() {
+    local files=() f out cand
+    if [ "$#" -gt 0 ]; then
+      files=("$@")
+    else
+      shopt -s nullglob
+      for cand in *; do
+        [[ -f "$cand" ]] || continue
+        _is_camera_raw "$cand" && files+=("$cand")
+      done
+      shopt -u nullglob
+    fi
+    if [ "${#files[@]}" -eq 0 ]; then
+      echo "extract_preview_from_raw: no RAW files" >&2
+      return 1
+    fi
+    local rc=0
+    for f in "${files[@]}"; do
+      if [ ! -f "$f" ]; then
+        echo "'$f' is not a valid file" >&2
+        rc=1
+        continue
+      fi
+      if ! _is_camera_raw "$f"; then
+        echo "'$f' does not look like camera RAW (mime=$(file -b --mime-type -- "$f" 2>/dev/null || echo unknown))" >&2
+        rc=1
+        continue
+      fi
+      out="${f}.jpg"
+      if exiftool -b -JpgFromRaw -- "$f" >"$out" 2>/dev/null && [ -s "$out" ]; then
+        continue
+      fi
+      if exiftool -b -PreviewImage -- "$f" >"$out" 2>/dev/null && [ -s "$out" ]; then
+        continue
+      fi
+      if exiftool -b -OtherImage -- "$f" >"$out" 2>/dev/null && [ -s "$out" ]; then
+        continue
+      fi
+      rm -f -- "$out"
+      echo "'$f' has no embedded JPEG preview" >&2
+      rc=1
+    done
+    return "$rc"
+  }
+
+  extract-jpg-from-dngs() {
+    extract_preview_from_raw "$@"
+  }
 fi
 
-if cmds_exist youtube-dl; then
-  alias youtube-dl-best="youtube-dl -f bestvideo+bestaudio/best"
+if cmds_exist yt-dlp || cmds_exist youtube-dl; then
+  _yt_dlp_best() {
+    yt-dlp -f bestvideo+bestaudio/best --compat-options multistreams \
+      --extractor-args 'youtube:bypass_native_jsi' \
+      --extractor-args 'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416' \
+      "$@"
+  }
+
+  youtube-dl-best() {
+    if cmds_exist yt-dlp; then
+      _yt_dlp_best "$@"
+    else
+      youtube-dl -f bestvideo+bestaudio/best "$@"
+    fi
+  }
 fi
+
 if cmds_exist yt-dlp; then
-  alias yt-dlp-best="yt-dlp -f bestvideo+bestaudio/best --compat-options multistreams --extractor-args 'youtube:bypass_native_jsi' --extractor-args 'youtube:getpot_bgutil_baseurl=http://127.0.0.1:4416'"
-  alias yt-dlp-ffcookies-best="yt-dlp -f bestvideo+bestaudio/best --compat-options multistreams --extractor-args 'youtube:bypass_native_jsi' --extractor-args 'youtube:getpot_bgutil_baseurl=http://127.0.0.1:4416' --cookies-from-browser firefox:~/.mozilla/firefox/{firefox_profile} --user-agent 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0'"
-  alias yt-dlp-bravecookies-best="yt-dlp -f bestvideo+bestaudio/best --compat-options multistreams --extractor-args 'youtube:bypass_native_jsi' --extractor-args 'youtubepot-bgutilhttp:base_url=http://127.0.0.1:4416' --cookies-from-browser chrome:~/.config/BraveSoftware/Brave-Browser --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36'"
+  yt-dlp-best() {
+    _yt_dlp_best "$@"
+  }
+  yt-dlp-ffcookies-best() {
+    _yt_dlp_best --cookies-from-browser firefox:~/.mozilla/firefox/25g66ptz.default-release \
+      --user-agent 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0' \
+      "$@"
+  }
+  yt-dlp-bravecookies-best() {
+    _yt_dlp_best --cookies-from-browser chrome:~/.config/BraveSoftware/Brave-Browser \
+      --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36' \
+      "$@"
+  }
+elif cmds_exist youtube-dl; then
+  yt-dlp-best() {
+    youtube-dl-best "$@"
+  }
 fi
 
 if cmds_exist play; then
   # miller@diasp.de
-  # https://{personal_site}/posts/1810581
+  # https://diaspora.natrinicle.com/posts/1810581
   alias enterprise_engine="play -n -c2 synth whitenoise lowpass -1 120 lowpass -1 120 lowpass -1 120"
   alias vertiform_city="play -n -c2 synth whitenoise lowpass -1 120 lowpass -1 100 tremolo 6 70"
 fi
 
 if cmds_exist ffmpeg; then
-  convert_video_to_webm () {
-    filename=${1}
-    filename_wo_ext=$(echo ${filename} | rev | cut -d"." -f2- | rev)
-
-    # First pass
-    ffmpeg -i ${filename} -c:v libvpx-vp9 -pass 1 -b:v 0 -crf 21 -threads 8 -speed 4 -tile-columns 6 -frame-parallel 1 -an -f webm -y /dev/null
-
-    # Second pass
-    ffmpeg -i ${filename} -c:v libvpx-vp9 -pass 2 -b:v 0 -crf 21 -threads 8 -speed 2 -tile-columns 6 -frame-parallel 1 -auto-alt-ref 1 -lag-in-frames 25 -c:a libopus -b:a 96k -f webm ${filename_wo_ext}.webm
+  _media_has_video() {
+    local mime desc
+    mime=$(file -b --mime-type -- "$1" 2>/dev/null || true)
+    desc=$(file -b -- "$1" 2>/dev/null || true)
+    case "$mime" in
+      video/* | application/x-matroska | application/mxf | application/ogg)
+        return 0
+        ;;
+    esac
+    case "$desc" in
+      *Matroska* | *WebM* | *ISO\ Media* | *MP4* | *AVI* | *MPEG*)
+        return 0
+        ;;
+    esac
+    ffprobe -v error -select_streams v:0 -show_entries stream=codec_type -of csv=p=0 -- "$1" 2>/dev/null | grep -qx video
   }
 
-  stabilize_video () {
-    filename=${1}
-    filename_wo_ext=$(echo ${filename} | rev | cut -d"." -f2- | rev)
-    filename_ext=$(echo ${filename} | rev | cut -d"." -f1 | rev)
-    shakiness=${2:-5}
-    accuracy=${3:-15}
-    smoothing=${4:-30}
-
-    # First pass
-    ffmpeg -i ${filename} -vf vidstabdetect=shakiness=${shakiness}:accuracy=${accuracy} -f null -
-
-    # Second pass
-    ffmpeg -i ${filename} -vf vidstabtransform=smoothing=${smoothing}:input="transforms.trf" ${filename_wo_ext}.stabilized.${filename_ext}
+  _media_has_audio() {
+    local mime desc
+    mime=$(file -b --mime-type -- "$1" 2>/dev/null || true)
+    desc=$(file -b -- "$1" 2>/dev/null || true)
+    case "$mime" in
+      audio/* | application/ogg)
+        return 0
+        ;;
+    esac
+    case "$desc" in
+      *Audio* | *FLAC* | *WAVE* | *AIFF* | *Opus* | *MPEG\ ADTS*)
+        return 0
+        ;;
+    esac
+    ffprobe -v error -select_streams a:0 -show_entries stream=codec_type -of csv=p=0 -- "$1" 2>/dev/null | grep -qx audio
   }
-  if cmds_exist flac; then
-    convert_flac_to_mp3 () {
-      filename=${1}
-      filename_wo_ext=$(echo ${filename} | rev | cut -d"." -f2- | rev)
 
-      flac --silent --decode --stdout "${filename}" | ffmpeg -i - -map 0:a:0 -b:a 320k -v 0 -f mp3 "${filename_wo_ext}.mp3"
-    }
-  fi
+  # convert_video — container/codec from the output name; probe input as video.
+  # Usage: convert_video INPUT [OUTPUT]
+  # Default OUTPUT is INPUT with .webm (VP9 + Opus, two-pass).
+  convert_video() {
+    local input="${1:-}"
+    if [[ -z "$input" ]]; then
+      echo "Usage: convert_video INPUT [OUTPUT]" >&2
+      return 1
+    fi
+    if [[ ! -f "$input" ]]; then
+      echo "'$input' is not a valid file" >&2
+      return 1
+    fi
+    if ! _media_has_video "$input"; then
+      echo "'$input' does not look like video (mime=$(file -b --mime-type -- "$input" 2>/dev/null || echo unknown))" >&2
+      return 1
+    fi
+    local output="${2:-${input%.*}.webm}"
+    if [[ "$output" == "$input" ]]; then
+      output="${input}.webm"
+    fi
+    local ext="${output##*.}"
+    ext="${ext,,}"
+    case "$ext" in
+      webm)
+        ffmpeg -i "$input" -c:v libvpx-vp9 -pass 1 -b:v 0 -crf 21 -threads 8 -speed 4 \
+          -tile-columns 6 -frame-parallel 1 -an -f webm -y /dev/null
+        ffmpeg -i "$input" -c:v libvpx-vp9 -pass 2 -b:v 0 -crf 21 -threads 8 -speed 2 \
+          -tile-columns 6 -frame-parallel 1 -auto-alt-ref 1 -lag-in-frames 25 \
+          -c:a libopus -b:a 96k -f webm "$output"
+        ;;
+      mp4)
+        ffmpeg -i "$input" -map 0 -c:v libx264 -crf 21 -preset medium \
+          -c:a aac -b:a 192k -c:s mov_text "$output"
+        ;;
+      mkv)
+        ffmpeg -i "$input" -map 0 -c:v libx264 -crf 21 -preset medium \
+          -c:a aac -b:a 192k -c:s copy "$output"
+        ;;
+      *)
+        echo "convert_video: unsupported output '.$ext' (use webm, mp4, or mkv)" >&2
+        return 1
+        ;;
+    esac
+  }
+
+  convert_video_to_webm() {
+    convert_video "$1" "${1%.*}.webm"
+  }
+
+  stabilize_video() {
+    local filename="${1:-}"
+    if [[ -z "$filename" ]]; then
+      echo "Usage: stabilize_video FILE [shakiness [accuracy [smoothing]]]" >&2
+      return 1
+    fi
+    if [[ ! -f "$filename" ]]; then
+      echo "'$filename' is not a valid file" >&2
+      return 1
+    fi
+    if ! _media_has_video "$filename"; then
+      echo "'$filename' does not look like video (mime=$(file -b --mime-type -- "$filename" 2>/dev/null || echo unknown))" >&2
+      return 1
+    fi
+    local stem ext base
+    base="${filename##*/}"
+    if [[ "$base" == *.* ]]; then
+      stem="${filename%.*}"
+      ext="${filename##*.}"
+    else
+      stem="$filename"
+      ext="mkv"
+    fi
+    local shakiness="${2:-5}"
+    local accuracy="${3:-15}"
+    local smoothing="${4:-30}"
+
+    ffmpeg -i "$filename" -vf "vidstabdetect=shakiness=${shakiness}:accuracy=${accuracy}" -f null -
+    ffmpeg -i "$filename" -vf "vidstabtransform=smoothing=${smoothing}:input=transforms.trf" \
+      "${stem}.stabilized.${ext}"
+  }
+
+  # convert_audio — probe audio MIME / streams; encoder from OUTPUT extension.
+  # Usage: convert_audio INPUT [OUTPUT]
+  # Default OUTPUT is INPUT with .mp3 at 320k.
+  convert_audio() {
+    local input="${1:-}"
+    if [[ -z "$input" ]]; then
+      echo "Usage: convert_audio INPUT [OUTPUT]" >&2
+      return 1
+    fi
+    if [[ ! -f "$input" ]]; then
+      echo "'$input' is not a valid file" >&2
+      return 1
+    fi
+    if ! _media_has_audio "$input"; then
+      echo "'$input' does not look like audio (mime=$(file -b --mime-type -- "$input" 2>/dev/null || echo unknown))" >&2
+      return 1
+    fi
+    local output="${2:-${input%.*}.mp3}"
+    if [[ "$output" == "$input" ]]; then
+      output="${input}.mp3"
+    fi
+    local ext="${output##*.}"
+    ext="${ext,,}"
+    case "$ext" in
+      mp3)
+        ffmpeg -i "$input" -map 0:a:0 -b:a 320k -v 0 -f mp3 "$output"
+        ;;
+      ogg)
+        ffmpeg -i "$input" -map 0:a:0 -c:a libvorbis "$output"
+        ;;
+      opus)
+        ffmpeg -i "$input" -map 0:a:0 -c:a libopus -b:a 128k "$output"
+        ;;
+      wav)
+        ffmpeg -i "$input" -map 0:a:0 -c:a pcm_s16le "$output"
+        ;;
+      flac)
+        ffmpeg -i "$input" -map 0:a:0 -c:a flac "$output"
+        ;;
+      m4a | aac)
+        ffmpeg -i "$input" -map 0:a:0 -c:a aac -b:a 256k "$output"
+        ;;
+      aiff | aif)
+        ffmpeg -i "$input" -map 0:a:0 -c:a pcm_s16be "$output"
+        ;;
+      *)
+        echo "convert_audio: unsupported output '.$ext'" >&2
+        return 1
+        ;;
+    esac
+  }
+
+  convert_flac_to_mp3() {
+    convert_audio "$1" "${1%.*}.mp3"
+  }
 fi
 
 if cmds_exist mkvpropedit; then
-  function mkv_disable_subtitles () {
-    for mkv_file in *.mkv; do
-      mkvpropedit "${mkv_file}" --edit track:s1 --set flag-default=0 --set flag-forced=0
+  _is_matroska() {
+    local f="$1" mime desc lower
+    mime=$(file -b --mime-type -- "$f" 2>/dev/null || true)
+    desc=$(file -b -- "$f" 2>/dev/null || true)
+    lower="${f,,}"
+    case "$mime" in
+      video/x-matroska | application/x-matroska | video/webm | audio/webm | application/vnd.matroska)
+        return 0
+        ;;
+    esac
+    case "$desc" in
+      *Matroska* | *WebM*)
+        return 0
+        ;;
+    esac
+    case "$lower" in
+      *.mkv | *.mk3d | *.mka | *.webm)
+        return 0
+        ;;
+    esac
+    return 1
+  }
+
+  mkv_disable_subtitles() {
+    local files=() f cand
+    if [ "$#" -gt 0 ]; then
+      files=("$@")
+    else
+      shopt -s nullglob
+      for cand in *; do
+        [[ -f "$cand" ]] || continue
+        _is_matroska "$cand" && files+=("$cand")
+      done
+      shopt -u nullglob
+    fi
+    if [ "${#files[@]}" -eq 0 ]; then
+      echo "mkv_disable_subtitles: no Matroska files" >&2
+      return 1
+    fi
+    local rc=0
+    for f in "${files[@]}"; do
+      if [ ! -f "$f" ]; then
+        echo "'$f' is not a valid file" >&2
+        rc=1
+        continue
+      fi
+      if ! _is_matroska "$f"; then
+        echo "'$f' does not look like Matroska (mime=$(file -b --mime-type -- "$f" 2>/dev/null || echo unknown))" >&2
+        rc=1
+        continue
+      fi
+      mkvpropedit "$f" --edit track:s1 --set flag-default=0 --set flag-forced=0 || rc=1
     done
+    return "$rc"
   }
 fi
 
-function kill_hung_vlc_instances () {
+function kill_hung_vlc_instances() {
   vlc_instances_with_window=$(wmctrl -lp | grep [V]LC | awk '{print $3}' | tr -s '\n' '|' | tr -d '|$')
   vlc_instances_without_window=$(ps aux | grep [v]lc | awk '{print $2}' | grep -Pv "^${vlc_instances_with_window}$")
   if [ -n "${vlc_instances_without_window}" ]; then
@@ -72,7 +361,7 @@ function kill_hung_vlc_instances () {
 
 if cmds_exist docker; then
   alias whipper="docker run -ti --rm --device=/dev/cdrom \
-      --mount type=bind,source=${HOME}/.config/whipper,target=${HOME}/.config/whipper \
+      --mount type=bind,source=${HOME}/.config/whipper,target=/home/worker/.config/whipper \
       --mount type=bind,source=${PWD}/output,target=/output \
       whipperteam/whipper"
 fi

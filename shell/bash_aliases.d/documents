@@ -1,11 +1,138 @@
 if cmds_exist pandoc; then
-  md2pdf() {
-    if [[ -z "$1" ]]; then
-      echo "Usage: md2pdf <file.md>"
+  # convert_document — pandoc convert. Input format from magic/shebang, then name.
+  # Usage: convert_document INPUT [OUTPUT]
+  # OUTPUT extension selects the writer (pdf default). PDF uses XeLaTeX.
+  convert_document() {
+    if [[ -z "${1:-}" ]]; then
+      echo "Usage: convert_document INPUT [OUTPUT]" >&2
       return 1
     fi
     local input="$1"
-    local output="${input%.md}.pdf"
-    pandoc "$input" -o "$output" --pdf-engine=xelatex
+    if [[ ! -f "$input" ]]; then
+      echo "'$input' is not a valid file" >&2
+      return 1
+    fi
+    local output="${2:-${input%.*}.pdf}"
+    if [[ "$output" == "$input" ]]; then
+      output="${input}.pdf"
+    fi
+
+    local mime desc from="" writer extra=()
+    mime=$(file -b --mime-type -- "$input" 2>/dev/null || true)
+    desc=$(file -b -- "$input" 2>/dev/null || true)
+
+    _doc_from_mime() {
+      case "$1" in
+        text/markdown | text/x-markdown | text/x-web-markdown) echo markdown ;;
+        text/html) echo html ;;
+        text/x-rst | text/rst) echo rst ;;
+        text/x-org | text/org) echo org ;;
+        text/x-tex | application/x-tex) echo latex ;;
+        application/vnd.openxmlformats-officedocument.wordprocessingml.document) echo docx ;;
+        application/vnd.oasis.opendocument.text) echo odt ;;
+        application/epub+zip) echo epub ;;
+        application/rtf | text/rtf) echo rtf ;;
+        text/plain | application/octet-stream | inode/x-empty)
+          return 1
+          ;;
+        *)
+          case "$desc" in
+            *HTML*) echo html ;;
+            *Rich\ Text*) echo rtf ;;
+            *LaTeX*) echo latex ;;
+            *) return 1 ;;
+          esac
+          ;;
+      esac
+    }
+
+    _doc_from_name() {
+      local lower="${input,,}"
+      case "$lower" in
+        *.md | *.markdown | *.mdown) echo markdown ;;
+        *.rst | *.rest) echo rst ;;
+        *.html | *.htm) echo html ;;
+        *.org) echo org ;;
+        *.tex | *.latex) echo latex ;;
+        *.docx) echo docx ;;
+        *.odt) echo odt ;;
+        *.epub) echo epub ;;
+        *.rtf) echo rtf ;;
+        *) return 1 ;;
+      esac
+    }
+
+    _doc_from_head() {
+      local head first
+      head=$(head -c 2048 -- "$input" 2>/dev/null || true)
+      case "$head" in
+        *'#+TITLE'* | *'#+title'*)
+          echo org
+          return 0
+          ;;
+        *'<!DOCTYPE html'* | *'<!doctype html'* | *'<html'* | *'<HTML'*)
+          echo html
+          return 0
+          ;;
+        ---*)
+          echo markdown
+          return 0
+          ;;
+      esac
+      first=$(printf '%s\n' "$head" | sed -n '/[^[:space:]]/{p;q;}')
+      case "$first" in
+        '#'[[:space:]]*)
+          echo markdown
+          return 0
+          ;;
+      esac
+      return 1
+    }
+
+    from=$(_doc_from_mime "$mime") || from=""
+    if [[ -z "$from" ]]; then
+      from=$(_doc_from_name) || from=""
+    fi
+    if [[ -z "$from" ]]; then
+      from=$(_doc_from_head) || from=""
+    fi
+
+    local ext="${output##*.}"
+    ext="${ext,,}"
+    case "$ext" in
+      pdf)
+        writer=pdf
+        extra=(--pdf-engine=xelatex)
+        ;;
+      docx) writer=docx ;;
+      odt) writer=odt ;;
+      html | htm) writer=html ;;
+      rst) writer=rst ;;
+      md | markdown) writer=markdown ;;
+      org) writer=org ;;
+      epub) writer=epub ;;
+      rtf) writer=rtf ;;
+      tex | latex) writer=latex ;;
+      *) writer="$ext" ;;
+    esac
+
+    if [[ -n "$from" ]]; then
+      pandoc -f "$from" -t "$writer" "$input" -o "$output" "${extra[@]}"
+    else
+      pandoc -t "$writer" "$input" -o "$output" "${extra[@]}"
+    fi
+  }
+
+  md2pdf() {
+    if [[ -z "${1:-}" ]]; then
+      echo "Usage: md2pdf <file.md>" >&2
+      return 1
+    fi
+    local input="$1"
+    local output="${input%.*}.pdf"
+    if [[ "$output" == "$input" ]]; then
+      output="${input}.pdf"
+    fi
+    convert_document "$input" "$output"
   }
 fi

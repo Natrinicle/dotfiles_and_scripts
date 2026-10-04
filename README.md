@@ -48,12 +48,12 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 
 | File | Role |
 |------|------|
-| `block` | Disk/SMART, `dd-progress` |
-| `compression` | pigz/xz, `extract` |
+| `block` | Disk/SMART failure signals, `dd-progress` |
+| `compression` | pigz/xz, `extract` / `compress` (magic then name) |
 | `deb_pkg` | apt/dpkg wrappers |
 | `direnv` | direnv hook |
 | `docker` | image size / registry tags |
-| `documents` | `md2pdf` (pandoc + XeLaTeX) |
+| `documents` | `convert_document` / `md2pdf` (pandoc, magic then name) |
 | `filesystem` | fsck, open-files, dig-holes, `cpv` |
 | `firewall` | ufw cleanup |
 | `git` | stats + reset helper |
@@ -62,14 +62,14 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 | `ipfs` | IPFS (content-addressed online filesystem) — pin/gc and publish helpers |
 | `ipmi` | IPMI chassis helpers |
 | `lxc` | optional ksm-wrapper |
-| `media` | yt-dlp, ffmpeg, whipper |
+| `media` | yt-dlp, ffmpeg convert/stabilize, RAW preview, whipper |
 | `memory` | mem/swap/zram/ksm stats |
-| `network` | nm/ip, dig-short, redirect tests |
+| `network` | nm/ip, dig-short, nft/iptables port route, cert names |
 | `process` | psgrep / suspend |
-| `pyenv` / `python` | pyenv, round, nuitka, venv |
+| `pyenv` / `python` | pyenv, round, nuitka, `pyclean`, venv |
 | `ssh` | known_hosts + scp home rc |
 | `system` | service, load, dkms-buildall |
-| `text` / `utils` | dedup, vercomp, genpass, thefuck |
+| `text` / `utils` | dedup, vercomp, genpass, thefuck, `open` (MIME) |
 | `wireguard` | wg helpers |
 
 ### Environment — scripts (`bin/` → `~/.local/bin`)
