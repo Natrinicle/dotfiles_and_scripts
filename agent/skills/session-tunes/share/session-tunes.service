@@ -1,0 +1,21 @@
+[Unit]
+Description=Session tunes (quiet RTTTL while Grok/Claude work)
+After=pipewire.service pipewire-pulse.service
+Wants=pipewire-pulse.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 %h/.claude/skills/session-tunes/scripts/daemon.py
+Restart=always
+RestartSec=3
+TimeoutStopSec=8
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=session-tunes
+Environment=PYTHONUNBUFFERED=1
+Environment=XDG_RUNTIME_DIR=/run/user/%U
+Environment=PULSE_SERVER=unix:/run/user/%U/pulse/native
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

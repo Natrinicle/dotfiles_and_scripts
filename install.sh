@@ -229,6 +229,16 @@ if [[ $DO_BIN -eq 1 ]]; then
 			fi
 		fi
 	done
+	if [[ -d $ROOT/share ]]; then
+		run mkdir -p "$HOME/.config/systemd/user"
+		while IFS= read -r -d '' unit; do
+			base=$(basename "$unit")
+			install_file "$unit" "$HOME/.config/systemd/user/$base" "share/$base"
+		done < <(find "$ROOT/share" -name '*.service' -print0)
+		if [[ $DRY_RUN -eq 0 ]]; then
+			systemctl --user daemon-reload >/dev/null 2>&1 || true
+		fi
+	fi
 fi
 
 if [[ $DO_AGENT -eq 1 ]]; then
@@ -290,5 +300,6 @@ Next steps:
   3. Agent: restart Claude Code / Grok so rules and skills reload
   4. Agent: fill {company} / {app_package} placeholders if needed
   5. Replacing a live skill with a pack stub requires --force
+  6. Optional: session-tunes install --enable
 
 EOF
