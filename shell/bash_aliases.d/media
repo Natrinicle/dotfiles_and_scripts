@@ -70,7 +70,7 @@ if cmds_exist exiftool; then
     return "$rc"
   }
 
-  extract-jpg-from-dngs() {
+  function extract-jpg-from-dngs {
     extract_preview_from_raw "$@"
   }
 fi
@@ -83,7 +83,7 @@ if cmds_exist yt-dlp || cmds_exist youtube-dl; then
       "$@"
   }
 
-  youtube-dl-best() {
+  function youtube-dl-best {
     if cmds_exist yt-dlp; then
       _yt_dlp_best "$@"
     else
@@ -93,21 +93,21 @@ if cmds_exist yt-dlp || cmds_exist youtube-dl; then
 fi
 
 if cmds_exist yt-dlp; then
-  yt-dlp-best() {
+  function yt-dlp-best {
     _yt_dlp_best "$@"
   }
-  yt-dlp-ffcookies-best() {
+  function yt-dlp-ffcookies-best {
     _yt_dlp_best --cookies-from-browser firefox:~/.mozilla/firefox/25g66ptz.default-release \
       --user-agent 'Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/109.0' \
       "$@"
   }
-  yt-dlp-bravecookies-best() {
+  function yt-dlp-bravecookies-best {
     _yt_dlp_best --cookies-from-browser chrome:~/.config/BraveSoftware/Brave-Browser \
       --user-agent 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36' \
       "$@"
   }
 elif cmds_exist youtube-dl; then
-  yt-dlp-best() {
+  function yt-dlp-best {
     youtube-dl-best "$@"
   }
 fi
