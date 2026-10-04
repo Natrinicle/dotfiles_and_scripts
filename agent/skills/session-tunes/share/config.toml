@@ -1,0 +1,24 @@
+# Quiet RTTTL flock while Grok/Claude work. Modem only here and there.
+# PCM amplitude is the volume control. Triangle RTTTL is quieter than square.
+
+enabled = true
+sample_rate = 22050
+busy_amplitude = 0.0039
+modem_amplitude = 0.0068
+alert_amplitude = 0.0092
+error_amplitude = 0.012
+pulse_volume = 65536
+poll_interval_s = 0.5
+generate_interval_s = 900
+activity_window_s = 8.0
+attention_hold_s = 12.0
+busy_rotate_s = 180.0
+sting_debounce_s = 20.0
+ollama_url = "http://127.0.0.1:11434"
+ollama_model = "gemma4"
+wave = "triangle"
+thinking_sound = "peppy"
+fade_s = 0.9
+flock_max = 250
+modem_chance = 0.15
+evolve_batch = 10
