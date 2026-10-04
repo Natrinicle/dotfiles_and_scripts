@@ -110,7 +110,7 @@ def _modem_roll(rng: random.Random, cfg: dict[str, Any]) -> tuple[float, bool]:
     chance = float(cfg.get("modem_chance") or 0.15)
     if rng.random() > chance:
         return 0.0, False
-    return rng.uniform(0.07, 0.13), rng.random() < 0.25
+    return rng.uniform(0.07, 0.13), True
 
 
 def drift_rtttl_line(line: str, rng: random.Random) -> str:
@@ -532,7 +532,7 @@ class Flock:
         *,
         amplitude: float,
         sample_rate: int,
-        modem_amplitude: float = 0.0068,
+        modem_amplitude: float = 0.0051,
         wave: str | None = None,
     ) -> bytes:
         use_wave = wave or sheep.wave or "triangle"

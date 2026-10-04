@@ -1,12 +1,12 @@
-# Quiet RTTTL flock while Grok/Claude work. Modem only here and there.
-# PCM amplitude is the volume control. Triangle RTTTL is quieter than square.
+# Quiet RTTTL flock while Grok/Claude work. 70s computer-room analog beeps here and there.
+# paplay media.role=abstract. PCM amplitudes are the real volume.
 
 enabled = true
 sample_rate = 22050
-busy_amplitude = 0.0039
-modem_amplitude = 0.0068
-alert_amplitude = 0.0092
-error_amplitude = 0.012
+busy_amplitude = 0.0045
+modem_amplitude = 0.0051
+alert_amplitude = 0.0106
+error_amplitude = 0.0138
 pulse_volume = 65536
 poll_interval_s = 0.5
 generate_interval_s = 900

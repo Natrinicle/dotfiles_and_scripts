@@ -1,15 +1,15 @@
 ---
 name: session-tunes
-description: Quiet evolving RTTTL flock while Grok/Claude think, occasional 1960s modem, unique stings on needed input or failure. Use when session soundtrack, chiptune, ringtone codes, Electric Sheep audio, busy/idle audio, or local Ollama tone generation comes up.
+description: Quiet evolving RTTTL flock while Grok/Claude think, occasional 70s computer-room analog beeps, unique stings on needed input or failure. Use when session soundtrack, chiptune, ringtone codes, Electric Sheep audio, busy/idle audio, or local Ollama tone generation comes up.
 ---
 
 # Session Tunes
 
-A user systemd player runs an Electric Sheep-style flock of quiet RTTTL clips while a Grok or Claude session is thinking. Clips crossfade, never the same genome twice in a row. Bell 103 modem shows up on about 15% of clips. Alerts are unique flock stings, slightly louder and more urgent by type.
+A user systemd player runs an Electric Sheep-style flock of quiet RTTTL clips while a Grok or Claude session is thinking. Clips crossfade, never the same genome twice in a row. A 70s computer-room analog beep train (TechMoan 38:36 sting: 1650 → 1890 → 2025 Hz boop, then 1495/2740 Hz doots) shows up on about 15% of clips. Alerts are unique flock stings, slightly louder and more urgent by type.
 
 The skill tree ships original short seeds. Drop extra `.rtttl` files into `~/.local/share/session-tunes/library/` for more variety. The flock mutates those plus local Ollama `gemma4` motifs every 15 minutes. Keep downloaded ringtones out of this skill tree.
 
-Keep background far below calls/media. PCM: `busy_amplitude = 0.0039` (triangle RTTTL), `modem_amplitude = 0.0068`, `alert_amplitude = 0.0092`, `error_amplitude = 0.012`. paplay uses `media.role=abstract`.
+Keep background far below calls/media. PCM: `busy_amplitude = 0.0045` (triangle RTTTL), `modem_amplitude = 0.0051`, `alert_amplitude = 0.0106`, `error_amplitude = 0.0138`. paplay uses `media.role=abstract`.
 
 ## Layout
 

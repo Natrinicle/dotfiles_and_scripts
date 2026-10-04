@@ -19,10 +19,10 @@ EXAMPLE_CONFIG = SKILL_DIR / "share" / "config.toml"
 DEFAULTS: dict[str, Any] = {
     "enabled": True,
     "sample_rate": 22050,
-    "busy_amplitude": 0.0039,
-    "modem_amplitude": 0.0068,
-    "alert_amplitude": 0.0092,
-    "error_amplitude": 0.012,
+    "busy_amplitude": 0.0045,
+    "modem_amplitude": 0.0051,
+    "alert_amplitude": 0.0106,
+    "error_amplitude": 0.0138,
     "pulse_volume": 65536,
     "fade_s": 0.9,
     "flock_max": 250,
@@ -76,7 +76,7 @@ def load_config() -> dict[str, Any]:
 
 def _dumps(data: dict[str, Any]) -> str:
     lines = [
-        "# Quiet RTTTL / Bell 103 modem while Grok/Claude work.",
+        "# Quiet RTTTL / 70s computer-room analog beeps while Grok/Claude work.",
         "# PCM amplitude is the volume control. Keep this tiny.",
         "",
     ]
