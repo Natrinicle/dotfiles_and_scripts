@@ -1,0 +1,9 @@
+{
+  "name": "rperks-activate-coupons",
+  "private": true,
+  "type": "module",
+  "description": "Local runner that signs into your own RPerks account and activates coupons",
+  "dependencies": {
+    "puppeteer-core": "^24.15.0"
+  }
+}

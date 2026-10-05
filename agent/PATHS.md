@@ -14,4 +14,4 @@ Skills use placeholders so Claude Code and Grok can share the same pack.
 
 ## Helper scripts
 
-Install repo `bin/` to **`~/.local/bin`** (on `PATH`). Skills should call bare commands such as `morning-data-gather` or `speakr-api`, never a vendor-specific scripts directory.
+Install repo `bin/` to **`~/.local/bin`** (on `PATH`). Skills should call bare commands such as `morning-data-gather`, `speakr-api`, or `rperks-activate`, never a vendor-specific scripts directory.
