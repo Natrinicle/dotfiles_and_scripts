@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+set -euo pipefail
+ROOT="${RPERKS_APP_DIR:-$HOME/.local/bin/rperks-activate-coupons}"
+exec /usr/bin/node "${ROOT}/run-rperks.mjs" "$@"
