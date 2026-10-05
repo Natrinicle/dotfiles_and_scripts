@@ -29,11 +29,11 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact)
+├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # ~20 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 43 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 44 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -85,6 +85,8 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 | `docker-service-check.sh` | Docker service health check |
 | `unpack-artifact` | Classify APK/XAPK/IPA/ELF/firmware and print likely protocol sources |
 | `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work (`install`/`status`/`mute`/`test`) |
+| `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |
+| `rperks-activate-coupons/` | Puppeteer-core app (own RPerks account). Units in `share/rperks-activate-coupons/` |
 
 Skills reference these as **PATH commands**, not a vendor-specific scripts directory.
 See `agent/PATHS.md` for `{MEMORY_ROOT}`, `{AGENT_HOME}`, etc.
@@ -106,7 +108,7 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 ask about other toolkit repos), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware), etc.
 
-**Skills** (43) include packaging, scanners, PII detection, MemPalace, Tofu
+**Skills** (44) include packaging, scanners, PII detection, MemPalace, Tofu
 plan review, local-vs-cloud routing (`model-router`, `skill-router`),
 Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
@@ -116,7 +118,8 @@ printable pages (`printable-webpage`),
 resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
 `decision-judge` (parent-as-judge, 2- or 4-advocate court),
-and `session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works),
+`session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works),
+and `rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),
 usable on either platform.
 
 Memory paths: resolve `~/.claude/memory` or `~/.grok/memory` (often one
@@ -152,8 +155,19 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | `{app_package}` / `{server_package}` | Optional app path templates |
 | `{SECURITY_TICKET_PROJECT}` | Optional issue-tracker project key |
 | `{MEMORY_ROOT}` / `{AGENT_HOME}` | Agent config and memory roots |
+| `you@example.com` / `replace-me` | RPerks username/password in `config.json` (never committed) |
+| store `latitude` / `longitude` | Store geopin for offer geofence; example uses `null` |
 
 `${HOME}` remains shell-expandable.
+
+## Vendor-specific bits
+
+| Item | Why it stays named |
+|------|--------------------|
+| Ridley's RPerks / `rperks.shopridleys.com` | Origin and offer paths the runner navigates |
+| `prod.kacu.app` / `ridleys.immapi.com` | Cashback iframe and session origins |
+
+Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.
 
 ## Install
 
@@ -167,6 +181,12 @@ cd /path/to/dotfiles_and_scripts
 ./install.sh --shell --bin
 source ~/.bashrc                # after shell install
 # restart Claude Code / Grok after --agent
+# RPerks timer is copied, not enabled:
+#   cp ~/.local/bin/rperks-activate-coupons/config.example.json \
+#      ~/.local/bin/rperks-activate-coupons/config.json
+#   chmod 600 ~/.local/bin/rperks-activate-coupons/config.json
+#   systemctl --user enable --now rperks-activate-install.service
+#   systemctl --user enable --now rperks-activate.timer
 ```
 
 Default install **does not overwrite**. Live Claude/Grok skills are often longer
@@ -190,7 +210,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 |------|---------|
 | **pipx / uv tool shims** (ruff, yt-dlp, esptool, semgrep, …) | Install via package managers; do not vendor symlinks |
 | **claude / grok / agent** | CLI installs; not source packs |
-| **adf-ocr / check_all_drives_health / voice-recorder** | **Shipped** under `bin/` |
+| **adf-ocr / check_all_drives_health / voice-recorder / rperks-activate** | **Shipped** under `bin/` (RPerks units in `share/`) |
 | **Backup / sync-conflict copies of scripts** | Skip |
 | **reimage-kdialog** | Useful KDE image batch helper, but **upstream third-party** (GPL); install from upstream / distro packaging if needed |
 | **blisp** | Binary firmware tool; distribute upstream |
@@ -206,6 +226,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 | Slack scraper auth | Optional `/tmp/slack-scraper/auth.json` (or `SLACK_AUTH_FILE`) |
 | `voice-recorder` Python deps | `pip install -r bin/requirements-voice-recorder.txt` (or `VR_PYTHON` venv) |
 | Calendar | Optional via `CALENDAR_CMD` or `CALENDAR_ICS_URL` (see morning-data-gather) |
+| RPerks runner | Node, Chromium (`CHROME_PATH` or `/usr/bin/chromium`), `npm install --omit=dev` in the app dir |
 
 ## What is intentionally excluded
 
@@ -213,6 +234,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 - Optional directory LDAP (example only, not installed by default)  
 - Personal memory files / contact dumps  
 - Secrets, SSH keys, swap/sync-conflict files  
+- RPerks `config.json`, Chrome profile, and `node_modules/` (example config only)  
 
 ## Re-export
 

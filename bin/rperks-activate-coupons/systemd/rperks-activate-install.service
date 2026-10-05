@@ -1,0 +1,14 @@
+[Unit]
+Description=Install npm deps for RPerks coupon activator
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=%h/.local/bin/rperks-activate-coupons
+ExecStart=/usr/bin/npm install --omit=dev --no-fund --no-audit
+TimeoutStartSec=180
+RemainAfterExit=yes
+
+[Install]
+WantedBy=default.target

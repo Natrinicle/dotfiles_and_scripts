@@ -6,3 +6,4 @@
 | Large office document skill bundles | Huge schema trees |
 | Live tokens, MCP OAuth, private hosts | Secrets |
 | Personal contact memory dumps | PII |
+| RPerks `config.json`, Chrome profile, `node_modules/` | Host secrets / re-downloadable |

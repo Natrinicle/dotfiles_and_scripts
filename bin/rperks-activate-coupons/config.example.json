@@ -1,0 +1,9 @@
+{
+  "username": "you@example.com",
+  "password": "replace-me",
+  "delayMs": 450,
+  "headless": true,
+  "userDataDir": "~/.config/rperks-chrome",
+  "latitude": null,
+  "longitude": null
+}

@@ -34,7 +34,9 @@ Shell installs:
   shell/bashrc          -> ~/.bashrc
   shell/bash_aliases    -> ~/.bash_aliases
   shell/bash_aliases.d  -> ~/.bash_aliases.d/  (merge; does not delete extras)
-  bin/*                 -> ~/.local/bin/
+  bin/*                 -> ~/.local/bin/  (files)
+  bin/<dir>/            -> ~/.local/bin/<dir>/
+  share/**/*.service,.timer -> ~/.config/systemd/user/  (does not enable)
 
 Agent installs (single shared trees):
   agent/rules/*         -> ~/.claude/rules/
@@ -152,6 +154,9 @@ install_tree_merge() {
 	local f base
 	while IFS= read -r -d '' f; do
 		base=${f#"$from"/}
+		case "$base" in
+		node_modules | node_modules/* | config.json | .env) continue ;;
+		esac
 		install_file "$f" "$to/$base" "$bsub/$base"
 	done < <(find "$from" -type f -print0)
 }
@@ -229,12 +234,22 @@ if [[ $DO_BIN -eq 1 ]]; then
 			fi
 		fi
 	done
+	for d in "$ROOT/bin"/*; do
+		[[ -d $d ]] || continue
+		name=$(basename "$d")
+		[[ $name == __pycache__ ]] && continue
+		dest="$HOME/.local/bin/$name"
+		install_tree_merge "$d" "$dest" "bin/$name"
+		if [[ $DRY_RUN -eq 0 && -f $dest/systemd/install-user-units.sh ]]; then
+			chmod +x "$dest/systemd/install-user-units.sh"
+		fi
+	done
 	if [[ -d $ROOT/share ]]; then
 		run mkdir -p "$HOME/.config/systemd/user"
 		while IFS= read -r -d '' unit; do
 			base=$(basename "$unit")
 			install_file "$unit" "$HOME/.config/systemd/user/$base" "share/$base"
-		done < <(find "$ROOT/share" -name '*.service' -print0)
+		done < <(find "$ROOT/share" \( -name '*.service' -o -name '*.timer' \) -print0)
 		if [[ $DRY_RUN -eq 0 ]]; then
 			systemctl --user daemon-reload >/dev/null 2>&1 || true
 		fi
@@ -301,5 +316,8 @@ Next steps:
   4. Agent: fill {company} / {app_package} placeholders if needed
   5. Replacing a live skill with a pack stub requires --force
   6. Optional: session-tunes install --enable
+  7. Optional: RPerks — cp config.example.json → config.json (mode 600), then
+     systemctl --user enable --now rperks-activate-install.service
+     systemctl --user enable --now rperks-activate.timer
 
 EOF
