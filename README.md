@@ -108,8 +108,10 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 ask about other toolkit repos), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware), etc.
 
-**Skills** (44) include packaging, scanners, PII detection, MemPalace, Tofu
-plan review, local-vs-cloud routing (`model-router`, `skill-router`),
+**Skills** (44) include packaging, scanners, PII detection, MemPalace
+(`mine` is a directory; stage under `~/.mempalace/staging/` with `--mode projects`
+when the hub unit uses `PrivateTmp`), Tofu plan review,
+local-vs-cloud routing (`model-router`, `skill-router`),
 Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
 compiled-app unpack (`reverse-engineering-protocols`, then
