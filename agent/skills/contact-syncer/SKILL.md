@@ -45,7 +45,8 @@ For people with enough signal in the window:
 - Preserve hand-written notes; append dated observations  
 
 Do **not** write to desktop address books or platform-specific contact UIs from
-this skill. Export/sync is a separate user choice outside this pack.
+this skill. Use `update-contacts-from-sources` for address-book cards from
+dumps (people **or** businesses; `Me to` / `Voicemail from` are cruft).
 
 ## Friction → other skills
 

@@ -33,7 +33,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # ~20 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 44 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 45 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -108,7 +108,7 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 ask about other toolkit repos), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware), etc.
 
-**Skills** (44) include packaging, scanners, PII detection, MemPalace
+**Skills** (45) include packaging, scanners, PII detection, MemPalace
 (`mine` is a directory; stage under `~/.mempalace/staging/` with `--mode projects`
 when the hub unit uses `PrivateTmp`), Tofu plan review,
 local-vs-cloud routing (`model-router`, `skill-router`),
@@ -121,6 +121,8 @@ resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
 `decision-judge` (parent-as-judge, 2- or 4-advocate court),
 `session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works),
+`update-contacts-from-sources` (address-book create/patch from dumps; some
+cards are businesses; `Me to` / `Voicemail from` are cruft),
 and `rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),
 usable on either platform.
 
