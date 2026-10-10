@@ -1,0 +1,14 @@
+kind: agent-toolkit
+version: "2026-10-09"
+source: sanitized copy of server-skills
+description: Portable agent skills for Grok/Claude-style agents. Includes writing style isolation rules, scanners, and domain tools.
+placeholders:
+  user: "{user}"
+  company: "{company}"
+  location: "{location}"
+  home: "${HOME}"
+notes:
+  - nate-writing-style and resume-tailor contain personal voice patterns; adapt or replace for other users.
+  - Multi-party group chat isolation rule added 2026-10-09: only verified user messages update style profile.
+  - Residual personal tokens may remain in style reference files by design (voice examples).
+install: see README.md
