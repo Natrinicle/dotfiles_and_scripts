@@ -29,11 +29,11 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks)
+├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # ~20 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 45 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # 22 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # 49 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -84,6 +84,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 | `slack-auth-check` | Messaging auth preflight |
 | `docker-service-check.sh` | Docker service health check |
 | `unpack-artifact` | Classify APK/XAPK/IPA/ELF/firmware and print likely protocol sources |
+| `find-patch-queue` | File and update `.find-patch-queue.json` for tester / skeptic / patcher agents |
 | `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work (`install`/`status`/`mute`/`test`) |
 | `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |
 | `rperks-activate-coupons/` | Puppeteer-core app (own RPerks account). Units in `share/rperks-activate-coupons/` |
@@ -106,11 +107,18 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 `memory-scope-review`, `lazy-load-data` (`{MEMORY_ROOT}`),
 `skill-toolkit-sync` (copy skill/rule edits into the current toolkit, then
 ask about other toolkit repos), `skill-composition` (sub-skills, do not
-broaden one skill across IR vs APK vs firmware), etc.
+broaden one skill across IR vs APK vs firmware, or across finder vs
+patcher vs skeptic), `independent-checker` (the agent that produced a
+claim does not grade it), `system-security` (WAN bind of kube-apiserver /
+kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
+`mempalace-timeline-supersede` (keep older drawers; expire current truth with
+`kg_supersede`),
+etc.
 
-**Skills** (45) include packaging, scanners, PII detection, MemPalace
+**Skills** (49) include packaging, scanners, PII detection, MemPalace
 (`mine` is a directory; stage under `~/.mempalace/staging/` with `--mode projects`
-when the hub unit uses `PrivateTmp`), Tofu plan review,
+when the hub unit uses `PrivateTmp`; replacements use `kg_supersede` so older
+drawers stay on the timeline), Tofu plan review,
 local-vs-cloud routing (`model-router`, `skill-router`),
 Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
@@ -119,6 +127,8 @@ compiled-app unpack (`reverse-engineering-protocols`, then
 printable pages (`printable-webpage`),
 resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
+a find-patch loop (`find-patch-loop`, then `bug-finder` / `bug-skeptic` /
+`bug-patcher`, queue CLI `find-patch-queue`),
 `decision-judge` (parent-as-judge, 2- or 4-advocate court),
 `session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works),
 `update-contacts-from-sources` (address-book create/patch from dumps; some

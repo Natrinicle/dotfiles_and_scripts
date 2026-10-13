@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "find-patch-queue",
+  "type": "object",
+  "required": ["items"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "status", "title", "repro", "evidence"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^BUG-[0-9]{3,}$" },
+          "status": {
+            "type": "string",
+            "enum": [
+              "reported",
+              "confirmed",
+              "rejected",
+              "patching",
+              "patched",
+              "verified",
+              "wontfix",
+              "needs-info"
+            ]
+          },
+          "title": { "type": "string", "minLength": 1 },
+          "scope": { "type": "string" },
+          "repro": { "type": "string", "minLength": 1 },
+          "expected": { "type": "string" },
+          "actual": { "type": "string" },
+          "evidence": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "finder": { "type": "string" },
+          "skeptic": {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": ["real", "false", "needs-info"]
+              },
+              "reason": { "type": "string" }
+            }
+          },
+          "patcher": { "type": "string" },
+          "verify": {
+            "type": "object",
+            "properties": {
+              "verdict": {
+                "type": "string",
+                "enum": ["fixed", "still-open"]
+              },
+              "evidence": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

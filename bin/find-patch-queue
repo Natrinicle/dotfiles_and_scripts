@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# File and update a find-patch queue (.find-patch-queue.json).
+# Wrapper around find-patch-loop scripts/find_patch_queue.py
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+candidates=(
+	"${HOME}/.claude/skills/find-patch-loop/scripts/find_patch_queue.py"
+	"${here}/../agent/skills/find-patch-loop/scripts/find_patch_queue.py"
+)
+
+for script in "${candidates[@]}"; do
+	if [[ -f $script ]]; then
+		exec python3 "$script" "$@"
+	fi
+done
+
+echo "find_patch_queue.py not found (install find-patch-loop)" >&2
+exit 1

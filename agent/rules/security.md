@@ -17,6 +17,10 @@ paths:
 
 Apply when touching auth, APIs, infrastructure, or dependency surfaces.
 
+Control-plane and WAN bind checks (kube-apiserver, kubelet, SSH, IPMI,
+dashboards) are **system-security** (always on). Scraped CISA KEV / NVD /
+GainSec review is **cve-catalog**.
+
 ## Input validation
 - Validate and sanitize at trust boundaries.
 - Prefer schema libraries (Zod, Valibot, Joi, etc.) over ad-hoc checks.
