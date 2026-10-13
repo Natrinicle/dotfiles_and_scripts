@@ -24,5 +24,8 @@ unrelated media or artifact kinds.
    fold IR decode into decompile skills.
 5. New sub-skill only when a kind has its own unpack path or bit-map rules.
    Do not add a sub-skill that only restates the parent.
+6. **Find vs patch vs skeptic** → **find-patch-loop**, then **bug-finder**,
+   **bug-skeptic**, **bug-patcher**. Do not grow **check-work** into a hunt
+   loop. Session-complete verification stays **check-work**.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

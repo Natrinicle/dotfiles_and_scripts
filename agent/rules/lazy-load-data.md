@@ -21,6 +21,7 @@ Keep always-on context small. Store large reference material outside the main me
 |---------|-------------------------------------|
 | Working in a large monorepo | `workspace-repos.md`, `platform-repo-structure.md` |
 | Security review of any code | `vulnerability-patterns.md` |
+| Building or exposing a host / VM / cluster | rule `system-security`; `vulnerability-patterns.md` |
 | Browser automation | browser automation notes / chrome spawn patterns |
 | Local tracing / OTEL demos | local observability setup notes |
 | Model routing / cost audits | `model-routing-table.md` |
