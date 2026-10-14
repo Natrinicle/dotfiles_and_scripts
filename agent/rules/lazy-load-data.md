@@ -28,6 +28,7 @@ Keep always-on context small. Store large reference material outside the main me
 | Browser automation | browser automation notes / chrome spawn patterns |
 | Local tracing / OTEL demos | local observability setup notes |
 | Model routing / cost audits | `model-routing-table.md` |
+| Packaging a toolkit | `toolkit-homes.md`; classify generic pack vs repo-specific product work first |
 | Contacts / messaging analysis | contacts profiles (store carefully; may contain PII) |
 
 Do not list secrets, tokens, or private hostnames in always-loaded files.

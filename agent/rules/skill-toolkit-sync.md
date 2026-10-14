@@ -4,8 +4,20 @@ When you **create or edit a skill or a rule**, copy that change into the
 **general pack** in the same turn. Specialized packs are domain-only — see
 below. Do not ask “update specialized packs too?” after a general-pack copy.
 
-Load **package-toolkit** for layout, sanitization, and `toolkit.yaml` /
-README freshness. Do not skip the copy because the home skill already exists.
+Load **package-toolkit** for layout, sanitization, classify-first, and
+`toolkit.yaml` / README freshness. Do not skip the copy because the home
+skill already exists.
+
+## Classify first
+
+**package-toolkit** sanitizes **toolkits**. Decide the kind before copying:
+
+| Kind | Destination |
+|------|-------------|
+| Generic reusable pack (agent skills/rules, shell helpers, Flipper IR, court monitor) | `general_pack` from toolkit-homes.yaml, or a specialized pack when the domain matches |
+| Repo-specific product work (compose, ADRs, services, product hostnames) | That application repo. Residual-scan personal tokens. Keep product names. PR in that repo when the project requires it. |
+
+A compose stack or ADR that names `{product}` stays in that product repo.
 
 ## Resolve pack paths from host config
 

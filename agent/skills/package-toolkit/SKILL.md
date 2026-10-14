@@ -2,7 +2,8 @@
 name: package-toolkit
 description: >
   Package agent toolkits or environment packs into a sanitized shareable tree.
-  Abstracts personal paths and org names. Helpers belong on PATH.
+  Abstracts personal paths and org names. Use when deciding generic pack vs
+  repo-specific product work. Helpers belong on PATH.
 ---
 
 # Package Toolkit
@@ -45,12 +46,24 @@ copy. See `skill-toolkit-sync`.
 - Role-level wording when vendor is incidental  
 - Keep real CLI names when the CLI is the interface  
 
+## Classify first
+
+Sanitize when creating or updating a **toolkit**. Decide the kind before copying:
+
+| Kind | Where it lives |
+|------|----------------|
+| Generic reusable pack | `general_pack` from `toolkit-homes.yaml`, or a specialized pack whose domain matches |
+| Repo-specific product work | The application repo (compose, ADRs, services, product hostnames). Residual-scan personal tokens. Keep product names. |
+
+A laptop compose stack or ADR that names `{product}` stays in that product repo.
+
 ## Workflow
 
-1. Inventory; drop secrets, backups, and package-manager symlinks  
-2. `scripts/sanitize-copy.py` + abstraction rules  
-3. `toolkit.yaml` + README (keep README fresh with content)  
-4. Residual-scan for names, emails, tokens, absolute homes  
+1. Classify (table above)
+2. Inventory; drop secrets, backups, and package-manager symlinks
+3. `scripts/sanitize-copy.py` + abstraction rules
+4. `toolkit.yaml` + README (keep README fresh with content)
+5. Residual-scan for names, emails, tokens, absolute homes  
 
 ## Install contract
 
