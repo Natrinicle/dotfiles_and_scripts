@@ -18,6 +18,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | **Safe to share** | Secrets and machine-local paths kept out; optional LDAP is example-only |
 | **Installable** | `install.sh --shell` / `--agent` / `--all`; skips existing files unless `--force`; Grok links to Claude |
 | **Reusable packager** | Ship `package-toolkit` so others can re-export their own trees |
+| **pre-commit** | `.pre-commit-config.yaml` — gitleaks + hygiene (`pre-commit install`) |
 
 ## What's where
 

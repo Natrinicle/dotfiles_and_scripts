@@ -74,4 +74,3 @@ Nimble / Kev) shape, not a chat-essay shape. Keep current T0 on the local chat
 model until a DMM is installed and eval'd (Nimble needs Ollama ≥0.35). Do not
 use a DMM for `decision-judge` advocates or other T3 prose. Details:
 `{MEMORY_ROOT}/decision-making-models-2026-10-08.md`.
-

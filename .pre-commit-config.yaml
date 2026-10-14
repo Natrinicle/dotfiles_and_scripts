@@ -1,0 +1,37 @@
+# Generic pack: secrets + hygiene first. shellcheck/shfmt are a follow-up
+# once aliases and helper fragments get shebangs.
+
+minimum_pre_commit_version: '3.2.0'
+
+default_language_version:
+  python: python3.12
+
+default_stages: [pre-commit]
+
+exclude: '(^|/)(.*\.(png|jpg|jpeg|gif|webp|bin|hex)$)'
+
+repos:
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: '\.md$'
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-case-conflict
+      - id: check-illegal-windows-names
+      - id: check-yaml
+        args: ['--unsafe', '--allow-multiple-documents']
+      - id: check-json
+      - id: check-toml
+      - id: detect-private-key
+        exclude: '(sanitize-map|sanitize-copy)'
+      - id: mixed-line-ending
+        args: ['--fix=lf']
