@@ -5,8 +5,9 @@ Portable toolkit with two layers:
 1. **Environment** — bash startup, modular aliases, authored `~/.local/bin` helpers  
 2. **Agent** — Claude/Grok **rules** and **skills** with portable path placeholders  
 
-Optional packaging helpers (`package-toolkit`) keep absolute homes and local
-identity out of exports via `${HOME}` / `{...}` placeholders.
+Optional packaging helpers (`package-toolkit`) classify generic pack vs
+repo-specific product work, then keep absolute homes and local identity
+out of exports via `${HOME}` / `{...}` placeholders.
 
 ## Benefits
 
@@ -107,9 +108,9 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 `terraform`, `helm-k8s`, `iac-plan-analysis`, `otel-instrumentation`,
 `model-routing`, `message-scanning`, `readme-freshness`,
 `memory-scope-review`, `lazy-load-data` (`{MEMORY_ROOT}`),
-`skill-toolkit-sync` (copy skill/rule edits into the general pack;
-specialized packs are domain-only — no prompt unless the artifact belongs
-there), `skill-composition` (sub-skills, do not
+`skill-toolkit-sync` (classify generic pack vs repo-specific product work
+first; copy skill/rule edits into the general pack; specialized packs are
+domain-only — no prompt unless the artifact belongs there), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware, or across finder vs
 patcher vs skeptic), `independent-checker` (the agent that produced a
 claim does not grade it), `system-security` (WAN bind of kube-apiserver /
@@ -122,8 +123,9 @@ drawers; expire current truth with `kg_supersede`), `mempalace-file-interfaces`
 (file discovered APIs, CLIs, devices, and methods in MemPalace; later sessions
 query the palace first), etc.
 
-**Skills** (50) include packaging (`package-toolkit` resolves `general_pack`
-from host `toolkit-homes.yaml`; example under
+**Skills** (50) include packaging (`package-toolkit` classifies generic pack
+vs repo-specific product work, then resolves `general_pack` from host
+`toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
 (`mine` is a directory; stage under `~/.mempalace/staging/` with `--mode projects`
 when the hub unit uses `PrivateTmp`; replacements use `kg_supersede` so older
