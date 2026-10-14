@@ -1,0 +1,18 @@
+# Copy to {AGENT_HOME}/config/toolkit-homes.yaml (and, if you use a second
+# agent home, the same file there). Expand ${HOME}. Do not ship a filled copy
+# in a shareable pack.
+
+general_pack: ${HOME}/path/to/general-pack
+skill_dir: agent/skills
+rule_dir: agent/rules
+
+# Optional. Layouts differ: some packs use agent/skills, some .claude/skills.
+# Read toolkit.yaml paths.agent_skills when present.
+specialized_packs:
+  - path: ${HOME}/path/to/specialized-pack
+    skill_dir: .claude/skills
+    rule_dir: .claude/rules
+
+never_create:
+  - ${HOME}/path/to/guessed-sibling
+never_create_pattern: ${HOME}/repos/{skill}-toolkit

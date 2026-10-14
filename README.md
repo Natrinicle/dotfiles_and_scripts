@@ -32,8 +32,8 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 25 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 49 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # 26 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # 50 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -107,19 +107,23 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 `terraform`, `helm-k8s`, `iac-plan-analysis`, `otel-instrumentation`,
 `model-routing`, `message-scanning`, `readme-freshness`,
 `memory-scope-review`, `lazy-load-data` (`{MEMORY_ROOT}`),
-`skill-toolkit-sync` (copy skill/rule edits into the current toolkit, then
-ask about other toolkit repos), `skill-composition` (sub-skills, do not
+`skill-toolkit-sync` (copy skill/rule edits into the general pack, then
+ask about specialized packs), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware, or across finder vs
 patcher vs skeptic), `independent-checker` (the agent that produced a
 claim does not grade it), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
+`docker-named-bind-volumes` (Compose persistent data is a named volume with
+a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; harness
 skills/rules stay on disk), `mempalace-timeline-supersede` (keep older
 drawers; expire current truth with `kg_supersede`), `mempalace-file-interfaces`
 (file discovered APIs, CLIs, devices, and methods in MemPalace; later sessions
 query the palace first), etc.
 
-**Skills** (49) include packaging, scanners, PII detection, MemPalace
+**Skills** (50) include packaging (`package-toolkit` resolves `general_pack`
+from host `toolkit-homes.yaml`; example under
+`package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
 (`mine` is a directory; stage under `~/.mempalace/staging/` with `--mode projects`
 when the hub unit uses `PrivateTmp`; replacements use `kg_supersede` so older
 drawers stay on the timeline), Tofu plan review,
@@ -129,6 +133,7 @@ Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
 compiled-app unpack (`reverse-engineering-protocols`, then
 `decompile-mobile-app` / `decompile-firmware`),
 printable pages (`printable-webpage`),
+illustrated brochures (`illustrated-brochure`, landscape PDF with Dia and Graphviz),
 resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
 a find-patch loop (`find-patch-loop`, then `bug-finder` / `bug-skeptic` /
