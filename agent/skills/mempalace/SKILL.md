@@ -25,6 +25,7 @@ is not enough.
 All clients share one HTTP hub on a multi-process backend (Qdrant or
 pgvector). Do not open a second in-process palace. `kg_add` is lock-free;
 long mines use `mempalace mine --daemon` so the hub keeps serving reads.
+Hub + daemon + Qdrant setup: pack `examples/mempalace-multi-rw/`.
 
 ## Single-file mine recipe
 
