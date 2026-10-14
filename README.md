@@ -32,7 +32,7 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 22 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── rules/                     # 25 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 49 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
@@ -41,7 +41,9 @@ identity out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── sanitize-map.yaml
 │   └── sanitize-map.example.yaml
 └── examples/
-    └── ldap.company.example
+    ├── ldap.company.example
+    ├── mempalace-qdrant-hub.service.d.conf.example
+    └── pandoc_templates/
 ```
 
 ### Environment — alias categories
@@ -111,9 +113,11 @@ broaden one skill across IR vs APK vs firmware, or across finder vs
 patcher vs skeptic), `independent-checker` (the agent that produced a
 claim does not grade it), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
-`mempalace-timeline-supersede` (keep older drawers; expire current truth with
-`kg_supersede`),
-etc.
+`prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; harness
+skills/rules stay on disk), `mempalace-timeline-supersede` (keep older
+drawers; expire current truth with `kg_supersede`), `mempalace-file-interfaces`
+(file discovered APIs, CLIs, devices, and methods in MemPalace; later sessions
+query the palace first), etc.
 
 **Skills** (49) include packaging, scanners, PII detection, MemPalace
 (`mine` is a directory; stage under `~/.mempalace/staging/` with `--mode projects`

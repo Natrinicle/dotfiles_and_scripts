@@ -11,11 +11,20 @@ description: >
 
 Install/configure via CLI when needed; mine trees or conversation exports;
 organize with wings/rooms. Prefer CLI/MCP tools from the install. Pair with
-`mempalace-recall` for search-before-answer on past work.
+`mempalace-recall` for search-before-answer on past work. File discovered
+APIs, CLIs, devices, and methods per rule `mempalace-file-interfaces`.
+Durable facts prefer the palace over local memory files (`prefer-mempalace`).
+Harness skills/rules stay on disk.
 
 **`mine` takes a directory, not a file.** Trust `Files processed ≥ 1` and
 `Drawers filed ≥ 1`, then search-verify the Source filename. Exit code 0 alone
 is not enough.
+
+## Concurrent agents
+
+All clients share one HTTP hub on a multi-process backend (Qdrant or
+pgvector). Do not open a second in-process palace. `kg_add` is lock-free;
+long mines use `mempalace mine --daemon` so the hub keeps serving reads.
 
 ## Single-file mine recipe
 
@@ -42,6 +51,21 @@ Optional: `--dry-run` before a real mine.
 1. Confirm summary: files processed, drawers filed
 2. `mempalace search "…" --wing <wing>` — top hit Source is the file you filed
 3. `mempalace status` if you need wing counts
+
+## Timeline — supersede current, keep history
+
+Older memories stay searchable. A newer fact expires current truth via
+`mempalace_kg_supersede` (`valid_to` on the old triple). Leave older drawers
+in place.
+
+When saving a replacement:
+
+1. `mempalace_kg_query` (no `as_of`)
+2. `mempalace_kg_supersede(subject, predicate, old_object, new_object, at=YYYY-MM-DD)` — object max 128 chars
+3. Mine a dated card with `as_of:`, `status: current`, `SUPERSEDES:`
+
+Hybrid search ranks similarity only. Conflicting drawers: current KG, then
+newest `filed_at`. SOP: `{MEMORY_ROOT}/mempalace-recency-and-preferences.md`.
 
 ## Unhappy paths
 

@@ -22,6 +22,9 @@ Keep always-on context small. Store large reference material outside the main me
 | Working in a large monorepo | `workspace-repos.md`, `platform-repo-structure.md` |
 | Security review of any code | `vulnerability-patterns.md` |
 | Building or exposing a host / VM / cluster | rule `system-security`; `vulnerability-patterns.md` |
+| Looking up an API, CLI, device, MCP, library, or protocol | rules `prefer-mempalace` + `mempalace-file-interfaces`; search palace first, then file methods |
+| Durable facts vs local memory files | rule `prefer-mempalace`; palace KG / newest `filed_at` wins |
+| Preference / fact replacements over time | rule `mempalace-timeline-supersede`; `{MEMORY_ROOT}/mempalace-recency-and-preferences.md` |
 | Browser automation | browser automation notes / chrome spawn patterns |
 | Local tracing / OTEL demos | local observability setup notes |
 | Model routing / cost audits | `model-routing-table.md` |
