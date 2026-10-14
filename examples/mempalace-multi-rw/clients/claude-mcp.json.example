@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "mempalace": {
+      "type": "stdio",
+      "command": "mempalace-mcp",
+      "args": [
+        "--palace",
+        "{PALACE}"
+      ],
+      "env": {
+        "MEMPALACE_PALACE_PATH": "{PALACE}",
+        "MEMPALACE_BACKEND": "qdrant",
+        "MEMPALACE_QDRANT_URL": "http://127.0.0.1:6333",
+        "MEMPALACE_MCP_ALLOW_PEER_WRITER": "1"
+      }
+    }
+  }
+}

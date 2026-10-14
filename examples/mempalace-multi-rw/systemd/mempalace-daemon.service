@@ -1,0 +1,37 @@
+[Unit]
+Description=MemPalace write daemon (Qdrant queue for concurrent mines)
+Documentation=https://github.com/MemPalace/mempalace
+After=network-online.target mempalace-mcp-http.service
+Wants=network-online.target
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+# `daemon start` without --foreground exits 0 if a daemon is already
+# running; systemd then restart-loops until start-limit-hit.
+ExecStartPre=/bin/bash -c 'for i in $(seq 1 30); do curl -sf http://127.0.0.1:6333/readyz >/dev/null && exit 0; sleep 1; done; echo "qdrant :6333 not ready" >&2; exit 1'
+ExecStart=%h/.local/bin/mempalace --palace %h/.var/mempalace/palace daemon start --foreground --backend qdrant
+Restart=always
+RestartSec=5
+TimeoutStartSec=60
+TimeoutStopSec=30
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mempalace-daemon
+
+Environment=HOME=%h
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+Environment=MEMPALACE_PALACE_PATH=%h/.var/mempalace/palace
+Environment=MEMPALACE_BACKEND=qdrant
+Environment=MEMPALACE_QDRANT_URL=http://127.0.0.1:6333
+Environment=MEMPALACE_QDRANT_TIMEOUT=120
+Environment=MEMPALACE_MCP_ALLOW_PEER_WRITER=1
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

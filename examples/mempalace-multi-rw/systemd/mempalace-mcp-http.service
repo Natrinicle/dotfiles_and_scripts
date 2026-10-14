@@ -1,0 +1,34 @@
+[Unit]
+Description=MemPalace MCP HTTP server (shared palace hub)
+Documentation=https://github.com/MemPalace/mempalace
+After=network-online.target
+Wants=network-online.target
+StartLimitBurst=5
+StartLimitIntervalSec=60
+
+[Service]
+Type=simple
+# Non-loopback bind so containers on the host network can reach the hub.
+# Bearer token is minted under ~/.mempalace/server/ (mode 0600).
+ExecStart=%h/.local/bin/mempalace serve \
+  --host 0.0.0.0 \
+  --port 8765 \
+  --palace %h/.var/mempalace/palace
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+TimeoutStartSec=60
+KillMode=control-group
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mempalace-mcp-http
+
+Environment=HOME=%h
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin:/bin
+Environment=PYTHONUNBUFFERED=1
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=default.target

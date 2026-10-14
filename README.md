@@ -44,7 +44,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 │   └── sanitize-map.example.yaml
 └── examples/
     ├── ldap.company.example
-    ├── mempalace-qdrant-hub.service.d.conf.example
+    ├── mempalace-multi-rw/            # Qdrant + HTTP hub + write daemon (copy yourself)
     └── pandoc_templates/
 ```
 
@@ -119,10 +119,15 @@ kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
 `docker-named-bind-volumes` (Compose persistent data is a named volume with
 a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; harness
-skills/rules stay on disk), `mempalace-timeline-supersede` (keep older
-drawers; expire current truth with `kg_supersede`), `mempalace-file-interfaces`
+skills/rules stay on disk; **this pack only**, not domain-only toolkits),
+`mempalace-timeline-supersede` (keep older drawers; expire current truth with
+`kg_supersede`), `mempalace-file-interfaces`
 (file discovered APIs, CLIs, devices, and methods in MemPalace; later sessions
 query the palace first), etc.
+
+Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
+daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
+those units yourself; `install.sh` does not enable them.
 
 **Skills** (50) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
@@ -227,6 +232,10 @@ Optional directory helpers:
 ```bash
 cp examples/ldap.company.example ~/.bash_aliases.d/ldap
 # edit placeholders, then source ~/.bash_aliases
+
+# Shared MemPalace hub (Qdrant + HTTP MCP + write daemon):
+#   see examples/mempalace-multi-rw/README.md
+#   examples/mempalace-multi-rw/install-units.sh
 ```
 
 ## Other `~/.local/bin` inventory (not shipped)

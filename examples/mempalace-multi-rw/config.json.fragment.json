@@ -1,0 +1,10 @@
+{
+  "palace_path": "{PALACE}",
+  "backend": "qdrant",
+  "qdrant_url": "http://127.0.0.1:6333",
+  "write_routing": {
+    "default": "prefer",
+    "cli": "prefer",
+    "hooks": "prefer"
+  }
+}

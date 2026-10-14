@@ -32,4 +32,10 @@ file or supersede it in the palace so other agents see it.
 Local memory files are staging and harness bootstrap. When they disagree
 with the palace, the palace wins. Timeline: `mempalace-timeline-supersede`.
 Concurrent hub: a multi-process backend (Qdrant or pgvector) plus
-`MEMPALACE_MCP_ALLOW_PEER_WRITER` and the write daemon.
+`MEMPALACE_MCP_ALLOW_PEER_WRITER` and the write daemon. Replicable setup:
+pack `examples/mempalace-multi-rw/` (not installed by `install.sh --agent`).
+
+## Pack scope
+
+This rule ships in the general `dotfiles_and_scripts` agent pack. Do not
+copy it into domain-only toolkits.

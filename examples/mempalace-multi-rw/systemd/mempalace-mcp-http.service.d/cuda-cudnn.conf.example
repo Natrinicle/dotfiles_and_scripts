@@ -1,0 +1,6 @@
+[Service]
+# Optional. onnxruntime-gpu 1.26 needs libcudnn.so.9; many distro CUDA
+# toolkits do not ship it. Point at the pipx venv copy:
+#   python3 -c "import nvidia.cudnn, pathlib; print(pathlib.Path(nvidia.cudnn.__file__).parent / 'lib')"
+# Rename this file to cuda-cudnn.conf after editing.
+Environment=LD_LIBRARY_PATH=%h/.local/pipx/venvs/mempalace/lib/python3.14/site-packages/nvidia/cudnn/lib

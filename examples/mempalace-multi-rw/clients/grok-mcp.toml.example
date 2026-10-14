@@ -1,0 +1,8 @@
+# Fragment for ~/.grok/config.toml
+# Token file is minted on first `mempalace serve` (mode 0600).
+# Restart the Grok CLI after changing this; a leftover stdio MCP loads the
+# palace in-process.
+
+[mcp_servers.mempalace]
+url = "http://127.0.0.1:8765/mcp"
+bearer_token_file = "~/.mempalace/server/{palace_id_prefix}/token"
