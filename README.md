@@ -118,7 +118,9 @@ claim does not grade it), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
 `employer-pr-findings-gate` (hard gate before PRs in the current employer's
 GitHub org), `pre-commit-gate` (run `pre-commit` when a config exists;
-follow findings or prompt — do not silent SKIP),
+follow findings or prompt — do not silent SKIP; gitleaks AWS canary is
+`A-Z2-7`, `sha256sum -c` before sudo install, Twilio SID needs a custom
+isolated canary),
 `docker-named-bind-volumes` (Compose persistent data is a named volume with
 a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; harness
