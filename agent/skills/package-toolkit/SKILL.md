@@ -7,6 +7,27 @@ description: >
 
 # Package Toolkit
 
+## Where the general pack lives
+
+Host layouts differ. Do not hardcode a checkout path in this skill.
+
+When the user says **make a toolkit**, **package this skill as a toolkit**, or
+**add this to the toolkit**:
+
+1. Read `{AGENT_HOME}/config/toolkit-homes.yaml`. Fallback:
+   `~/.claude/config/toolkit-homes.yaml`, then `{MEMORY_ROOT}/toolkit-homes.md`.
+   Example: `references/toolkit-homes.example.yaml`.
+2. Copy into `general_pack` / `skill_dir` (or `rule_dir`). If that pack’s
+   `toolkit.yaml` sets `paths.agent_skills`, use that.
+3. Bump `toolkit.yaml` `version` and `agent_skills_included`.
+4. Update `README.md` (count and listing).
+5. Keep the live copy under `{AGENT_HOME}/skills/` and symlink Grok.
+
+Do **not** create `{HOME}/repos/<name>-toolkit`. Do **not** invent sibling
+names. If the YAML is missing, ask.
+
+Prompt only for packs listed under `specialized_packs`. See `skill-toolkit-sync`.
+
 ## Kinds
 
 | Kind | Contents |
