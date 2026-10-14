@@ -6,7 +6,9 @@ general_pack: ${HOME}/path/to/general-pack
 skill_dir: agent/skills
 rule_dir: agent/rules
 
-# Optional. Layouts differ: some packs use agent/skills, some .claude/skills.
+# Optional. Domain packs only. Copy an artifact here when it belongs to that
+# pack or is something the pack already ships. Do not prompt after every
+# general-pack copy. Layouts differ: agent/skills vs .claude/skills.
 # Read toolkit.yaml paths.agent_skills when present.
 specialized_packs:
   - path: ${HOME}/path/to/specialized-pack

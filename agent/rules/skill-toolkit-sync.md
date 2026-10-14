@@ -1,8 +1,8 @@
 # Sync skill and rule updates into toolkits
 
 When you **create or edit a skill or a rule**, copy that change into the
-**general pack** in the same turn. Then **ask** whether specialized packs
-should get the same update.
+**general pack** in the same turn. Specialized packs are domain-only — see
+below. Do not ask “update specialized packs too?” after a general-pack copy.
 
 Load **package-toolkit** for layout, sanitization, and `toolkit.yaml` /
 README freshness. Do not skip the copy because the home skill already exists.
@@ -52,10 +52,27 @@ toolkits.
 Do this even when the edit started in `{AGENT_HOME}/skills` or
 `{AGENT_HOME}/rules`. The general pack still gets the copy.
 
-## Specialized packs (prompt)
+## Specialized packs (domain only)
 
-After the general-pack copy, **prompt** before touching specialized packs
-listed in `toolkit-homes.yaml`. Do not assume a yes. Do not push.
+`remote_codes` and `court-case-monitor-toolkit` only receive artifacts that
+belong to that pack. Copy into a specialized pack in the same turn when
+**either**:
+
+- The pack already ships that skill or rule (`toolkit.yaml`, README, or the
+  skill/rule directory in that repo), or
+- The artifact is specific to what that pack publishes (Flipper IR, raw IR
+  decode, BLE/GATT, APK/firmware unpack for `remote_codes`; court calendar /
+  CaseLook monitoring for `court-case-monitor-toolkit`).
+
+Otherwise copy **only** to `general_pack`. Do **not** ask “update specialized
+packs too?”.
+
+Ask only when a **new** domain skill might belong in a specialized pack and
+that is actually ambiguous (example: a new Flipper IR helper).
+
+Do not keep syncing general harness rules (model routing, package-toolkit,
+MemPalace, find-patch-loop, illustrated-brochure, compose bind volumes, …)
+into specialized packs.
 
 ## Do not
 

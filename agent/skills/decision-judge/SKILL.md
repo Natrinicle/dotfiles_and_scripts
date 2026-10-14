@@ -84,7 +84,7 @@ Continue unlocks **starting** the work. It does not unlock landing actions (comm
 
 ## Routing
 
-Task ids: `decision-normalize` (parent), `decision-advocate` (T3, inherit parent / `general-purpose`). Never ollama/gemma4 for advocates.
+Task ids: `decision-normalize` (parent), `decision-advocate` (T3, inherit parent / `general-purpose`). Never ollama/gemma4 for advocates. Never a System One / Jev / Nimble / Kev **decision model** for advocates — those are T0 classifiers, not this court.
 
 ## Red flags
 

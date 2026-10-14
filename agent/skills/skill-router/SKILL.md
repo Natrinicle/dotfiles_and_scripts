@@ -38,6 +38,7 @@ grep/read loop.
 | Path | When |
 |------|------|
 | Direct Ollama `/api/generate` | Tool-free T0 text. Short prompt, cap `num_predict`. |
+| Ollama `/v1/systemone` (Nimble / Kev) | **Candidate only.** Closed yes/no, enum, or score. Needs Ollama ≥0.35 and a pulled DMM. See `{MEMORY_ROOT}/decision-making-models-2026-10-08.md`. |
 | Spawn `explore` / `code-explorer` / `local-search` / `local-extract` | Host config pins these to local Ollama. Skip re-reading the routing table. Omit `model`. |
 | Persona `local-brief` | When the parent will re-ingest a long child reply |
 
