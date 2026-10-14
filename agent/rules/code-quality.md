@@ -1,5 +1,10 @@
 # Code Quality
 
+If the repo has `.pre-commit-config.yaml`, `.pre-commit-config.yml`, or
+`.pre-commit.yaml`, rule **pre-commit-gate** is the hard gate. Run that
+first. Follow findings or prompt the user; do not silent SKIP. Do not
+invent a parallel lint path that disagrees with the repo config.
+
 ## When to run tools
 1. After you write or change code — format/lint before presenting results
 2. When reviewing someone else's code — report findings; ask before bulk auto-fix
@@ -18,6 +23,7 @@
 3. Ask before applying automatic fixes
 
 ## Pre-commit
+If **pre-commit-gate** applies, that run is this checklist. Otherwise:
 1. Format changed files
 2. Lint with fix
 3. Verify check mode is clean

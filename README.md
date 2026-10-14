@@ -34,7 +34,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 26 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── rules/                     # 28 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 50 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
@@ -116,6 +116,9 @@ broaden one skill across IR vs APK vs firmware, or across finder vs
 patcher vs skeptic), `independent-checker` (the agent that produced a
 claim does not grade it), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
+`employer-pr-findings-gate` (hard gate before PRs in the current employer's
+GitHub org), `pre-commit-gate` (run `pre-commit` when a config exists;
+follow findings or prompt — do not silent SKIP),
 `docker-named-bind-volumes` (Compose persistent data is a named volume with
 a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; harness
