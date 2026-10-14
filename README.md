@@ -107,8 +107,9 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 `terraform`, `helm-k8s`, `iac-plan-analysis`, `otel-instrumentation`,
 `model-routing`, `message-scanning`, `readme-freshness`,
 `memory-scope-review`, `lazy-load-data` (`{MEMORY_ROOT}`),
-`skill-toolkit-sync` (copy skill/rule edits into the general pack, then
-ask about specialized packs), `skill-composition` (sub-skills, do not
+`skill-toolkit-sync` (copy skill/rule edits into the general pack;
+specialized packs are domain-only — no prompt unless the artifact belongs
+there), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware, or across finder vs
 patcher vs skeptic), `independent-checker` (the agent that produced a
 claim does not grade it), `system-security` (WAN bind of kube-apiserver /

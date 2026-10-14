@@ -1,5 +1,10 @@
 # Model Routing
 
+Always-on spawn and pin policy. Taxonomy, routing table, cost, and skill
+audits: skill `model-router`. Parent vs local for the interactive session:
+skill `skill-router`. These are one policy split by load cost — do not
+collapse the skill into this rule.
+
 Prefer **local models (Ollama)** for light work. Keep **remote/cloud** models
 for orchestration, multi-step coding, and high-stakes judgment.
 
@@ -61,3 +66,12 @@ Before dispatching a subagent via the Agent tool, consult
 - `plan`, `general-purpose`, code reviewers, architecture critics,
   adversarial/style judgment, PII risk judgment, multi-file implementation
   agents
+
+## Decision models (System One) vs chat T0
+
+Closed yes/no, enum, or rubric over text is a **decision-model** (DMM: Jev /
+Nimble / Kev) shape, not a chat-essay shape. Keep current T0 on the local chat
+model until a DMM is installed and eval'd (Nimble needs Ollama ≥0.35). Do not
+use a DMM for `decision-judge` advocates or other T3 prose. Details:
+`{MEMORY_ROOT}/decision-making-models-2026-10-08.md`.
+

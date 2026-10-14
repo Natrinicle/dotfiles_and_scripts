@@ -26,7 +26,10 @@ When the user says **make a toolkit**, **package this skill as a toolkit**, or
 Do **not** create `{HOME}/repos/<name>-toolkit`. Do **not** invent sibling
 names. If the YAML is missing, ask.
 
-Prompt only for packs listed under `specialized_packs`. See `skill-toolkit-sync`.
+Specialized packs listed under `specialized_packs` are **domain-only**. Copy
+there only when the artifact belongs to that pack or is something it already
+ships. Do not prompt “update specialized packs too?” after a general-pack
+copy. See `skill-toolkit-sync`.
 
 ## Kinds
 

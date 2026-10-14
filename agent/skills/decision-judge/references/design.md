@@ -18,7 +18,7 @@ Parent session acts as judge: normalize any decision input, hand interpersonal *
 - `{AGENT_HOME}/skills/decision-judge/SKILL.md`
 - `{AGENT_HOME}/skills/decision-judge/references/design.md` (this file)
 - Grok: symlink `{GROK_HOME}/skills/decision-judge` → Claude copy
-- Toolkit: `agent/skills/decision-judge/` in `dotfiles_and_scripts`
+- Toolkit: `agent/skills/decision-judge/` in the general pack
 
 ## Routing
 
