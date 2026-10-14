@@ -7,7 +7,8 @@ paths:
 
 # Python
 
-- After edits: `ruff check --fix` and `ruff format` when available
+- If **pre-commit-gate** applies, that run is the first lint
+- After edits: `ruff check --fix` and `ruff format` when available unless pre-commit already ran those hooks on this file
 - Type-check with `pyright` or `mypy` when the project uses them
 - Annotate public function signatures
 - Prefer `pathlib.Path` over string path math

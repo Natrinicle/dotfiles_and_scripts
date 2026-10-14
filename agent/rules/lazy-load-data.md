@@ -29,6 +29,8 @@ Keep always-on context small. Store large reference material outside the main me
 | Local tracing / OTEL demos | local observability setup notes |
 | Model routing / cost audits | `model-routing-table.md` |
 | Packaging a toolkit | `toolkit-homes.md`; classify generic pack vs repo-specific product work first |
+| Opening a PR in the current employer's GitHub org | rule `employer-pr-findings-gate`; `{MEMORY_ROOT}/employer-pr-findings-gate.md` |
+| Repo has a pre-commit config | rule `pre-commit-gate`; `{MEMORY_ROOT}/pre-commit-gate.md` |
 | Contacts / messaging analysis | contacts profiles (store carefully; may contain PII) |
 
 Do not list secrets, tokens, or private hostnames in always-loaded files.
