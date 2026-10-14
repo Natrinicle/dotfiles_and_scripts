@@ -1,0 +1,14 @@
+# Example drop-in for a GPU host hub in front of compose Qdrant.
+# Install under ~/.config/systemd/user/mempalace-mcp-http.service.d/
+# Placeholders:
+#   {MEMPALACE_BIN}  e.g. /usr/local/bin/mempalace
+#   {PALACE}         same path string used inside the Qdrant copy
+
+[Service]
+ExecStart=
+ExecStart={MEMPALACE_BIN} serve --host 0.0.0.0 --port 8765 --backend qdrant --palace {PALACE}
+TimeoutStartSec=180
+Environment=MEMPALACE_PALACE_PATH={PALACE}
+Environment=MEMPALACE_BACKEND=qdrant
+Environment=MEMPALACE_QDRANT_URL=http://127.0.0.1:6333
+Environment=MEMPALACE_MCP_ALLOW_PEER_WRITER=1
