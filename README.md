@@ -35,7 +35,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 28 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 50 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 66 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -113,7 +113,8 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 first; copy skill/rule edits into the general pack; specialized packs are
 domain-only — no prompt unless the artifact belongs there), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware, or across finder vs
-patcher vs skeptic), `independent-checker` (the agent that produced a
+patcher vs skeptic; thin companions for server-admin reuse of forensic cores;
+check upstream callers on updates), `independent-checker` (the agent that produced a
 claim does not grade it), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
 `employer-pr-findings-gate` (hard gate before PRs in the current employer's
@@ -134,7 +135,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (50) include packaging (`package-toolkit` classifies generic pack
+**Skills** (66) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -156,7 +157,13 @@ a find-patch loop (`find-patch-loop`, then `bug-finder` / `bug-skeptic` /
 `session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works),
 `update-contacts-from-sources` (address-book create/patch from dumps; some
 cards are businesses; `Me to` / `Voicemail from` are cruft),
-and `rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),
+`rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),
+forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
+`identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
+`reformat-volume-evidence`, `password-account-evidence`, `forensic-expert-report-format`)
+and their thin server-admin companions (`server-timestamp-clues`, `server-transfer-likelihood`,
+`server-duplicate-detection`, `server-package-install-dating`, `server-device-history`,
+`server-volume-provenance`, `server-account-audit`, `ops-report-format`),
 usable on either platform.
 
 Memory paths: resolve `~/.claude/memory` or `~/.grok/memory` (often one
