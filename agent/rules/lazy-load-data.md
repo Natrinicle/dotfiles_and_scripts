@@ -33,5 +33,6 @@ Keep always-on context small. Store large reference material outside the main me
 | Repo has a pre-commit config | rule `pre-commit-gate`; `{MEMORY_ROOT}/pre-commit-gate.md` |
 | gitleaks / hadolint canaries or CI CLI install (any repo) | `{MEMORY_ROOT}/scanner-self-test-correctness.md`; palace `kg_query` `gitleaks` / `hadolint`; charset `A-Z2-7` not `A-Z0-9` |
 | Contacts / messaging analysis | contacts profiles (store carefully; may contain PII) |
+| Change comparisons / Meld-style diffs / YAML JSON dyff | skill `meld-style-diff` |
 
 Do not list secrets, tokens, or private hostnames in always-loaded files.
