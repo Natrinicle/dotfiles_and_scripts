@@ -12,10 +12,11 @@ When the user asks for a **new skill**, do not grow an existing skill to cover
 unrelated media or artifact kinds.
 
 1. **Reuse first.** If another skill already owns a slice (IR pack, raw IR,
-   live BLE, APK unpack, firmware blob), call it. Do not copy its procedure.
-2. **Split if broad.** One skill must not be “identify any protocol.” Dispatcher
-   skills stay a table + **REQUIRED** sub-skill names. Procedures live in the
-   sub-skill.
+   live BLE, APK unpack, firmware blob, timestamp clues, bandwidth likelihood,
+   etc.), call it. Do not copy its procedure.
+2. **Split if broad.** One skill must not be “identify any protocol” or “do all
+   forensics.” Dispatcher skills stay a table + **REQUIRED** sub-skill names.
+   Procedures live in the sub-skill.
 3. **Compiled app or firmware blob** → **reverse-engineering-protocols**, then
    **decompile-mobile-app** (APK/XAPK/IPA, uni-app/Flutter/native) or
    **decompile-firmware** (MCU `.bin`/`.hex`, on-device ELF, UART/I2C/SPI).
@@ -27,5 +28,11 @@ unrelated media or artifact kinds.
 6. **Find vs patch vs skeptic** → **find-patch-loop**, then **bug-finder**,
    **bug-skeptic**, **bug-patcher**. Do not grow **check-work** into a hunt
    loop. Session-complete verification stays **check-work**.
+7. **Forensic vs server-admin** → core skills (file-timestamp-clues,
+   download-bandwidth-likelihood, identical-folder-copy-indicators, etc.) plus
+   thin companions (server-timestamp-clues, server-transfer-likelihood, …).
+   Companions apply the core first and only add environment-specific artifacts.
+   When updating a core, check all listed companions and other callers for
+   compatibility; split only if needs have diverged, with a convergence note.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.
