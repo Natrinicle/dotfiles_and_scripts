@@ -35,7 +35,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 28 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 66 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 67 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -135,7 +135,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (66) include packaging (`package-toolkit` classifies generic pack
+**Skills** (67) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -148,6 +148,7 @@ Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
 compiled-app unpack (`reverse-engineering-protocols`, then
 `decompile-mobile-app` / `decompile-firmware`),
 printable pages (`printable-webpage`),
+Meld-style side-by-side diffs plus dyff for YAML/JSON (`meld-style-diff`),
 illustrated brochures (`illustrated-brochure`, landscape PDF with Dia and Graphviz),
 resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
