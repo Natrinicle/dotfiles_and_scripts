@@ -18,7 +18,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | **Safe to share** | Secrets and machine-local paths kept out; optional LDAP is example-only |
 | **Installable** | `install.sh --shell` / `--agent` / `--all`; skips existing files unless `--force`; Grok links to Claude |
 | **Reusable packager** | Ship `package-toolkit` so others can re-export their own trees |
-| **pre-commit** | `.pre-commit-config.yaml` — gitleaks + hygiene (`pre-commit install`) |
+| **pre-commit** | `.pre-commit-config.yaml` — gitleaks, hygiene, residual-identity-scan (`pre-commit install`) |
 
 ## What's where
 
@@ -34,14 +34,15 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 28 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── rules/                     # 29 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 82 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
 │   ├── local.example.env
 │   ├── sanitize-map.yaml
-│   └── sanitize-map.example.yaml
+│   ├── sanitize-map.example.yaml
+│   └── identity-denylist.example.yaml  # fake names only; host denylist is not packed
 └── examples/
     ├── ldap.company.example
     ├── mempalace-multi-rw/            # Qdrant + HTTP hub + write daemon (copy yourself)
@@ -121,7 +122,8 @@ kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
 GitHub org), `pre-commit-gate` (run `pre-commit` when a config exists;
 follow findings or prompt — do not silent SKIP; gitleaks AWS canary is
 `A-Z2-7`, `sha256sum -c` before sudo install, Twilio SID needs a custom
-isolated canary),
+isolated canary), `toolkit-residual-identity` (hard identity gate on toolkit
+commits: host denylist + emails + absolute homes; do not pack real names),
 `docker-named-bind-volumes` (Compose persistent data is a named volume with
 a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; harness
@@ -207,6 +209,7 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | `{app_package}` / `{server_package}` | Optional app path templates |
 | `{SECURITY_TICKET_PROJECT}` | Optional issue-tracker project key |
 | `{MEMORY_ROOT}` / `{AGENT_HOME}` | Agent config and memory roots |
+| `{subject}` / `{account}` | Case-party or account names in forensic examples |
 | `you@example.com` / `replace-me` | RPerks username/password in `config.json` (never committed) |
 | store `latitude` / `longitude` | Store geopin for offer geofence; example uses `null` |
 
@@ -220,6 +223,8 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | `prod.kacu.app` / `ridleys.immapi.com` | Cashback iframe and session origins |
 
 Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.
+
+Forensic example lines use `{subject}` / `{account}`. Real tokens live in a **host** denylist (`{AGENT_HOME}/config/identity-denylist.yaml`); `config/identity-denylist.example.yaml` uses fake names only. `python3 agent/skills/package-toolkit/scripts/residual-identity-scan.py` is the pre-commit gate.
 
 ## Install
 

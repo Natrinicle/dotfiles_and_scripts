@@ -35,3 +35,12 @@ repos:
         exclude: '(sanitize-map|sanitize-copy)'
       - id: mixed-line-ending
         args: ['--fix=lf']
+
+  - repo: local
+    hooks:
+      - id: residual-identity-scan
+        name: residual-identity-scan
+        entry: python3 agent/skills/package-toolkit/scripts/residual-identity-scan.py
+        language: system
+        pass_filenames: true
+        files: '^(agent|shell|bin|config|share|README\.md|toolkit\.yaml)/|^[^/]+\.(md|yaml|yml|sh)$'

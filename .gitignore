@@ -1,5 +1,7 @@
 # Local / private (do not commit)
 config/sanitize-map.local.yaml
+config/identity-denylist.local.yaml
+config/identity-denylist.yaml
 config/local.env
 .dotfiles_and_scripts_backup_*
 *.local

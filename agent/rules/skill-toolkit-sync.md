@@ -54,8 +54,10 @@ toolkits.
    `.claude/rules/`.
 2. Copy the updated skill **tree** (`SKILL.md`, `references/`, `scripts/`) or
    the updated `*.md` rule into that directory, same relative name.
-3. If `package-toolkit` sanitization applies, strip homes, logins, and
-   employer names.
+3. If `package-toolkit` sanitization applies, strip homes, logins,
+   employer names, and case-party names. Run
+   `scripts/residual-identity-scan.py` (rule `toolkit-residual-identity`)
+   before proposing a pack commit.
 4. If `toolkit.yaml` exists, bump `version` when the public surface changed,
    and keep `agent_skills_included` / `agent_rules_included` accurate.
 5. Update the toolkit `README.md` in the same change when install paths,

@@ -63,7 +63,7 @@ A laptop compose stack or ADR that names `{product}` stays in that product repo.
 2. Inventory; drop secrets, backups, and package-manager symlinks
 3. `scripts/sanitize-copy.py` + abstraction rules
 4. `toolkit.yaml` + README (keep README fresh with content)
-5. Residual-scan for names, emails, tokens, absolute homes  
+5. Residual-scan: `scripts/residual-identity-scan.py` (host denylist + emails + absolute homes). Rule `toolkit-residual-identity`. Do not commit real names.
 
 ## Install contract
 

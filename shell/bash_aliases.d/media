@@ -113,7 +113,7 @@ elif cmds_exist youtube-dl; then
 fi
 
 if cmds_exist play; then
-  # miller@diasp.de
+  # sox engine-room / city ambience snippets
   # https://diaspora.natrinicle.com/posts/1810581
   alias enterprise_engine="play -n -c2 synth whitenoise lowpass -1 120 lowpass -1 120 lowpass -1 120"
   alias vertiform_city="play -n -c2 synth whitenoise lowpass -1 120 lowpass -1 100 tremolo 6 70"
