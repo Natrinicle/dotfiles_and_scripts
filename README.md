@@ -35,7 +35,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 28 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 67 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 75 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -135,7 +135,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (67) include packaging (`package-toolkit` classifies generic pack
+**Skills** (75) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -161,10 +161,13 @@ cards are businesses; `Me to` / `Voicemail from` are cruft),
 `rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
-`reformat-volume-evidence`, `password-account-evidence`, `forensic-expert-report-format`)
+`reformat-volume-evidence`, `password-account-evidence`, `forensic-expert-report-format`,
+`timestomp-detection`, `execution-evidence`, `shell-item-activity`,
+`srum-network-volume`, `shell-history-integrity`)
 and their thin server-admin companions (`server-timestamp-clues`, `server-transfer-likelihood`,
 `server-duplicate-detection`, `server-package-install-dating`, `server-device-history`,
-`server-volume-provenance`, `server-account-audit`, `ops-report-format`),
+`server-volume-provenance`, `server-account-audit`, `ops-report-format`,
+`server-timestomp-detection`, `server-execution-evidence`, `powershell-history-integrity`),
 usable on either platform.
 
 Memory paths: resolve `~/.claude/memory` or `~/.grok/memory` (often one
