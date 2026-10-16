@@ -13,7 +13,8 @@ unrelated media or artifact kinds.
 
 1. **Reuse first.** If another skill already owns a slice (IR pack, raw IR,
    live BLE, APK unpack, firmware blob, timestamp clues, bandwidth likelihood,
-   etc.), call it. Do not copy its procedure.
+   timestomp detection, execution evidence, shell items, SRUM, shell history, etc.),
+   call it. Do not copy its procedure.
 2. **Split if broad.** One skill must not be “identify any protocol” or “do all
    forensics.” Dispatcher skills stay a table + **REQUIRED** sub-skill names.
    Procedures live in the sub-skill.
@@ -29,8 +30,11 @@ unrelated media or artifact kinds.
    **bug-skeptic**, **bug-patcher**. Do not grow **check-work** into a hunt
    loop. Session-complete verification stays **check-work**.
 7. **Forensic vs server-admin** → core skills (file-timestamp-clues,
-   download-bandwidth-likelihood, identical-folder-copy-indicators, etc.) plus
-   thin companions (server-timestamp-clues, server-transfer-likelihood, …).
+   download-bandwidth-likelihood, identical-folder-copy-indicators,
+   timestomp-detection, execution-evidence, shell-item-activity,
+   srum-network-volume, shell-history-integrity, etc.) plus
+   thin companions (server-timestamp-clues, server-timestomp-detection,
+   server-execution-evidence, powershell-history-integrity, …).
    Companions apply the core first and only add environment-specific artifacts.
    When updating a core, check all listed companions and other callers for
    compatibility; split only if needs have diverged, with a convergence note.
