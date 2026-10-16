@@ -5,6 +5,7 @@ Map absolute homes to `${HOME}` or `~/…`. Prefer `$USER` over literal logins.
 
 ## Identity
 Replace names, emails, and personal domains with `{user}`, `{full_name}`, `{personal_domain}`.
+Case-party / subject names become `{subject}` / `{account}` — never a real person in pack skills.
 
 ## Organization
 Replace employer product names with `{company}` / `{Company}` unless the public tool name *is* the interface.

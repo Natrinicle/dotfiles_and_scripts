@@ -1,0 +1,11 @@
+# Example residual-identity denylist for package-toolkit.
+# Copy to identity-denylist.local.yaml (gitignored) OR keep tokens on the
+# host at {AGENT_HOME}/config/identity-denylist.yaml — never commit real
+# names, case-party names, or employer names into the shareable pack.
+#
+# residual-identity-scan.py loads host + *.local.yaml files and fails the
+# commit if any token appears in the tree.
+
+forbidden:
+  - "Alice Example"
+  - "Acme Corp"

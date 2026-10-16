@@ -30,3 +30,7 @@ Account SID (`AC`+32 hex) needs a custom rule and an **isolated** canary.
 
 Runs after you edit files, and again before commit or `gh pr create`.
 User override (“skip pre-commit this run”) still gets reported.
+
+When the repo is a **toolkit** (`toolkit.yaml` / pack README): also run
+`residual-identity-scan` (rule `toolkit-residual-identity`). Host denylist
+tokens stay out of the pack.

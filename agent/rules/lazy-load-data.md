@@ -28,7 +28,7 @@ Keep always-on context small. Store large reference material outside the main me
 | Browser automation | browser automation notes / chrome spawn patterns |
 | Local tracing / OTEL demos | local observability setup notes |
 | Model routing / cost audits | `model-routing-table.md` |
-| Packaging a toolkit | `toolkit-homes.md`; classify generic pack vs repo-specific product work first |
+| Packaging a toolkit | `toolkit-homes.md`; classify first; rule `toolkit-residual-identity` (host denylist, never pack real names) |
 | Opening a PR in the current employer's GitHub org | rule `employer-pr-findings-gate`; `{MEMORY_ROOT}/employer-pr-findings-gate.md` |
 | Repo has a pre-commit config | rule `pre-commit-gate`; `{MEMORY_ROOT}/pre-commit-gate.md` |
 | gitleaks / hadolint canaries or CI CLI install (any repo) | `{MEMORY_ROOT}/scanner-self-test-correctness.md`; palace `kg_query` `gitleaks` / `hadolint`; charset `A-Z2-7` not `A-Z0-9` |
