@@ -1,0 +1,8 @@
+# Vendor-specific: Reverse Engineer Anything.
+# Pin the package version. Copy into ~/.grok/config.toml.
+
+[mcp_servers.rea]
+command = "npx"
+args = ["-y", "rea-agents@6.5.0", "mcp"]
+enabled = true
+startup_timeout_sec = 60

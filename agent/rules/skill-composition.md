@@ -22,6 +22,9 @@ unrelated media or artifact kinds.
 3. **Compiled app or firmware blob** → **reverse-engineering-protocols**, then
    **decompile-mobile-app** (APK/XAPK/IPA, uni-app/Flutter/native) or
    **decompile-firmware** (MCU `.bin`/`.hex`, on-device ELF, UART/I2C/SPI).
+   When **reverse-engineer-anything** (REA MCP) is connected, use it for
+   shipped binaries, packages, JS/Electron, Android, firmware images, and
+   runtime observation. Do not fold REA procedures into the unpack dispatcher.
 4. **IR capture** → **flipper-ir-library** for parsed/basic NEC and pack layout;
    **decoding-ir-protocols** for raw / state / advanced (Carrier-style). Do not
    fold IR decode into decompile skills.

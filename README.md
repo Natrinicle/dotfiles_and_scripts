@@ -35,7 +35,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 29 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 82 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 84 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -46,6 +46,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 └── examples/
     ├── ldap.company.example
     ├── mempalace-multi-rw/            # Qdrant + HTTP hub + write daemon (copy yourself)
+    ├── rea-mcp/                       # REA MCP client snippets (Claude JSON / Grok TOML)
     └── pandoc_templates/
 ```
 
@@ -137,7 +138,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (82) include packaging (`package-toolkit` classifies generic pack
+**Skills** (84) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -149,6 +150,8 @@ Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
 compiled-app unpack (`reverse-engineering-protocols`, then
 `decompile-mobile-app` / `decompile-firmware`),
+shipped-artifact RE via Reverse Engineer Anything (`reverse-engineer-anything`,
+REA MCP `rea-agents`; skill snapshot v42 / package 6.5.0),
 printable pages (`printable-webpage`),
 Meld-style side-by-side diffs plus dyff for YAML/JSON (`meld-style-diff`),
 illustrated brochures (`illustrated-brochure`, landscape PDF with Dia and Graphviz),
@@ -221,6 +224,7 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 |------|--------------------|
 | Ridley's RPerks / `rperks.shopridleys.com` | Origin and offer paths the runner navigates |
 | `prod.kacu.app` / `ridleys.immapi.com` | Cashback iframe and session origins |
+| Reverse Engineer Anything / `rea-agents` | Third-party MCP + skill (MIT, [morluto/rea](https://github.com/morluto/rea)). Pack ships a skill snapshot (v42, package `rea-agents@6.5.0`). Refresh with `npx -y rea-agents@6.5.0 setup --client claude_code` or `--client grok_build`. |
 
 Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.
 
@@ -288,6 +292,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 | `voice-recorder` Python deps | `pip install -r bin/requirements-voice-recorder.txt` (or `VR_PYTHON` venv) |
 | Calendar | Optional via `CALENDAR_CMD` or `CALENDAR_ICS_URL` (see morning-data-gather) |
 | RPerks runner | Node, Chromium (`CHROME_PATH` or `/usr/bin/chromium`), `npm install --omit=dev` in the app dir |
+| Reverse Engineer Anything | Node.js + `npx -y rea-agents@6.5.0 mcp`. Optional engines (Hopper, Ghidra, JADX, IDA) are caller-supplied; REA setup does not install them. Client snippets: `examples/rea-mcp/` |
 
 ## What is intentionally excluded
 
