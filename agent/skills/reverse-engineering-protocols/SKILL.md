@@ -19,6 +19,11 @@ IR is not this tree: **flipper-ir-library** (parsed/basic + pack),
 **decoding-ir-protocols** (raw / state / Carrier). Live BLE after GATT is
 known: BLE MCP.
 
+When the **REA** MCP server is connected, load **reverse-engineer-anything**
+for shipped-artifact analysis (native, JS/Electron, Android, firmware,
+runtime). This dispatcher stays for `unpack_artifact.py` then the decompile
+sub-skills.
+
 ## Classify
 
 Run `scripts/unpack_artifact.py <path>`. Hash, kind, likely sources.
