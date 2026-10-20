@@ -16,6 +16,11 @@ On a named person, project, decision, preference, or interface:
 `mempalace_kg_query` then `mempalace_search` **before** reading a local
 memory file or scraping the web. Current KG, then newest `filed_at`.
 
+Lazy-load triggers (rule `lazy-load-data`) are **palace-only** for filed
+as-builts. Do not also `Read` a `{MEMORY_ROOT}` copy of the same note.
+If search is empty: widen once, then use a disk fallback only when that
+rule still lists a file that exists. Empty palace ≠ invent.
+
 ## Write
 
 Stage a directory, `kg_add` / `kg_supersede` immediately, then one mine

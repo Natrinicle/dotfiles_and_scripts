@@ -110,7 +110,7 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 **Rules** include: `code-quality`, `security`, `shell`, `python`, `ansible`,
 `terraform`, `helm-k8s`, `iac-plan-analysis`, `otel-instrumentation`,
 `model-routing`, `message-scanning`, `readme-freshness`,
-`memory-scope-review`, `lazy-load-data` (`{MEMORY_ROOT}`),
+`memory-scope-review`, `lazy-load-data` (palace first; `{MEMORY_ROOT}` fallbacks),
 `skill-toolkit-sync` (classify generic pack vs repo-specific product work
 first; copy skill/rule edits into the general pack; specialized packs are
 domain-only — no prompt unless the artifact belongs there), `skill-composition` (sub-skills, do not

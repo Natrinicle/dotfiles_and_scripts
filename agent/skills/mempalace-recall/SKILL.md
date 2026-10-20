@@ -12,3 +12,7 @@ rules/skills; the palace holds history.
 Rule `mempalace-file-interfaces` covers filing those interfaces after discovery.
 Rule `prefer-mempalace`: palace current KG / newest `filed_at` beats a local
 memory-file copy. Harness skills and rules stay on disk.
+Lazy-load triggers (rule `lazy-load-data`) are recall too: query the
+palace with the listed entity/search. Do not also read a markdown copy
+of a filed as-built. Empty hit → widen once, then a disk fallback only
+if that rule still lists a file that exists. Empty palace ≠ invent.
