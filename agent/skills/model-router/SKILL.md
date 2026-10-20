@@ -17,7 +17,7 @@ Skills declare a **task id**; this skill (or the host routing table) maps it to 
 
 | Tier | Role |
 |------|------|
-| T0 Local | Structured extract, simple parse, commit-scan-like tasks — Ollama when healthy. Closed yes/no, enum, or score is a **decision-model** (System One) *shape*; keep T0 on the chat model until a DMM is eval'd (`{MEMORY_ROOT}/decision-making-models-2026-10-08.md`). |
+| T0 Local | Structured extract, simple parse, commit-scan-like tasks — Ollama when healthy. Closed yes/no, enum, or score is a **decision-model** (System One) *shape*; keep T0 on the chat model until a DMM is eval'd (palace: `Jev Nimble Kev System One gemma4`). |
 | T1 Cheap cloud | Extraction when local quality fails |
 | T2 Mid | Categorization, rule-following analysis |
 | T3 Strong | Friction judgment, subtle language, architecture critique |

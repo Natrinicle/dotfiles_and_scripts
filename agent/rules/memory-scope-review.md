@@ -8,9 +8,12 @@ Before writing a lasting note (memory, rule, skill, hook):
 
 ## 2. Size
 - Short universal prefs → always-on index / rules
-- Long references → lazy-load files with a one-line trigger
+- Durable as-builts → MemPalace (one source; trigger is `kg_query` + search)
+- Long harness SOPs / unfiled notes → lazy-load files with a one-line trigger
 
 ## 3. Discoverability
-Lazy-loaded files need a trigger in a rule or MEMORY index so agents know when to open them.
+Lazy-loaded facts need a trigger so agents know when to query the palace
+or open a remaining disk file. Empty palace: widen once, then a listed
+disk fallback if it exists; do not invent.
 
 Prefer skills for workflows that should load on demand rather than every session.

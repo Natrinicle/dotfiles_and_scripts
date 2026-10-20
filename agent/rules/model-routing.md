@@ -45,6 +45,13 @@ On Grok Build / Grok CLI:
 4. Parent stays on a capable model for planning, MCP, implementation, and
    synthesis.
 
+Pins match the **exact** `subagent_type`. Plugin ids such as
+`feature-dev:code-explorer` miss a `code-explorer` pin. PreToolUse hook
+`spawn-subagent-local-pin` rewrites an omitted `model` on explore-class types
+to the suffix pin or the host T0 local id, and warns the parent. Explicit
+cloud `model` is left in place. Reviewers and `general-purpose` are
+untouched. Restart the session after hook edits.
+
 ## Claude Code / Agent tool path
 
 Before dispatching a subagent via the Agent tool, consult
@@ -73,4 +80,4 @@ Closed yes/no, enum, or rubric over text is a **decision-model** (DMM: Jev /
 Nimble / Kev) shape, not a chat-essay shape. Keep current T0 on the local chat
 model until a DMM is installed and eval'd (Nimble needs Ollama ≥0.35). Do not
 use a DMM for `decision-judge` advocates or other T3 prose. Details:
-`{MEMORY_ROOT}/decision-making-models-2026-10-08.md`.
+palace `Jev Nimble Kev System One gemma4` (wing `personal`).
