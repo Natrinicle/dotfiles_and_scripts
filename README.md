@@ -34,7 +34,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 29 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── rules/                     # 30 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 84 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
@@ -127,6 +127,8 @@ isolated canary), `toolkit-residual-identity` (hard identity gate on toolkit
 commits: host denylist + emails + absolute homes; do not pack real names),
 `docker-named-bind-volumes` (Compose persistent data is a named volume with
 a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
+`grade-stated-ask` (quote the user's words; grade that ask; attachments and
+case history are background; ask only when the words support two readings),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; harness
 skills/rules stay on disk; **this pack only**, not domain-only toolkits),
 `mempalace-timeline-supersede` (keep older drawers; expire current truth with

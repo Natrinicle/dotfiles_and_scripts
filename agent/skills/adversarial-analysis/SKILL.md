@@ -12,9 +12,11 @@ Two modes: **relationship analysis** and **draft optimization**.
 ## Analysis mode
 
 1. Prefer **fresh evidence** (recent chat/PR/mail pulls) over stale memory alone.  
-2. Multiple perspectives: their incentives, yours, third-party reader.  
-3. Verdict: main failure modes, what works, what to avoid.  
-4. Persist via `communication-pattern-analysis` — this skill does not own those files.
+2. Quote the user's request in their own words. Grade that request. Grade tactics
+   or attachments as a separate line. Follow rule `grade-stated-ask`.  
+3. Multiple perspectives: their incentives, yours, third-party reader.  
+4. Verdict: main failure modes, what works, what to avoid.  
+5. Persist via `communication-pattern-analysis` — this skill does not own those files.
 
 ## Draft mode
 
