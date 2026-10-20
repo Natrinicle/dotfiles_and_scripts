@@ -35,3 +35,4 @@ Stick to observables and quotes. No amateur diagnosis.
 - Append dated episodes; keep a short “standing patterns” summary at top  
 - Link cross-channel evidence when a redirect was claimed  
 - When patterns clear, note resolution rather than deleting history
+- Quote the user's stated request when recording outreach. Follow rule `grade-stated-ask`.
