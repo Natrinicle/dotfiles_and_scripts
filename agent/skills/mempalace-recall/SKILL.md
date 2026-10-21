@@ -9,7 +9,7 @@ Before answering about prior decisions, people, or a named API/CLI/device
 interface, call `mempalace_kg_query` (no `as_of`) then `mempalace_search`.
 Skip for pure greenfield edits with no memory angle. Standing SOPs stay in
 rules/skills; the palace holds history.
-Rule `mempalace-file-interfaces` covers filing those interfaces after discovery.
+Rule `mempalace-file-interfaces` files recovered command sequences the same turn they are found.
 Rule `prefer-mempalace`: palace current KG / newest `filed_at` beats a local
 memory-file copy. Harness skills and rules stay on disk.
 Lazy-load triggers (rule `lazy-load-data`) are recall too: query the
