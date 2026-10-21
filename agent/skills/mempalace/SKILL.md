@@ -2,30 +2,32 @@
 name: mempalace
 description: >
   Mine projects and conversations into a local searchable memory palace.
-  Also use when asked to save all findings to MemPalace, save relevant details
-  to MemPalace, save findings into MemPalace, update MemPalace with any
-  relevant findings, or save all these findings to MemPalace.
+  Also use when asked to save findings to MemPalace. Also use when recovering
+  GATT UUIDs, AT commands, UART/HTTP frames, MCP tool order, or other protocol
+  sequences — file those the same turn without waiting to be asked.
 ---
 
 # MemPalace
 
 Install/configure via CLI when needed; mine trees or conversation exports;
 organize with wings/rooms. Prefer CLI/MCP tools from the install. Pair with
-`mempalace-recall` for search-before-answer on past work. File discovered
-APIs, CLIs, devices, and methods per rule `mempalace-file-interfaces`.
+`mempalace-recall` for search-before-answer on past work. File recovered
+command sequences the **same turn** per rule `mempalace-file-interfaces`.
 Durable facts prefer the palace over local memory files (`prefer-mempalace`).
 Harness skills/rules stay on disk.
 
-**`mine` takes a directory, not a file.** Trust `Files processed ≥ 1` and
-`Drawers filed ≥ 1`, then search-verify the Source filename. Exit code 0 alone
-is not enough.
+**`mine` takes a directory, not a file.** Always `mempalace mine DIR --daemon`.
+Trust `Files processed ≥ 1` and `Drawers filed ≥ 1`, then search-verify the
+Source filename. Exit code 0 alone is not enough.
 
 ## Concurrent agents
 
 All clients share one HTTP hub on a multi-process backend (Qdrant or
-pgvector). Do not open a second in-process palace. `kg_add` is lock-free;
-long mines use `mempalace mine --daemon` so the hub keeps serving reads.
-Hub + daemon + Qdrant setup: pack `examples/mempalace-multi-rw/`.
+pgvector). Do not open a second in-process palace. `kg_add` is lock-free.
+Directory mines: `mempalace mine DIR --daemon` (agents add `--background`).
+Do not MCP `mempalace_mine` (palace lock). Do not use `add_drawer` as a
+mine. `--direct` only if the daemon is down and the user named that
+fallback. Hub + daemon + Qdrant setup: pack `examples/mempalace-multi-rw/`.
 
 ## Single-file mine recipe
 
@@ -38,7 +40,9 @@ fail as `invalid mode 'None'`.
 STAGE="${HOME}/.mempalace/staging/$(date +%F)-topic"
 mkdir -p "$STAGE"
 cp /absolute/path/to/note.md "$STAGE/"
-mempalace mine "$STAGE" --mode projects --wing <wing> --agent {user}
+mempalace mine "$STAGE" --mode projects --wing <wing> --agent {user} --daemon
+# Agents: add --background, record the job id, search-verify when succeeded.
+# mempalace daemon wait <job_id>
 mempalace search "unique phrase from note" --wing <wing>
 ```
 
@@ -71,5 +75,6 @@ newest `filed_at`. SOP: `{MEMORY_ROOT}/mempalace-recency-and-preferences.md`.
 ## Unhappy paths
 
 - **0 drawers / skipped all** — file path passed, or content already filed
+- **LockHeldByOtherProcess / MCP mine stalled** — use CLI `mempalace mine DIR --daemon`; do not `add_drawer` as a substitute
 - **Index corrupt / HNSW / compaction** — `mempalace repair --mode from-sqlite --archive-existing --yes` first; re-mine drops MCP/diary-only drawers
 - **Empty search** — say so; do not invent palace content

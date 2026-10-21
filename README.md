@@ -129,12 +129,14 @@ commits: host denylist + emails + absolute homes; do not pack real names),
 a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
 `grade-stated-ask` (quote the user's words; grade that ask; attachments and
 case history are background; ask only when the words support two readings),
-`prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; harness
-skills/rules stay on disk; **this pack only**, not domain-only toolkits),
+`prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; directory
+mines use `mempalace mine DIR --daemon`; harness skills/rules stay on disk;
+**this pack only**, not domain-only toolkits),
 `mempalace-timeline-supersede` (keep older drawers; expire current truth with
 `kg_supersede`), `mempalace-file-interfaces`
-(file discovered APIs, CLIs, devices, and methods in MemPalace; later sessions
-query the palace first), etc.
+(file recovered APIs, CLIs, devices, and command sequences in MemPalace the
+same turn they are found — a chat recap is not filing; palace `add_drawer`
+is the commit; later sessions query the palace first), etc.
 
 Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
@@ -144,9 +146,10 @@ those units yourself; `install.sh` does not enable them.
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
-(`mine` is a directory; stage under `~/.mempalace/staging/` with `--mode projects`
-when the hub unit uses `PrivateTmp`; replacements use `kg_supersede` so older
-drawers stay on the timeline), Tofu plan review,
+(`mine` is a directory through the write daemon: `mempalace mine DIR --daemon`;
+stage under `~/.mempalace/staging/` with `--mode projects` when the hub unit
+uses `PrivateTmp`; replacements use `kg_supersede` so older drawers stay on
+the timeline), Tofu plan review,
 local-vs-cloud routing (`model-router`, `skill-router`),
 Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),

@@ -137,9 +137,13 @@ Merge into `~/.mempalace/config.json` (absolute `palace_path`, same string as
 }
 ```
 
-`mempalace mine --daemon` **waits** on the job by default. Hooks that must not
-block use the daemon submit API with `wait=False`. Do not pass `--direct`
-beside the hub.
+`mempalace mine --daemon` **waits** on the job by default. Agents add
+`--background` and record the job id. Hooks that must not block use the
+daemon submit API with `wait=False`. Pass `--daemon` even when
+`write_routing` is `prefer` — that policy can still fall back to
+`--direct`. Do not pass `--direct` beside the hub. Do not MCP
+`mempalace_mine` (palace lock). Do not use `add_drawer` as a directory
+mine.
 
 ## 7. Agent clients
 

@@ -23,10 +23,22 @@ rule still lists a file that exists. Empty palace ≠ invent.
 
 ## Write
 
-Stage a directory, `kg_add` / `kg_supersede` immediately, then one mine
-through the hub or `mempalace mine --daemon`. Do not open a second
-in-process palace (stdio fallback, extra container MCP, or `--direct`
-beside the hub).
+Stage a directory, `kg_add` / `kg_supersede` immediately, then
+`mempalace mine DIR --daemon` (agents add `--background`, record the
+job id, search-verify when it succeeds). Pass `--daemon` so
+`write_routing=prefer` cannot fall back to `--direct`.
+
+Do not MCP `mempalace_mine` (it takes the palace lock and returns
+`LockHeldByOtherProcess` while the daemon is writing). Do not use
+`add_drawer` as a directory mine (interface cards only —
+`mempalace-file-interfaces`). `--direct` only if the daemon is down
+**and** the user named that fallback. Do not open a second in-process
+palace (stdio fallback, extra container MCP).
+
+Recovered command sequences (AT, GATT, UART, HTTP, MCP tool order, host
+radios that reach a device): file the **same turn** per
+`mempalace-file-interfaces`, before the user-facing answer. A chat recap
+is not filing. Palace `add_drawer` is the commit. It is not a git commit.
 
 ## What stays on disk
 
