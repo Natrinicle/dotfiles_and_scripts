@@ -75,6 +75,7 @@ HOME_ALLOW_LOGINS = {
     "nobody",
     "www-data",
     "debian",
+    "node",
 }
 
 PLACEHOLDER_MARKERS = ("{user}", "{company_domain}", "${HOME}", "$USER")
