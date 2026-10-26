@@ -35,7 +35,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 30 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 84 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 85 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -46,6 +46,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 └── examples/
     ├── ldap.company.example
     ├── mempalace-multi-rw/            # Qdrant + HTTP hub + write daemon (copy yourself)
+    ├── n8n/                           # Traefik n8n.localhost compose example (copy yourself)
     ├── rea-mcp/                       # REA MCP client snippets (Claude JSON / Grok TOML)
     └── pandoc_templates/
 ```
@@ -142,7 +143,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (84) include packaging (`package-toolkit` classifies generic pack
+**Skills** (85) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -169,6 +170,8 @@ a find-patch loop (`find-patch-loop`, then `bug-finder` / `bug-skeptic` /
 `update-contacts-from-sources` (address-book create/patch from dumps; some
 cards are businesses; `Me to` / `Voicemail from` are cruft),
 `rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),
+`n8n-workflow` (generate/import a clickable DAG at `n8n.localhost`; example
+compose in `examples/n8n/`),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
 `reformat-volume-evidence`, `password-account-evidence`, `forensic-expert-report-format`,
@@ -230,6 +233,7 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | Ridley's RPerks / `rperks.shopridleys.com` | Origin and offer paths the runner navigates |
 | `prod.kacu.app` / `ridleys.immapi.com` | Cashback iframe and session origins |
 | Reverse Engineer Anything / `rea-agents` | Third-party MCP + skill (MIT, [morluto/rea](https://github.com/morluto/rea)). Pack ships a skill snapshot (v42, package `rea-agents@6.5.0`). Refresh with `npx -y rea-agents@6.5.0 setup --client claude_code` or `--client grok_build`. |
+| n8n / Traefik / `n8n.localhost` | Workflow UI image, reverse-proxy Host rule, and RFC 6761 editor URL |
 
 Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.
 
