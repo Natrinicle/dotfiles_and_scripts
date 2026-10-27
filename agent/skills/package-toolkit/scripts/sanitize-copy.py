@@ -6,6 +6,9 @@ Usage:
   sanitize-copy.py --dest DIR --from-dir SRC --relative-to SRC
 
 Default replacements always include $HOME absolute path -> ${HOME}.
+Host denylist tokens (or --denylist FILE) are replaced with {subject}.
+Authoring fails if no denylist tokens load unless --allow-missing-denylist.
+
 Additional replacements come from MAP.yaml:
 
   replacements:
@@ -23,6 +26,16 @@ import re
 import shutil
 import sys
 from pathlib import Path
+
+from identity_denylist import (
+    MISSING_DENYLIST_MSG,
+    collect_tokens,
+    compile_token_re,
+    default_denylist_paths,
+    replace_denylist_tokens,
+    should_require_denylist,
+    skip_denylist_on_path,
+)
 
 try:
     import yaml  # type: ignore
@@ -50,11 +63,18 @@ def should_drop(content: str, rules: dict) -> str | None:
     return None
 
 
-def sanitize_text(content: str, home: str, rules: dict) -> str:
+def sanitize_text(
+    content: str,
+    home: str,
+    rules: dict,
+    token_re: re.Pattern[str] | None = None,
+    *,
+    apply_denylist: bool = True,
+) -> tuple[str, int]:
     # Longest-first path so nested paths are handled
     if home:
         content = content.replace(home, "${HOME}")
-        # Also bare ${HOME} without trailing slash variants already covered
+        # Also bare /home/user without trailing slash variants already covered
     # Generic /home/<user> and /Users/<user> (when not already ${HOME})
     content = re.sub(r"/home/[A-Za-z0-9._-]+", "${HOME}", content)
     content = re.sub(r"/Users/[A-Za-z0-9._-]+", "${HOME}", content)
@@ -67,12 +87,15 @@ def sanitize_text(content: str, home: str, rules: dict) -> str:
         flags = re.IGNORECASE if item.get("ignore_case") else 0
         if item.get("regex"):
             content = re.sub(find, repl, content, flags=flags)
+        elif flags:
+            content = re.sub(re.escape(find), repl, content, flags=flags)
         else:
-            if flags:
-                content = re.sub(re.escape(find), repl, content, flags=flags)
-            else:
-                content = content.replace(find, repl)
-    return content
+            content = content.replace(find, repl)
+
+    n = 0
+    if apply_denylist and token_re is not None:
+        content, n = replace_denylist_tokens(content, token_re)
+    return content, n
 
 
 def copy_one(
@@ -82,6 +105,7 @@ def copy_one(
     home: str,
     rules: dict,
     dry_run: bool,
+    token_re: re.Pattern[str] | None,
 ) -> str:
     if not src.is_file():
         return f"skip (not file): {src}"
@@ -102,16 +126,33 @@ def copy_one(
     if reason:
         return f"DROPPED {src} ({reason})"
 
-    sanitized = sanitize_text(text, home, rules)
+    apply_denylist = not (skip_denylist_on_path(src) or skip_denylist_on_path(rel))
+    sanitized, n_sub = sanitize_text(
+        text, home, rules, token_re, apply_denylist=apply_denylist
+    )
     out = dest_root / rel
     if dry_run:
-        return f"would write {out} ({len(sanitized)} bytes)"
+        extra = f", {n_sub} denylist substitutions" if n_sub else ""
+        return f"would write {out} ({len(sanitized)} bytes{extra})"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(sanitized, encoding="utf-8")
     # preserve exec bit
     mode = src.stat().st_mode
     out.chmod(mode)
-    return f"wrote {out}"
+    extra = f" ({n_sub} denylist substitutions)" if n_sub else ""
+    return f"wrote {out}{extra}"
+
+
+def _denylist_paths(args: argparse.Namespace, dest: Path) -> list[Path]:
+    paths: list[Path] = []
+    if not args.no_host_denylist:
+        paths.extend(default_denylist_paths(dest))
+    for extra in args.denylist:
+        p = extra.expanduser()
+        if not p.is_file():
+            raise SystemExit(f"sanitize-copy: denylist not found: {p}")
+        paths.append(p)
+    return paths
 
 
 def main() -> int:
@@ -121,6 +162,23 @@ def main() -> int:
     ap.add_argument("--from-dir", type=Path, default=None)
     ap.add_argument("--relative-to", type=Path, default=None)
     ap.add_argument("--dry-run", action="store_true")
+    ap.add_argument(
+        "--denylist",
+        action="append",
+        default=[],
+        type=Path,
+        help="Extra denylist YAML (repeatable)",
+    )
+    ap.add_argument(
+        "--no-host-denylist",
+        action="store_true",
+        help="Do not load host/default denylist paths",
+    )
+    ap.add_argument(
+        "--allow-missing-denylist",
+        action="store_true",
+        help="Do not fail when no denylist tokens load (tests/CI override)",
+    )
     ap.add_argument("files", nargs="*", type=Path)
     args = ap.parse_args()
 
@@ -128,6 +186,19 @@ def main() -> int:
     home = os.environ.get("HOME", "")
     dest: Path = args.dest.expanduser().resolve()
     dest.mkdir(parents=True, exist_ok=True)
+
+    tokens, loaded = collect_tokens(_denylist_paths(args, dest))
+    if (
+        should_require_denylist(allow_missing=args.allow_missing_denylist, require=True)
+        and not tokens
+    ):
+        print(f"sanitize-copy: {MISSING_DENYLIST_MSG}", file=sys.stderr)
+        return 1
+    token_re = compile_token_re(tokens)
+    if loaded:
+        print(f"sanitize-copy: denylist files ({len(tokens)} tokens):")
+        for p in loaded:
+            print(f"  {p}")
 
     jobs: list[tuple[Path, Path]] = []
     if args.from_dir:
@@ -156,7 +227,7 @@ def main() -> int:
         return 1
 
     for src, rel in jobs:
-        print(copy_one(src, dest, rel, home, rules, args.dry_run))
+        print(copy_one(src, dest, rel, home, rules, args.dry_run, token_re))
     return 0
 
 

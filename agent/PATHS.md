@@ -7,7 +7,7 @@ Skills use placeholders so Claude Code and Grok can share the same pack.
 | `{AGENT_HOME}` | Agent config root | `~/.claude`, `~/.grok` |
 | `{AGENT_RULES}` | Rules directory | `{AGENT_HOME}/rules` |
 | `{AGENT_SKILLS}` | Skills directory | `{AGENT_HOME}/skills` |
-| `{AGENT_HOOKS}` | Hooks directory | `{AGENT_HOME}/hooks` |
+| `{AGENT_HOOKS}` | Hooks directory | `{AGENT_HOME}/hooks` (see `agent/hooks/README.md`) |
 | `{AGENT_SETTINGS}` | Host settings | `settings.json` / `config.toml` |
 | `{MEMORY_ROOT}` | Global memory | `{AGENT_HOME}/memory` (often one symlinked tree) |
 | `{PROJECT_MEMORY}` | Per-project memory | under the host's projects tree |

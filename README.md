@@ -34,8 +34,9 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 30 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 85 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # 34 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # 89 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── hooks/                     # spawn-subagent-local-pin.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -130,6 +131,10 @@ commits: host denylist + emails + absolute homes; do not pack real names),
 a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
 `grade-stated-ask` (quote the user's words; grade that ask; attachments and
 case history are background; ask only when the words support two readings),
+`public-api-auth` (WAN/public APIs need strong auth; a reverse proxy is not
+auth), `ask-before-remote-actions` (local-first: ask before commit, push, PR
+comment, or server mutate), `prefer-updates-before-workarounds` (check for a
+newer version of the installed wrapper before extract-and-run),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; directory
 mines use `mempalace mine DIR --daemon`; harness skills/rules stay on disk;
 **this pack only**, not domain-only toolkits),
@@ -137,13 +142,14 @@ mines use `mempalace mine DIR --daemon`; harness skills/rules stay on disk;
 `kg_supersede`), `mempalace-file-interfaces`
 (file recovered APIs, CLIs, devices, and command sequences in MemPalace the
 same turn they are found — a chat recap is not filing; palace `add_drawer`
-is the commit; later sessions query the palace first), etc.
+is the commit; later sessions query the palace first),
+`subagents-first` (if a child can finish the step, spawn it; parent orchestrates, summarizes, verifies), etc.
 
 Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (85) include packaging (`package-toolkit` classifies generic pack
+**Skills** (89) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -172,6 +178,12 @@ cards are businesses; `Me to` / `Voicemail from` are cruft),
 `rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),
 `n8n-workflow` (generate/import a clickable DAG at `n8n.localhost`; example
 compose in `examples/n8n/`),
+`linkedin-thread-archive` (Voyager in-page text PDF; GitHub/Slack screenshots
+stay on `thread-screenshots-*`),
+`speckit` (import GitHub Spec Kit constitution/specify/clarify/checklist/analyze/converge),
+`ai-security-rules` (slopsquatting, secrets, prompt injection),
+`license-provenance` (SPDX / copy-risk checklist),
+`nate-writing-style` (`{user}` placeholder voice notes; replace with your own),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
 `reformat-volume-evidence`, `password-account-evidence`, `forensic-expert-report-format`,
@@ -237,7 +249,7 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 
 Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.
 
-Forensic example lines use `{subject}` / `{account}`. Real tokens live in a **host** denylist (`{AGENT_HOME}/config/identity-denylist.yaml`); `config/identity-denylist.example.yaml` uses fake names only. `python3 agent/skills/package-toolkit/scripts/residual-identity-scan.py` is the pre-commit gate.
+Forensic example lines use `{subject}` / `{account}`. Real tokens live in a **host** denylist (`{AGENT_HOME}/config/identity-denylist.yaml`); `config/identity-denylist.example.yaml` uses fake names only. `sanitize-copy.py` replaces host tokens with `{subject}` at copy time and fails if no denylist loads. `python3 agent/skills/package-toolkit/scripts/residual-identity-scan.py` is the whole-tree pre-commit gate (authoring fails closed; CI still does email/home without a host file). Authoring also runs `identity-subagent-scan.py --ollama` (local gemma4 `/api/generate`) to catch people/employers the denylist missed. If Ollama is down, spawn `local-extract` / `explore` with the prompt plus bundle (not `general-purpose`). Vendor-locked names (`When accessing AWS…`, GitHub, Docker, Traefik, Flipper) stay. CI skips this pass.
 
 ## Install
 
@@ -245,12 +257,14 @@ Forensic example lines use `{subject}` / `{account}`. Real tokens live in a **ho
 cd /path/to/dotfiles_and_scripts
 ./install.sh --dry-run
 ./install.sh --all              # shell + bin + agent; skip files that already exist
-./install.sh --agent            # add missing skills/rules only
+./install.sh --agent            # add missing skills/rules/hooks only
 ./install.sh --agent --force    # replace live files (backs up first; will clobber expanded skills with pack stubs)
 # or selectively:
 ./install.sh --shell --bin
 source ~/.bashrc                # after shell install
 # restart Claude Code / Grok after --agent
+# Hooks copy to ~/.claude/hooks/; register in settings.json
+# (see agent/hooks/README.md). Grok compat.claude hooks = true.
 # RPerks timer is copied, not enabled:
 #   cp ~/.local/bin/rperks-activate-coupons/config.example.json \
 #      ~/.local/bin/rperks-activate-coupons/config.json
@@ -317,6 +331,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 # After editing live agent or shell trees:
 python3 agent/skills/package-toolkit/scripts/sanitize-copy.py \
   --dest /tmp/out --map config/sanitize-map.yaml ~/.bashrc
+# Host denylist is required unless --allow-missing-denylist.
 
 # Keep README aligned (rule: readme-freshness)
 ```

@@ -1,0 +1,25 @@
+{
+  "comment": "Discrete NEC maps used by correct_parsed_ir.py. Fill a missing key only when parsed siblings uniquely match a map (address + every overlapping name) with at least min_anchors hits. Do not add a map from a guess.",
+  "maps": [
+    {
+      "id": "solar-street-nec-00",
+      "protocol": "NEC",
+      "address": "00",
+      "min_anchors": 3,
+      "buttons": {
+        "Red": "45",
+        "On": "46",
+        "Off": "44",
+        "Brighter": "43",
+        "Dimmer": "0D",
+        "+": "07",
+        "-": "09",
+        "M": "08",
+        "Auto": "19",
+        "3H": "15",
+        "5H": "16",
+        "8H": "18"
+      }
+    }
+  ]
+}

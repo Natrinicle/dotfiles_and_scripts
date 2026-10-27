@@ -21,7 +21,7 @@ Options:
   --all           Install shell + bin + agent packs (default if no target flags)
   --shell         Install bashrc / bash_aliases / bash_aliases.d
   --bin           Install bin/* -> ~/.local/bin
-  --agent         Install shared agent/rules + agent/skills into Claude; link Grok
+  --agent         Install shared agent/rules + skills + hooks into Claude; link Grok
   --force         Overwrite existing files (backs up first). Default is skip.
   --dry-run       Print actions only
   --backup-dir D  Backup directory (default: timestamped under \$HOME)
@@ -41,6 +41,7 @@ Shell installs:
 Agent installs (single shared trees):
   agent/rules/*         -> ~/.claude/rules/
   agent/skills/*        -> ~/.claude/skills/
+  agent/hooks/*         -> ~/.claude/hooks/  (script only; register in settings.json)
   ~/.grok/rules         -> symlink to ~/.claude/rules  (if missing)
   ~/.grok/skills/<name> -> symlink to ~/.claude/skills/<name>
 
@@ -296,6 +297,14 @@ if [[ $DO_AGENT -eq 1 ]]; then
 	if [[ -d $ROOT/agent/grok/skills && ! -d $ROOT/agent/skills ]]; then
 		run mkdir -p "$HOME/.grok/skills"
 		install_tree_merge "$ROOT/agent/grok/skills" "$HOME/.grok/skills" "agent/grok/skills"
+	fi
+
+	if [[ -d $ROOT/agent/hooks ]]; then
+		run mkdir -p "$HOME/.claude/hooks"
+		install_tree_merge "$ROOT/agent/hooks" "$HOME/.claude/hooks" "agent/hooks"
+		if [[ $DRY_RUN -eq 0 ]]; then
+			chmod +x "$HOME/.claude/hooks"/*.py "$HOME/.claude/hooks"/*.sh 2>/dev/null || true
+		fi
 	fi
 fi
 

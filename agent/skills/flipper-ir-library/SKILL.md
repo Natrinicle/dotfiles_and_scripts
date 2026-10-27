@@ -12,11 +12,13 @@ description: >
 Package Flipper captures into a browseable tree: one folder per unit, cleaned
 photos, a README at every directory, and `.ir` files that actually load on the
 Flipper. Discrete label text (FCC, model, serial) is transcribed and verified;
-it is never trusted to an image model.
+it is never trusted to an image model. Included user-manual pages are cleaned
+and shipped when the capture folder has those shots.
 
-If the `.ir` is raw / unparsed / AC-state (not NEC, NECext, Samsung32, RC5, RC6,
-SIRC, SIRC15, SIRC20), load **decoding-ir-protocols** before writing the unit
-README. Parsed SIRC is a button map, same as NEC.
+If Flipper saved `type: raw`, run `scripts/correct_parsed_ir.py` before the
+unit README. Leftover HVAC/state (not NEC, NECext, Samsung32, RC5, RC6, SIRC,
+SIRC15, SIRC20) loads **decoding-ir-protocols**. Parsed SIRC is a button map,
+same as NEC.
 
 ## Pack root
 
@@ -30,6 +32,8 @@ Infrared/<Type>/<Brand>/<Model>/
   remote.jpg          # optional
   unit.jpg            # optional; add unit-front/rear/top/bottom/side as needed
   label.jpg           # pixel crop of the rating plate when IDs exist
+  manual-1.jpg        # optional; cleaned included user-manual page/spread
+  manual-2.jpg        # additional pages in reading order (manual-3.jpg, …)
   encode_*.py         # only when the protocol is not a one-shot parsed command
 ```
 
@@ -41,12 +45,19 @@ New folders: `Air_V` not `Air V`. Leave existing spaced names; encode spaces as
 ## Workflow
 
 1. Place the capture and photos in `Infrared/<Type>/<Brand>/<Model>/`.
-2. If Flipper saved `type: raw` (or the remote is HVAC/AC/state-based), decode
-   with **decoding-ir-protocols** first. Do not invent buttons.
+2. If Flipper saved `type: raw`, run `scripts/correct_parsed_ir.py UNIT.ir`
+   (then `--write`). It promotes jittered NEC/NECext/Samsung32 to parsed and
+   tags NEC-repeat-only keys. Leftover HVAC/state frames go to
+   **decoding-ir-protocols**. Do not invent buttons or command bytes. See
+   `references/parsed-ir-correct.md`.
 3. Clean photos per `references/photos.md` (cutout procedure for dense I/O).
    Transcribe the rating plate **before** any AI edit. Lookup FCC. Strip GPS.
-   Keep camera originals in the unit folder as `Name.ignore.jpg` (gitignored
-   via `*.ignore.*`). Do not delete them.
+   Route a dump with local Ollama vision (`scripts/classify_shots.py`) so
+   remote / unit / label / manual / skip is decided on-box. When originals
+   include a user manual, instruction sheet, or leaflet, ship those pages as
+   `manual-1.jpg`, `manual-2.jpg`, … (see **User-manual pages**). Keep camera
+   originals in the unit folder as `Name.ignore.jpg` (gitignored via
+   `*.ignore.*`). Do not delete them.
 4. Write the unit README (button map, protocol, IDs). If an encode script is
    required, say so and that Flipper cannot send it as parsed NEC.
 5. Ensure a README exists at **every** ancestor (`Infrared/`, type, brand, model)
@@ -56,7 +67,11 @@ New folders: `Air_V` not `Air V`. Leave existing spaced names; encode spaces as
 
 ## Do not
 
-- Redraw button icons or rating-plate glyphs with an image model.
+- Redraw button icons, rating-plate glyphs, or user-manual text with an
+  image model. Paper cutouts use local rembg (BiRefNet), not Imagine.
+- Call rembg's default `bria-rmbg` (non-commercial) or `withoutbg` (uploads
+  the photo). Pin `birefnet-general`. Keep rembg on CPU so Ollama can use
+  the GPU.
 - Composite tiny stickers (QC ovals, round seals) onto an AI-cleaned body —
   that produces ghosted/duplicated labels. Omit them; transcribe in the README.
 - Warp an oblique camera original onto a straight-on cleaned body. Screws,
@@ -74,6 +89,9 @@ New folders: `Air_V` not `Air V`. Leave existing spaced names; encode spaces as
   the old path.
 - Synthesize IR codes unless **decoding-ir-protocols** proved the field. Mark
   synthesized buttons in the `.ir` comment and the unit README.
+- Invent NEC command bytes for repeat-only captures. Tag them
+  `correct_parsed_ir:` and re-learn. Fill from `nec-button-maps.json` only
+  when parsed siblings uniquely match a map.
 
 ## Exemplars
 
@@ -84,7 +102,13 @@ personal names into new files.
 ## Additional resources
 
 - `references/photos.md` — deskew, background, dirt, FCC, GPS, QC ghosting,
-  source-angle match, overlay hallucinations
+  source-angle match, overlay hallucinations, user-manual pages
 - `references/readme-tree.md` — index README templates and 404 rules
 - `scripts/check_readme_links.py` — relative Markdown link checker
-- **decoding-ir-protocols** — raw capture bit maps and encode scripts
+- `scripts/classify_shots.py` — local Ollama vision: remote/unit/label/manual/skip
+- `scripts/cutout_manual.py` — rembg BiRefNet matte, deskew, white, no EXIF
+- `scripts/correct_parsed_ir.py` — raw → parsed NEC/NECext/Samsung32 when
+  timings uniquely match; `--self-test` then `--write` on the unit or `Infrared/`
+- `references/parsed-ir-correct.md` — rewrite bar, repeat-only, map fill
+- `references/nec-button-maps.json` — discrete maps; add only when uniquely proven
+- **decoding-ir-protocols** — leftover HVAC/state bit maps and encode scripts
