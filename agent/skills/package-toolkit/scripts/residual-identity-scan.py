@@ -8,6 +8,9 @@ Usage:
   residual-identity-scan.py [--root DIR] [--denylist FILE] [FILE ...]
   residual-identity-scan.py --self-test
 
+With no FILE arguments, walks the whole --root tree.
+Authoring fails if no denylist tokens load (default unless CI/GITHUB_ACTIONS).
+
 Exit 1 on the first hit. Prints path:line: snippet (token redacted).
 """
 
@@ -16,9 +19,20 @@ from __future__ import annotations
 import argparse
 import os
 import re
+import subprocess
 import sys
 from collections.abc import Iterable, Sequence
 from pathlib import Path
+
+from identity_denylist import (
+    MISSING_DENYLIST_MSG,
+    SKIP_NAME_SUBSTR,
+    collect_tokens,
+    compile_token_re,
+    default_denylist_paths,
+    should_require_denylist,
+    skip_denylist_on_path,
+)
 
 SKIP_DIR_NAMES = {
     ".git",
@@ -29,6 +43,11 @@ SKIP_DIR_NAMES = {
     "node_modules",
     ".venv",
     "venv",
+}
+
+SKIP_FILE_NAMES = {
+    ".find-patch-queue.json",
+    ".find-patch-queue.json.lock",
 }
 
 SKIP_SUFFIXES = {
@@ -44,12 +63,6 @@ SKIP_SUFFIXES = {
     ".so",
     ".o",
 }
-
-# Example maps and denylist templates are allowed to contain fake names.
-SKIP_NAME_SUBSTR = (
-    "identity-denylist.example.yaml",
-    "sanitize-map.example.yaml",
-)
 
 EMAIL_RE = re.compile(
     r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
@@ -81,91 +94,53 @@ HOME_ALLOW_LOGINS = {
 PLACEHOLDER_MARKERS = ("{user}", "{company_domain}", "${HOME}", "$USER")
 
 
-def _parse_forbidden_yaml(text: str) -> list[str]:
-    """Tiny YAML subset: `forbidden:` then `- token` lines. No PyYAML."""
-    tokens: list[str] = []
-    in_forbidden = False
-    for raw in text.splitlines():
-        line = raw.strip()
-        if not line or line.startswith("#"):
-            continue
-        if line.rstrip(":") == "forbidden" or line.startswith("forbidden:"):
-            in_forbidden = True
-            rest = line.split(":", 1)[1].strip() if ":" in line else ""
-            if rest.startswith("[") and rest.endswith("]"):
-                inner = rest[1:-1].strip()
-                if inner:
-                    for part in inner.split(","):
-                        tok = part.strip().strip("\"'")
-                        if tok:
-                            tokens.append(tok)
-            continue
-        if in_forbidden:
-            if line.startswith("- "):
-                tok = line[2:].strip().strip("\"'")
-                if tok:
-                    tokens.append(tok)
-                continue
-            if not line.startswith(" ") and not line.startswith("-"):
-                in_forbidden = False
-    return tokens
-
-
-def load_denylist(path: Path) -> list[str]:
-    if not path.is_file():
-        return []
-    return _parse_forbidden_yaml(path.read_text(encoding="utf-8", errors="replace"))
-
-
-def default_denylist_paths(root: Path) -> list[Path]:
-    paths: list[Path] = []
-    env = os.environ.get("IDENTITY_DENYLIST_FILE")
-    if env:
-        paths.append(Path(env).expanduser())
-    agent_home = os.environ.get("AGENT_HOME")
-    if agent_home:
-        paths.append(Path(agent_home) / "config" / "identity-denylist.yaml")
-    home = Path.home()
-    paths.append(home / ".claude" / "config" / "identity-denylist.yaml")
-    paths.append(home / ".grok" / "config" / "identity-denylist.yaml")
-    paths.append(root / "config" / "identity-denylist.local.yaml")
-    paths.append(root / "config" / "identity-denylist.yaml")
-    # Unique, existing only
-    seen: set[Path] = set()
-    out: list[Path] = []
-    for p in paths:
-        try:
-            resolved = p.resolve()
-        except OSError:
-            continue
-        if resolved in seen or not p.is_file():
-            continue
-        seen.add(resolved)
-        out.append(p)
-    return out
-
-
-def compile_token_re(tokens: Sequence[str]) -> re.Pattern[str] | None:
-    parts: list[str] = []
-    for tok in tokens:
-        t = tok.strip()
-        if not t:
-            continue
-        parts.append(rf"\b{re.escape(t)}\b")
-    if not parts:
-        return None
-    return re.compile("|".join(parts), re.IGNORECASE)
-
-
 def should_skip_file(path: Path, root: Path) -> bool:
     try:
         rel = path.relative_to(root)
     except ValueError:
         rel = path
-    name = path.name
-    if any(s in name or s in str(rel) for s in SKIP_NAME_SUBSTR):
+    if skip_denylist_on_path(path) or skip_denylist_on_path(rel):
+        return True
+    if path.name in SKIP_FILE_NAMES:
+        return True
+    if any(s in path.name or s in str(rel) for s in SKIP_NAME_SUBSTR):
         return True
     return path.suffix.lower() in SKIP_SUFFIXES
+
+
+def iter_git_files(root: Path) -> list[Path] | None:
+    """Tracked + untracked-not-ignored. None if this root is not a git work tree."""
+    git_dir = root / ".git"
+    if not git_dir.exists():
+        return None
+    try:
+        proc = subprocess.run(
+            [
+                "git",
+                "-C",
+                str(root),
+                "ls-files",
+                "-z",
+                "--cached",
+                "--others",
+                "--exclude-standard",
+            ],
+            capture_output=True,
+            check=False,
+        )
+    except OSError:
+        return None
+    if proc.returncode != 0:
+        return None
+    out: list[Path] = []
+    for raw in proc.stdout.split(b"\0"):
+        if not raw:
+            continue
+        rel = raw.decode("utf-8", errors="replace")
+        path = root / rel
+        if path.is_file():
+            out.append(path)
+    return out
 
 
 def iter_files(root: Path, explicit: Sequence[Path]) -> Iterable[Path]:
@@ -173,6 +148,10 @@ def iter_files(root: Path, explicit: Sequence[Path]) -> Iterable[Path]:
         for p in explicit:
             if p.is_file():
                 yield p
+        return
+    git_files = iter_git_files(root)
+    if git_files is not None:
+        yield from git_files
         return
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIR_NAMES]
@@ -306,6 +285,18 @@ def self_test() -> int:
     return 0
 
 
+def _denylist_paths(args: argparse.Namespace, root: Path) -> list[Path]:
+    paths: list[Path] = []
+    if not args.no_host_denylist:
+        paths.extend(default_denylist_paths(root))
+    for extra in args.denylist:
+        p = extra.expanduser()
+        if not p.is_file():
+            raise SystemExit(f"residual-identity-scan: denylist not found: {p}")
+        paths.append(p)
+    return paths
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=None, help="Toolkit repo root")
@@ -315,6 +306,22 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=[],
         type=Path,
         help="Extra denylist YAML (repeatable)",
+    )
+    parser.add_argument(
+        "--no-host-denylist",
+        action="store_true",
+        help="Do not load host/default denylist paths",
+    )
+    parser.add_argument(
+        "--require-denylist",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="Fail when no denylist tokens loaded (default: on unless CI/GITHUB_ACTIONS)",
+    )
+    parser.add_argument(
+        "--allow-missing-denylist",
+        action="store_true",
+        help="Do not fail when no denylist tokens load (tests/CI override)",
     )
     parser.add_argument(
         "--no-email", action="store_true", help="Skip generic email scan"
@@ -328,18 +335,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return self_test()
 
     root = (args.root or Path.cwd()).resolve()
-    denylist_files = list(default_denylist_paths(root))
-    for extra in args.denylist:
-        if extra.is_file():
-            denylist_files.append(extra)
-
-    tokens: list[str] = []
-    loaded: list[str] = []
-    for dpath in denylist_files:
-        got = load_denylist(dpath)
-        if got:
-            tokens.extend(got)
-            loaded.append(str(dpath))
+    tokens, loaded = collect_tokens(_denylist_paths(args, root))
+    require = should_require_denylist(
+        allow_missing=args.allow_missing_denylist,
+        require=args.require_denylist,
+    )
+    if require and not tokens:
+        print(f"residual-identity-scan: FAIL: {MISSING_DENYLIST_MSG}", file=sys.stderr)
+        return 1
 
     token_re = compile_token_re(tokens)
     files = [p if p.is_absolute() else root / p for p in args.files]

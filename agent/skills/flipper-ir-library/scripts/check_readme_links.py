@@ -15,8 +15,13 @@ from urllib.parse import unquote, urlparse
 LINK = re.compile(r"\[[^\]]*\]\(([^)]+)\)")
 
 
+SKIP_DIR_NAMES = {".git", ".pio", ".venv", "node_modules"}
+
+
 def iter_md(root: Path) -> list[Path]:
-    return sorted(p for p in root.rglob("*.md") if ".git" not in p.parts)
+    return sorted(
+        p for p in root.rglob("*.md") if not SKIP_DIR_NAMES.intersection(p.parts)
+    )
 
 
 def targets(href: str, md_file: Path) -> Path | None:

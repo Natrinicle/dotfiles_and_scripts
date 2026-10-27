@@ -4,7 +4,9 @@ Product shots of remotes and units. Allowed edits: straighten/deskew, white (or
 transparent) background, wipe dirt/grime/dust, crop, JPEG optimize. **Do not**
 change button artwork, printed icons, or rating-plate text.
 
-Load the Imagine skill when calling `image_edit` / `image_gen`.
+Load the Imagine skill when calling `image_edit` / `image_gen`. Paper
+manuals and dense rating plates stay on rembg / pixel crop; Imagine is
+not the cutout tool.
 
 ## Order of operations
 
@@ -29,12 +31,50 @@ Load the Imagine skill when calling `image_edit` / `image_gen`.
    long edge 800–1600) with no EXIF. Confirm `Image.info` has no `exif`/`gps`.
 7. **Rename.** Shipped files: `remote.jpg`, `unit.jpg`, `unit-front.jpg`,
    `unit-rear.jpg`, `unit-top.jpg`, `unit-bottom.jpg`, `unit-side.jpg`,
-   `label.jpg`. Camera originals stay in the **same unit folder** as
+   `label.jpg`, `manual-1.jpg` / `manual-2.jpg` / … when a user manual is in
+   the originals. Camera originals stay in the **same unit folder** as
    `IMG….ignore.jpg` (or `Name.ignore.jpeg`). Pack `.gitignore` has `*.ignore.*`.
    Do not delete the originals. Do not commit them.
 
 `label.jpg` is a tight crop of the real sticker (contrast/sharpen OK). It is
-the source of truth for IDs even if the beauty shot omits a mark.
+the source of truth for IDs even if the beauty shot omits a mark. Keep it
+when a full manual page also shows the same table.
+
+## User-manual pages
+
+When the capture folder has photos of an included user manual, owner's
+manual, instruction sheet, packing list, or folded leaflet, **ship the
+cleaned pages**. Skip this only when no such photo exists.
+
+- **Filenames:** `manual-1.jpg`, `manual-2.jpg`, … in **reading order**
+  (cover / front spread first). A two-page open leaflet is one file (the
+  spread as photographed). Do not use `manual.jpg` without a number.
+- **Keep original pixels** for printed text, diagrams, and tables. Allowed
+  edits are the same as other product shots: straighten/deskew, white
+  background, wipe dirt on the *margin*, crop, JPEG optimize. Do **not**
+  run `image_edit` / `image_gen` on a page that has body text or a spec
+  table (same rule as a dense rating plate).
+- **Cutout:** paper off table or carpet onto white. `scripts/cutout_manual.py`
+  runs a **local rembg** ONNX matte (default `birefnet-general`, MIT), then
+  deskew + composite original paper pixels onto white + strip EXIF.
+  Install: `uv tool install --python 3.12 'rembg[cpu]'` (CPU only; leave
+  the GPU for Ollama). Do **not** use rembg's default `bria-rmbg`
+  (non-commercial) or `withoutbg` (uploads the photo). A luminance-only
+  mask fails on decorative iron tables — do not go back to that as the
+  primary path. Recut if carpet or table remains on the edge; a sliver of
+  paper margin is better than a chewed line of type.
+- **Classify first:** `scripts/classify_shots.py DIR` talks to local Ollama
+  (`gemma4` `/api/generate`). It labels each `*.ignore.*` as remote, unit,
+  label, manual, or skip. Treat the JSON as a routing **hint** — a leaflet
+  cover that prints the lamp is still `manual`, not `unit`. Skip in-use
+  install and lifestyle shots. Do not send originals to a cloud VL.
+- **`label.jpg` stays.** A tight ID crop of a rating plate or spec table is
+  still `label.jpg` even when that table also appears on `manual-N.jpg`.
+- **Do not** ship in-use install photos, lifestyle shots printed *inside*
+  the leaflet as a reason to skip the page, or a second copy of the same
+  spread. Transcribe IDs from the sheet before the cutout.
+- README: after `label.jpg` and the identification table, add an **Included
+  sheet** section that embeds `manual-1.jpg`, `manual-2.jpg`, … in order.
 
 ## QC labels and small stickers
 

@@ -42,5 +42,5 @@ repos:
         name: residual-identity-scan
         entry: python3 agent/skills/package-toolkit/scripts/residual-identity-scan.py
         language: system
-        pass_filenames: true
-        files: '^(agent|shell|bin|config|share|README\.md|toolkit\.yaml)/|^[^/]+\.(md|yaml|yml|sh)$'
+        pass_filenames: false
+        always_run: true

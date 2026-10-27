@@ -29,6 +29,8 @@ Child links are **relative** to that README. Spaces in a path: `Air%20V/`.
 ## Unit README
 
 - Photos first (remote, then unit views, then `label.jpg` if present).
+  When a user manual was photographed, add `manual-1.jpg`, `manual-2.jpg`,
+  … after the identification table under an **Included sheet** heading.
 - Identification table: brand, model, serial, printed FC oval, FCC **grant**
   ID, BIS/other, power. Note when a grant ID is not printed as `FCC ID: …`.
 - Flipper file name and whether it is parsed or raw.

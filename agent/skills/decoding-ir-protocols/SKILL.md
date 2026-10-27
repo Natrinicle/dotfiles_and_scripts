@@ -23,25 +23,28 @@ learned vs synthesized.
 
 ## Workflow
 
-1. Run `scripts/decode_flipper_ir.py` on the `.ir` (or paste). Keep every
+1. If the dump still looks like discrete NEC (9/4.5 ms data or 9/2.25 ms
+   repeats), run **flipper-ir-library** `scripts/correct_parsed_ir.py` first.
+   This skill is leftover state/HVAC.
+2. Run `scripts/decode_flipper_ir.py` on the `.ir` (or paste). Keep every
    button Flipper named, including unlabeled ones.
-2. Split bursts on gaps **> 10 ms**. Count frames. 3 frames with frame1 =
+3. Split bursts on gaps **> 10 ms**. Count frames. 3 frames with frame1 =
    `NOT frame0` and frame2 = frame0 is the invert-middle triple (common).
    **6 frames** is two triples (timers often do this).
-3. Pulse-distance default: space > 1000 µs = 1, else 0; leader is the first
+4. Pulse-distance default: space > 1000 µs = 1, else 0; leader is the first
    two samples; a trailing short mark is a stop bit, not a data bit.
-4. Build a table: button name → first-frame hex (MSB) → nbits. Confirm the
+5. Build a table: button name → first-frame hex (MSB) → nbits. Confirm the
    inverted middle frame before trusting a row.
-5. Diff rows that should change **one** control (same mode, two temps; same
+6. Diff rows that should change **one** control (same mode, two temps; same
    temp, two fans). A field that flips with the control and stays put otherwise
    is real. Fields that move together may be a checksum — do not splice.
-6. Synthesize a code **only** when a field is proven at two or more endpoints
+7. Synthesize a code **only** when a field is proven at two or more endpoints
    with an invertible map (example: 4-bit hour, bit-reversed nibble). Put the
    learn in the `.ir` as-is; mark fills as synthesized in comments **and** the
    README. Untested splices stay out of the Flipper file unless the user asks.
-7. Write `encode_<device>.py` in the unit folder when building more codes by
+8. Write `encode_<device>.py` in the unit folder when building more codes by
    hand would be error-prone (two-packet timers, checksums, 36+ bit state).
-8. Hand the payloads to **flipper-ir-library** for `.ir` comments, README, and
+9. Hand the payloads to **flipper-ir-library** for `.ir` comments, README, and
    “Flipper cannot send this as parsed NEC.”
 
 Details and the invert/timer patterns: `references/method.md`.

@@ -8,9 +8,15 @@ description: >
 
 Coordinate capture of long threads from web UIs.
 
-1. Prefer permalinks from APIs when available.  
+1. Prefer permalinks from APIs when available.
 2. Delegate host-specific steps to `thread-screenshots-github` or
-   `thread-screenshots-slack` (or equivalent chat host).  
-3. Organize outputs under a dated directory; write a short index (who/when/url).  
-4. Never type into compose boxes; never send messages.  
+   `thread-screenshots-slack` (or equivalent chat host).
+3. Organize outputs under a dated directory; write a short index (who/when/url).
+4. Never type into compose boxes; never send messages.
 5. Handle auth walls by asking the user to complete SSO in the automation browser.
+
+| Platform | Skill |
+|----------|-------|
+| GitHub PR comments | `thread-screenshots-github` |
+| Slack DMs/channels | `thread-screenshots-slack` |
+| LinkedIn messaging (searchable text PDF) | `linkedin-thread-archive` |

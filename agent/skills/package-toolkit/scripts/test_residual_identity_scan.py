@@ -3,6 +3,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 import sys
 import tempfile
@@ -14,14 +15,24 @@ SCRIPT = Path(__file__).resolve().parent / "residual-identity-scan.py"
 
 class ResidualIdentityScanTests(unittest.TestCase):
     def _run(
-        self, args: list[str], *, cwd: Path | None = None
+        self,
+        args: list[str],
+        *,
+        cwd: Path | None = None,
+        extra_env: dict[str, str] | None = None,
     ) -> subprocess.CompletedProcess[str]:
+        env = os.environ.copy()
+        env.pop("CI", None)
+        env.pop("GITHUB_ACTIONS", None)
+        if extra_env:
+            env.update(extra_env)
         return subprocess.run(
             [sys.executable, str(SCRIPT), *args],
             cwd=cwd,
             capture_output=True,
             text=True,
             check=False,
+            env=env,
         )
 
     def test_self_test(self) -> None:
@@ -42,7 +53,14 @@ class ResidualIdentityScanTests(unittest.TestCase):
                 encoding="utf-8",
             )
             proc = self._run(
-                ["--root", str(root), "--denylist", str(denylist), str(dirty)],
+                [
+                    "--root",
+                    str(root),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                    str(dirty),
+                ],
                 cwd=root,
             )
             self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
@@ -55,7 +73,14 @@ class ResidualIdentityScanTests(unittest.TestCase):
                 encoding="utf-8",
             )
             proc = self._run(
-                ["--root", str(root), "--denylist", str(denylist), str(dirty)],
+                [
+                    "--root",
+                    str(root),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                    str(dirty),
+                ],
                 cwd=root,
             )
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
@@ -68,11 +93,19 @@ class ResidualIdentityScanTests(unittest.TestCase):
             sample = root / "aliases.sh"
             sample.write_text(
                 "docker run --mount target=/home/worker/.config\n"
+                "HOME=/home/node\n"
                 "# docs: /home/alice/.bashrc vs ${HOME}\n",
                 encoding="utf-8",
             )
             proc = self._run(
-                ["--root", str(root), "--denylist", str(denylist), str(sample)],
+                [
+                    "--root",
+                    str(root),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                    str(sample),
+                ],
                 cwd=root,
             )
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
@@ -92,8 +125,111 @@ class ResidualIdentityScanTests(unittest.TestCase):
                 "forbidden:\n  - ExampleSubjectName\n", encoding="utf-8"
             )
             proc = self._run(
-                ["--root", str(root), "--denylist", str(denylist), str(example)],
+                [
+                    "--root",
+                    str(root),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                    str(example),
+                ],
                 cwd=root,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_require_denylist_fails_when_empty(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sample = root / "README.md"
+            sample.write_text("portable pack notes\n", encoding="utf-8")
+            proc = self._run(
+                [
+                    "--root",
+                    str(root),
+                    "--no-host-denylist",
+                    str(sample),
+                ],
+                cwd=root,
+            )
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            self.assertIn("no denylist", proc.stderr)
+
+    def test_ci_allows_missing_denylist(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            sample = root / "README.md"
+            sample.write_text("portable pack notes\n", encoding="utf-8")
+            proc = self._run(
+                ["--root", str(root), "--no-host-denylist", str(sample)],
+                cwd=root,
+                extra_env={"CI": "true"},
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+    def test_whole_tree_finds_unlisted_leftover(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            denylist = base / "denylist.yaml"
+            denylist.write_text(
+                "forbidden:\n  - ExampleSubjectName\n",
+                encoding="utf-8",
+            )
+            pack = base / "pack"
+            hidden = pack / "examples"
+            hidden.mkdir(parents=True)
+            (pack / "README.md").write_text("clean\n", encoding="utf-8")
+            leftover = hidden / "notes.md"
+            leftover.write_text("leftover ExampleSubjectName token\n", encoding="utf-8")
+            proc = self._run(
+                [
+                    "--root",
+                    str(pack),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                ],
+                cwd=pack,
+            )
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            self.assertIn("denylist", proc.stderr)
+            self.assertIn("notes.md", proc.stderr)
+
+    def test_gitignored_leftover_skipped_on_whole_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            base = Path(tmp)
+            denylist = base / "denylist.yaml"
+            denylist.write_text(
+                "forbidden:\n  - ExampleSubjectName\n",
+                encoding="utf-8",
+            )
+            pack = base / "pack"
+            pack.mkdir()
+            git_env = os.environ.copy()
+            git_env["GIT_CONFIG_GLOBAL"] = "/dev/null"
+            git_env["GIT_CONFIG_NOSYSTEM"] = "1"
+            init = subprocess.run(
+                ["git", "init", "-q"],
+                cwd=pack,
+                capture_output=True,
+                text=True,
+                check=False,
+                env=git_env,
+            )
+            self.assertEqual(init.returncode, 0, init.stderr)
+            (pack / ".gitignore").write_text("scratch-leftover.md\n", encoding="utf-8")
+            (pack / "README.md").write_text("clean\n", encoding="utf-8")
+            (pack / "scratch-leftover.md").write_text(
+                "leftover ExampleSubjectName token\n", encoding="utf-8"
+            )
+            proc = self._run(
+                [
+                    "--root",
+                    str(pack),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                ],
+                cwd=pack,
             )
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 

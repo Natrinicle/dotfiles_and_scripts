@@ -31,6 +31,8 @@ result when it is usable.
 Skip the child when the user named 1–2 exact files, or the work is a write /
 install / MCP / browser / review / judgment call.
 
+Offload: rule **subagents-first**. If a child can finish the step, spawn it (including write / MCP / REA / judgment). Parent summarizes and verifies.
+
 ## Grok CLI short-circuit
 
 On Grok Build / Grok CLI:

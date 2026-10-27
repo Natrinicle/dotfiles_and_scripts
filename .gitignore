@@ -1,4 +1,6 @@
 # Local / private (do not commit)
+.find-patch-queue.json
+.find-patch-queue.json.lock
 config/sanitize-map.local.yaml
 config/identity-denylist.local.yaml
 config/identity-denylist.yaml
