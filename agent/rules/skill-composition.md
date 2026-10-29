@@ -46,5 +46,9 @@ unrelated media or artifact kinds.
    Companions apply the core first and only add environment-specific artifacts.
    When updating a core, check all listed companions and other callers for
    compatibility; split only if needs have diverged, with a convergence note.
+8. **CUPS custom backend / KDE persist** → **cups-custom-backend**. Label
+   CUPS packaging (Nelko / Aimotech) → **cups-label-printer** (REQUIRED
+   cups-custom-backend; lives in a specialized catalog pack). Do not grow
+   reverse-engineering-protocols.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.
