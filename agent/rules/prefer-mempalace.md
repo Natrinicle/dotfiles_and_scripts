@@ -40,6 +40,9 @@ radios that reach a device): file the **same turn** per
 `mempalace-file-interfaces`, before the user-facing answer. A chat recap
 is not filing. Palace `add_drawer` is the commit. It is not a git commit.
 
+Research claims you are about to vault: run **claim-source-check** first
+(claim + source only). File `supported` pages. Rewrite the rest.
+
 Parent compaction: file necessary pieces first (rule
 `mempalace-compact-filing`) so later lookup has full drawers. The compact
 summary is not filing.
