@@ -2,8 +2,9 @@
 
 Always-on spawn and pin policy. Taxonomy, routing table, cost, and skill
 audits: skill `model-router`. Parent vs local for the interactive session:
-skill `skill-router`. These are one policy split by load cost — do not
-collapse the skill into this rule.
+skill `skill-router`. Spend gate (USD, tokens, wall-clock, context-window
+on spawn): rule `expected-value` / skill `expected-value`. These are one
+policy split by load cost — do not collapse the skill into this rule.
 
 Prefer **local models (Ollama)** for light work. Keep **remote/cloud** models
 for orchestration, multi-step coding, and high-stakes judgment.

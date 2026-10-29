@@ -34,8 +34,8 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 34 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 89 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # 37 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # 94 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── hooks/                     # spawn-subagent-local-pin.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
@@ -143,13 +143,14 @@ mines use `mempalace mine DIR --daemon`; harness skills/rules stay on disk;
 (file recovered APIs, CLIs, devices, and command sequences in MemPalace the
 same turn they are found — a chat recap is not filing; palace `add_drawer`
 is the commit; later sessions query the palace first),
-`subagents-first` (if a child can finish the step, spawn it; parent orchestrates, summarizes, verifies), etc.
+`subagents-first` (if a child can finish the step, spawn it; parent orchestrates, summarizes, verifies),
+`expected-value` (take an expensive action only with an edge; ledger is USD, tokens, wall-clock, and context-window; spawn value is parent context saved vs re-ingest), etc.
 
 Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (89) include packaging (`package-toolkit` classifies generic pack
+**Skills** (94) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -158,6 +159,7 @@ stage under `~/.mempalace/staging/` with `--mode projects` when the hub unit
 uses `PrivateTmp`; replacements use `kg_supersede` so older drawers stay on
 the timeline), Tofu plan review,
 local-vs-cloud routing (`model-router`, `skill-router`),
+expected-value spend gate (`expected-value`; USD, tokens, time, context-window on spawn),
 Speakr (`speakr-manage`, `speakr-scanner`), Jira (`jira-scanner`),
 Flipper IR (`flipper-ir-library`, `decoding-ir-protocols`),
 compiled-app unpack (`reverse-engineering-protocols`, then
