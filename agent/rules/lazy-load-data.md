@@ -68,5 +68,6 @@ names it. Do not `mempalace sync` in a way that prunes those drawers.
 | gitleaks / hadolint canaries or CI CLI install (any repo) | `{MEMORY_ROOT}/scanner-self-test-correctness.md`; palace `kg_query` `gitleaks` / `hadolint`; charset `A-Z2-7` not `A-Z0-9` |
 | Contacts / messaging analysis | contacts profiles (store carefully; may contain PII) |
 | Change comparisons / Meld-style diffs / YAML JSON dyff | skill `meld-style-diff` |
+| KDE / CUPS custom backend persist | palace `cups-custom-backend lpadmin retry-job last-seen print-manager list vs Add`; skill `cups-custom-backend` |
 
 Do not list secrets, tokens, or private hostnames in always-loaded files.
