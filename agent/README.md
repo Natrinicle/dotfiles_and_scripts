@@ -5,12 +5,13 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
 
 ## Contents
 
-- **Rules** (34) including `code-quality`, `security`, `subagents-first`,
+- **Rules** (37) including `code-quality`, `security`, `subagents-first`,
   `public-api-auth`, `ask-before-remote-actions`,
-  `prefer-updates-before-workarounds`, `toolkit-residual-identity`.
-- **Skills** (89) covering packaging, scanners, PII detection, MemPalace,
+  `prefer-updates-before-workarounds`, `toolkit-residual-identity`,
+  `expected-value`.
+- **Skills** (94) covering packaging, scanners, PII detection, MemPalace,
   Flipper IR, compiled-app unpack, forensic cores plus thin server companions,
-  and workflow helpers.
+  expected-value spend gate, and workflow helpers.
 - **Hooks** — `agent/hooks/` copies into `{AGENT_HOME}/hooks/`. Register in
   host `settings.json` (see `hooks/README.md`).
 - **Writing style** — `nate-writing-style` ships `{user}` placeholder voice

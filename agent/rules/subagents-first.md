@@ -34,6 +34,11 @@ necessary.
    do not pin to 8B local).
 5. Several independent slices → spawn in parallel.
 
+Every spawn scores **context-window** EV (skill `expected-value`): parent
+tokens saved (`C_parent_do`) vs brief + re-ingest. Cap parallel `N` so
+reports fit remaining parent context. Extra cloud children need their own
+edge.
+
 ## Do not
 
 - Do child-capable work on the parent because “context is already here”.
