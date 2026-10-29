@@ -33,3 +33,30 @@ Register (do not also add under `~/.grok/hooks/`):
 ```
 
 Restart the session after changing hook registration. Fail-open on errors.
+
+## mempalace-postcompact-index
+
+`PostCompact` (matcher omitted: `manual` and `auto`)
+
+Grok writes full turn text to session `compaction/segment_*.md`. Mining
+those files dumps skill-list noise. This hook stages only `INDEX.md`
+plus a session pointer, then `mempalace mine DIR --daemon --background`.
+The model still files necessary pieces per rule `mempalace-compact-filing`.
+Fail-open. Skip when INDEX is unchanged (sha256 marker). Do not also
+register under `~/.grok/hooks/` (Claude settings already fire on Grok).
+
+Register:
+
+```json
+{
+  "hooks": [
+    {
+      "type": "command",
+      "command": "python3 {AGENT_HOME}/hooks/mempalace-postcompact-index.py",
+      "timeout": 20
+    }
+  ]
+}
+```
+
+Optional env: `MEMPALACE_COMPACT_WING` (default `personal`).

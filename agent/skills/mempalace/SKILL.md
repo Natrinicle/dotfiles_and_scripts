@@ -5,6 +5,8 @@ description: >
   Also use when asked to save findings to MemPalace. Also use when recovering
   GATT UUIDs, AT commands, UART/HTTP frames, MCP tool order, or other protocol
   sequences — file those the same turn without waiting to be asked.
+  Also use before parent compaction to file necessary pieces so later
+  lookup has full drawers.
 ---
 
 # MemPalace
@@ -14,7 +16,9 @@ organize with wings/rooms. Prefer CLI/MCP tools from the install. Pair with
 `mempalace-recall` for search-before-answer on past work. File recovered
 command sequences the **same turn** per rule `mempalace-file-interfaces`.
 Durable facts prefer the palace over local memory files (`prefer-mempalace`).
-Harness skills/rules stay on disk.
+Harness skills/rules stay on disk. Before parent compact, file necessary
+pieces per rule `mempalace-compact-filing`. The compact summary is not
+filing. Compact **cost** is skill `expected-value` (`C_compact_parent`).
 
 **`mine` takes a directory, not a file.** Always `mempalace mine DIR --daemon`.
 Trust `Files processed ≥ 1` and `Drawers filed ≥ 1`, then search-verify the
@@ -56,6 +60,26 @@ Optional: `--dry-run` before a real mine.
 1. Confirm summary: files processed, drawers filed
 2. `mempalace search "…" --wing <wing>` — top hit Source is the file you filed
 3. `mempalace status` if you need wing counts
+
+## Compaction-time filing
+
+Before parent compact or on a compact continuation, file pieces later
+lookup still needs. Do not wait to be asked.
+
+File decisions, constraints, dirty paths, unique phrases, SHAs, command
+sequences, and KG facts as verbatim cards. Keep older drawers;
+`kg_supersede` current truth.
+
+1. Lookup: `kg_query` then `search`. Skip only when current KG plus the
+   newest drawer already holds those facts.
+2. Cards: `add_drawer` (wing and room set) + `kg_add` / `kg_supersede`.
+3. Staged notes: `mempalace mine DIR --daemon` (agents add `--background`).
+4. Search-verify the unique phrase. 0 drawers means it is not filed.
+
+Do not `add_drawer` the whole transcript. Session `compaction/segment_*.md`
+stays on disk for grep. A PostCompact hook mines `compaction/INDEX.md` as
+a pointer only (`{AGENT_HOME}/hooks/mempalace-postcompact-index.py`). Do
+not mine `segment_*.md`. After compact: `kg_query` then `search`.
 
 ## Timeline — supersede current, keep history
 

@@ -69,7 +69,9 @@ Skip one-off errors and ordinary stdlib. `add_drawer` is for these
 interface cards only. Directory mines use CLI
 `mempalace mine DIR --daemon` (recipe:
 `{MEMORY_ROOT}/feedback-mempalace-mine-directory.md`). Timeline:
-`mempalace-timeline-supersede`.
+`mempalace-timeline-supersede`. Session continuity that would be lost to
+parent compact: rule `mempalace-compact-filing` (the compact summary is
+not filing).
 
 ```text
 # Interface: {name}

@@ -22,6 +22,11 @@ Skills declare a **task id**; this skill (or the host routing table) maps it to 
 | T2 Mid | Categorization, rule-following analysis |
 | T3 Strong | Friction judgment, subtle language, architecture critique |
 
+Search/answer backends (web_search, Firecrawl, vendor Search APIs) are
+**tools**, not rows in this table. Do not scrape a consumer Ask UI as a
+free model. Parent compaction is skill `expected-value` (`C_compact_parent`);
+this table is the child's billed work (`$0` local compact).
+
 Read `{MEMORY_ROOT}/model-routing-table.md` when assigning new tasks or auditing cost.
 On Grok, respect config pins for light subagents — do not re-read the whole table
 before every local spawn. The `model-routing` rule requires that spawn
