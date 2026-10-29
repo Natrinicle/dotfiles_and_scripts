@@ -10,6 +10,7 @@ interface, call `mempalace_kg_query` (no `as_of`) then `mempalace_search`.
 Skip for pure greenfield edits with no memory angle. Standing SOPs stay in
 rules/skills; the palace holds history.
 Rule `mempalace-file-interfaces` files recovered command sequences the same turn they are found.
+Rule `mempalace-compact-filing` files session pieces before parent compact; after a compact continuation, search the palace — the compact summary is not the filing.
 Rule `prefer-mempalace`: palace current KG / newest `filed_at` beats a local
 memory-file copy. Harness skills and rules stay on disk.
 Lazy-load triggers (rule `lazy-load-data`) are recall too: query the

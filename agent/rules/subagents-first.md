@@ -35,9 +35,11 @@ necessary.
 5. Several independent slices → spawn in parallel.
 
 Every spawn scores **context-window** EV (skill `expected-value`): parent
-tokens saved (`C_parent_do`) vs brief + re-ingest. Cap parallel `N` so
-reports fit remaining parent context. Extra cloud children need their own
-edge.
+tokens saved (`C_parent_do`) plus avoided parent compaction
+(`C_compact_parent`, window-in + summary-out at parent $/token) vs brief +
+re-ingest. Cap parallel `N` so reports fit remaining parent context. Cheap
+or local children are the compact hedge. Extra cloud children need their
+own edge.
 
 ## Do not
 
@@ -50,7 +52,7 @@ when a child can do that step.
 
 | Excuse | Reality |
 |--------|---------|
-| “Faster to grep here” | Parent compaction costs more than a child. |
+| “Faster to grep here” | Parent compact is in+out on the expensive parent; local child's compact is free. |
 | “I need JADX in this context to verify” | Child returns the frames; parent re-runs self-test. |
 | “model-router says T3 stays on parent” | T3 stays on the **child**. |
 | “It’s not reverse engineering” | Offload every step a child can finish. |

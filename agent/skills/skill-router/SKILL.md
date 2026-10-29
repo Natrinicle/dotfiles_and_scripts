@@ -10,7 +10,8 @@ description: >
 # Skill Router
 
 Keep the interactive parent on a capable cloud model. Push tool-free and light
-work to local Ollama so upstream tokens stay low.
+work to local Ollama so upstream tokens stay low. Local child windows compact
+independently (`$0`). Search/answer backends are tools, not parent models.
 
 Model IDs and subagent pins live in `model-router` and
 `{MEMORY_ROOT}/model-routing-table.md`. This skill only decides **parent vs local**.

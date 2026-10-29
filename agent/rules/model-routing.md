@@ -2,12 +2,17 @@
 
 Always-on spawn and pin policy. Taxonomy, routing table, cost, and skill
 audits: skill `model-router`. Parent vs local for the interactive session:
-skill `skill-router`. Spend gate (USD, tokens, wall-clock, context-window
+skill `skill-router`. Spend gate (USD, tokens, wall-clock, context-window, **parent compaction**
 on spawn): rule `expected-value` / skill `expected-value`. These are one
 policy split by load cost — do not collapse the skill into this rule.
 
 Prefer **local models (Ollama)** for light work. Keep **remote/cloud** models
 for orchestration, multi-step coding, and high-stakes judgment.
+
+Parent compaction is billed in+out at parent rates. When parent-do would
+grow that window, spawn a cheap/local child (skill `expected-value`). The
+child's compact is the child's rate (`$0` local). Search/answer backends
+(web_search, Firecrawl, vendor Search APIs) are tools, not taxonomy tiers.
 
 ## Spawn local first (automatic)
 

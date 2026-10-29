@@ -34,9 +34,9 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 38 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── rules/                     # 39 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 95 skills → ~/.claude/skills + ~/.grok/skills
-│   ├── hooks/                     # spawn-subagent-local-pin.py (register in settings.json)
+│   ├── hooks/                     # spawn-subagent-local-pin.py, mempalace-postcompact-index.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -143,8 +143,12 @@ mines use `mempalace mine DIR --daemon`; harness skills/rules stay on disk;
 (file recovered APIs, CLIs, devices, and command sequences in MemPalace the
 same turn they are found — a chat recap is not filing; palace `add_drawer`
 is the commit; later sessions query the palace first),
+`mempalace-compact-filing`
+(file necessary pieces to MemPalace before parent compact so later lookup
+has full drawers; the compact summary is not filing; PostCompact mines
+`compaction/INDEX.md` as a pointer only),
 `subagents-first` (if a child can finish the step, spawn it; parent orchestrates, summarizes, verifies),
-`expected-value` (take an expensive action only with an edge; ledger is USD, tokens, wall-clock, and context-window; spawn value is parent context saved vs re-ingest),
+`expected-value` (take an expensive action only with an edge; ledger is USD, tokens, wall-clock, context-window, and parent compaction; spawn value is parent context saved vs re-ingest),
 `cups-custom-backend` (KDE Printers list is configured dests; last-seen discovery; `retry-job` holds jobs while the printer is off), etc.
 
 Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
