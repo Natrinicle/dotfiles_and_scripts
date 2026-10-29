@@ -1,0 +1,46 @@
+# Copy to ${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml and edit.
+# folder: "." files at the documents root. Unknown issuers go to inbox.
+# Do not list secrets. Folder names must already exist under root (except inbox/due/review).
+# Classification uses regex + this YAML first; local LLM only when confidence is low
+# (set ADF_OCR_NO_LLM=1 for CLI-only). Match strings are whole words (detr ≠ Detriments).
+# Title/Author/Subject/Keywords and ADF* fields live in the PDF; no sidecar JSON.
+
+root: ~/Documents
+inbox: Inbox/scans
+due_dir: Inbox/due
+review: Inbox/needs-review
+min_confidence: 0.75
+
+doc_types:
+  - receipt
+  - bill
+  - statement
+  - tax
+  - insurance
+  - medical
+  - legal
+  - id
+  - correspondence
+  - manual
+  - other
+
+# Allowlist. The classifier will not mkdir a new life-area folder.
+folders:
+  - Bills
+  - Receipts
+  - Taxes
+  - Insurance
+  - Medical
+  - Legal
+  - DMV
+  - Correspondence
+  - Manuals
+  - "."
+
+issuers:
+  - match: [example utility, city water, electric bill]
+    folder: Bills
+  - match: [example dmv, department of motor vehicles]
+    folder: DMV
+  - match: [example insurer]
+    folder: Insurance

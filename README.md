@@ -34,8 +34,8 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 39 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 95 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # 40 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # 96 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── hooks/                     # spawn-subagent-local-pin.py, mempalace-postcompact-index.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
@@ -85,7 +85,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | Script | Benefit to others |
 |--------|-------------------|
 | `check_all_drives_health` | SMART + FS health table for all disks |
-| `adf-ocr.sh` | ADF scan → OCR / local LLM naming. Matches SANE *description* (escl IP ids). Override with `ADF_OCR_DEVICE`. `SCAN_DUPLEX=true` (default) prefers ADF Duplex when advertised. |
+| `adf-ocr.sh` / `adf-ocr-file.py` | ADF scan → OCR → file-and-route (duplex blank-back drop, blank-sheet split, dHash/OCR duplicate drop, double-feed overlay quarantine, mixed-mail split on barcode/account/page-N-of-M/text, CLI heuristic classify then local LLM if needed, identity-index duplicate skip, PDF Info/XMP metadata, local ICS). Taxonomy `${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml` (example `share/adf-ocr/taxonomy.example.yaml`). `ADF_OCR_DEVICE`, `SCAN_DUPLEX=true`, `ADF_OCR_CONTENT_SPLIT`, `ADF_OCR_KEEP_CACHE`, `ADF_OCR_OUT_ROOT`, `ADF_OCR_CLASSIFY_MODEL`, `ADF_OCR_NO_LLM`. |
 | `voice-recorder` / `run-voice-recorder.sh` | Ambient mic capture (Silero VAD) → WAV segments; deps in `bin/requirements-voice-recorder.txt` |
 | `morning-data-gather` | Batch morning triage (PRs/tickets/IM; calendar if configured) |
 | `speakr-api` / `speakr-poll` / `speakr-notes-append` | Speakr recording API helpers |
@@ -118,8 +118,10 @@ first; copy skill/rule edits into the general pack; specialized packs are
 domain-only — no prompt unless the artifact belongs there), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware, or across finder vs
 patcher vs skeptic; thin companions for server-admin reuse of forensic cores;
-check upstream callers on updates), `independent-checker` (the agent that produced a
-claim does not grade it), `system-security` (WAN bind of kube-apiserver /
+check upstream callers on updates; research claims vs a cited source →
+`claim-source-check`), `independent-checker` (the agent that produced a
+claim does not grade it), `claim-source-check` (cheap checker gets claim +
+source only; vault `supported` pages), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
 `employer-pr-findings-gate` (hard gate before PRs in the current employer's
 GitHub org), `pre-commit-gate` (run `pre-commit` when a config exists;
@@ -155,7 +157,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (95) include packaging (`package-toolkit` classifies generic pack
+**Skills** (96) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -191,6 +193,7 @@ stay on `thread-screenshots-*`),
 `speckit` (import GitHub Spec Kit constitution/specify/clarify/checklist/analyze/converge),
 `ai-security-rules` (slopsquatting, secrets, prompt injection),
 `license-provenance` (SPDX / copy-risk checklist),
+`claim-source-check` (cheap checker: claim + source only; vault supported pages),
 `nate-writing-style` (`{user}` placeholder voice notes; replace with your own),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
@@ -306,7 +309,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 |------|---------|
 | **pipx / uv tool shims** (ruff, yt-dlp, esptool, semgrep, …) | Install via package managers; do not vendor symlinks |
 | **claude / grok / agent** | CLI installs; not source packs |
-| **adf-ocr / check_all_drives_health / voice-recorder / rperks-activate** | **Shipped** under `bin/` (RPerks units in `share/`) |
+| **adf-ocr / check_all_drives_health / voice-recorder / rperks-activate** | **Shipped** under `bin/` (RPerks units in `share/`; ADF taxonomy example in `share/adf-ocr/`) |
 | **Backup / sync-conflict copies of scripts** | Skip |
 | **reimage-kdialog** | Useful KDE image batch helper, but **upstream third-party** (GPL); install from upstream / distro packaging if needed |
 | **blisp** | Binary firmware tool; distribute upstream |

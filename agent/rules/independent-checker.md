@@ -16,3 +16,5 @@ The agent that produced a claim does not grade it.
 Use **find-patch-loop** when several agents hunt and others patch.
 Use **bug-skeptic** to refute a report or a patch.
 Use **check-work** to verify a whole session.
+Use **claim-source-check** when a research claim must be checked against a
+cited source (checker gets claim + source only, never producer reasoning).

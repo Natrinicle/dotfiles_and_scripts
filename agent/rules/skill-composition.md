@@ -50,5 +50,8 @@ unrelated media or artifact kinds.
    CUPS packaging (Nelko / Aimotech) → **cups-label-printer** (REQUIRED
    cups-custom-backend; lives in a specialized catalog pack). Do not grow
    reverse-engineering-protocols.
+9. **Research claims vs a cited source** → **claim-source-check**. Do not
+   grow **independent-checker** into the swarm/vault procedure. Bug hunt
+   stays **find-patch-loop**.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.
