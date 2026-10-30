@@ -9,7 +9,7 @@ A user systemd player runs an Electric Sheep-style flock of quiet RTTTL clips wh
 
 The skill tree ships original short seeds. Drop extra `.rtttl` files into `~/.local/share/session-tunes/library/` for more variety. The flock mutates those plus local Ollama `gemma4` motifs every 15 minutes. Keep downloaded ringtones out of this skill tree.
 
-Keep background far below calls/media. PCM: `busy_amplitude = 0.0045` (triangle RTTTL), `modem_amplitude = 0.0051`, `alert_amplitude = 0.0106`, `error_amplitude = 0.0138`. paplay uses `media.role=abstract`.
+Keep background far below calls/media. PCM: `busy_amplitude = 0.0045` (triangle RTTTL), `modem_amplitude = 0.0051`, `alert_amplitude = 0.0106`, `error_amplitude = 0.0138`. paplay uses `media.role=abstract`. Busy→idle and busy→sting fade the flock out (`fade_s = 0.9`) via the Pulse sink-input volume; the sting starts while busy is still fading (solo). A live video call (PipeWire camera node `running`, `Stream/Input/Video`, meeting-app mic, or `media.role` phone/communication) yields to silence until it ends.
 
 ## Layout
 
@@ -30,9 +30,9 @@ Keep background far below calls/media. PCM: `busy_amplitude = 0.0045` (triangle 
 | `busy` | `UserPromptSubmit`, or C fallback (session file growth / `systemd-inhibit` "agent turn in progress") | evolving RTTTL flock, modem on ~15% of clips |
 | `attention` | `Notification` `permission_prompt`; Grok `approval_required` | one sting, then hold silent ~12s |
 | `error` | `StopFailure`; Grok `agent_error` | one falling sting |
-| `idle` | `Stop`, `StopCancelled`, `SessionEnd`, `idle_prompt` | silence |
+| `idle` | `Stop`, `StopCancelled`, `SessionEnd`, `idle_prompt`, or an active video call | fade-out, then silence |
 
-Skip `PreToolUse` (blocking). After an attention sting, C fallback (transcript mtime / inhibit) restores busy once the hold expires. Ignore `subagentType` events; the parent session drives the tune.
+Skip `PreToolUse` (blocking). After an attention sting, C fallback (transcript mtime / inhibit) restores busy once the hold expires. Ignore `subagentType` events; the parent session drives the tune. `yield_on_call = true` watches PipeWire `pw-dump Node` (camera `running`) plus Pulse source-outputs; fingerprints are binary/node names, not tab titles.
 
 Shared lifecycle hooks live only in `~/.claude/settings.json` so Grok (`compat.claude hooks = true`) does not double-fire. Grok-only events (`StopFailure`, `StopCancelled`) live in `~/.grok/hooks/session-tunes.json`.
 

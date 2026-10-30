@@ -19,6 +19,7 @@ ollama_model = "gemma4"
 wave = "triangle"
 thinking_sound = "peppy"
 fade_s = 0.9
+yield_on_call = true
 flock_max = 250
 modem_chance = 0.15
 evolve_batch = 10

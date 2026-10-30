@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 from typing import Any
-
-import tomllib
 
 SKILL_DIR = Path(__file__).resolve().parent.parent
 SEED_LIB = SKILL_DIR / "library"
@@ -34,6 +33,7 @@ DEFAULTS: dict[str, Any] = {
     "attention_hold_s": 12.0,
     "busy_rotate_s": 180.0,
     "sting_debounce_s": 20.0,
+    "yield_on_call": True,
     "ollama_url": "http://127.0.0.1:11434",
     "ollama_model": "gemma4",
     "wave": "triangle",
