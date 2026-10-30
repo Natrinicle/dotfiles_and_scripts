@@ -10,9 +10,11 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
+from calls import fingerprints_from_nodes, fingerprints_from_source_outputs
 from config import SEED_LIB
 from flock import Flock
 from modem import render_modem
+from player import parse_pactl_sections, pulse_fade_levels
 from rtttl import parse_rtttl, render_pcm, serialize_rtttl
 
 
@@ -75,6 +77,96 @@ def run() -> list[str]:
         errors.append("alert genomes not urgent enough")
     else:
         print(f"ok alert bpm={att.bpm} error scale={err.scale}")
+    levels = pulse_fade_levels(10)
+    if not levels or levels[-1] != 0 or levels[0] >= 65536:
+        errors.append(f"pulse fade levels wrong: {levels[:3]}…{levels[-1:]}")
+    else:
+        print(f"ok pulse fade steps={len(levels)} end={levels[-1]}")
+    cam_run = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "running",
+                "props": {
+                    "media.class": "Video/Source",
+                    "media.role": "Camera",
+                    "node.name": "v4l2_test_cam",
+                },
+            },
+        }
+    ]
+    cam_fps = fingerprints_from_nodes(cam_run)
+    if "camera:v4l2_test_cam" not in cam_fps:
+        errors.append(f"running camera not detected: {cam_fps}")
+    else:
+        print("ok running camera fingerprint")
+    cam_off = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "suspended",
+                "props": {
+                    "media.class": "Video/Source",
+                    "media.role": "Camera",
+                    "node.name": "v4l2_test_cam",
+                },
+            },
+        }
+    ]
+    if fingerprints_from_nodes(cam_off):
+        errors.append("suspended camera treated as a call")
+    else:
+        print("ok suspended camera ignored")
+    chrome_mic = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "running",
+                "props": {
+                    "media.class": "Stream/Input/Audio",
+                    "application.process.binary": "chrome",
+                    "application.name": "Chrome",
+                },
+            },
+        }
+    ]
+    if fingerprints_from_nodes(chrome_mic):
+        errors.append("chrome mic without camera treated as a call")
+    else:
+        print("ok chrome mic alone ignored")
+    chrome_call = fingerprints_from_nodes(cam_run + chrome_mic)
+    if "camera:v4l2_test_cam" not in chrome_call or "mic:chrome" not in chrome_call:
+        errors.append(f"chrome+camera not a call: {chrome_call}")
+    else:
+        print("ok chrome+camera fingerprint")
+    zoom_mic = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "running",
+                "props": {
+                    "media.class": "Stream/Input/Audio",
+                    "application.process.binary": "zoom",
+                },
+            },
+        }
+    ]
+    if "mic:zoom" not in fingerprints_from_nodes(zoom_mic):
+        errors.append("zoom mic not detected")
+    else:
+        print("ok zoom mic fingerprint")
+    pactl_text = (
+        "Source Output #9\n"
+        "\tProperties:\n"
+        '\t\tapplication.process.binary = "zoom"\n'
+        '\t\tapplication.name = "Zoom"\n'
+    )
+    blocks = parse_pactl_sections(pactl_text, "Source Output #")
+    pactl_fps = fingerprints_from_source_outputs(blocks, camera_on=False)
+    if "mic:zoom" not in pactl_fps:
+        errors.append(f"pactl zoom capture missed: {pactl_fps}")
+    else:
+        print("ok pactl zoom capture")
     return errors
 
 

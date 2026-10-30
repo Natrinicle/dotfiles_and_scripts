@@ -93,7 +93,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | `docker-service-check.sh` | Docker service health check |
 | `unpack-artifact` | Classify APK/XAPK/IPA/ELF/firmware and print likely protocol sources |
 | `find-patch-queue` | File and update `.find-patch-queue.json` for tester / skeptic / patcher agents |
-| `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work (`install`/`status`/`mute`/`test`) |
+| `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work; fade-out, solo sting, yields on a video call (`install`/`status`/`mute`/`test`) |
 | `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |
 | `rperks-activate-coupons/` | Puppeteer-core app (own RPerks account). Units in `share/rperks-activate-coupons/` |
 

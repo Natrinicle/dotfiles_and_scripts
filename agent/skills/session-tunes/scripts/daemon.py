@@ -13,6 +13,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
+from calls import call_fingerprints
 from config import load_config, muted
 from flock import get_flock
 from generate import mint_rtttl
@@ -36,9 +37,15 @@ class SessionTunes:
         self.last_sheep = ""
         self._cfg: dict = {}
         self._stop = threading.Event()
+        self._calls: set[str] = set()
 
-    def stop_audio(self) -> None:
-        self.player.stop()
+    def stop_audio(self, *, fade: bool = True) -> None:
+        cfg = self._cfg or load_config()
+        fade_s = float(cfg.get("fade_s") or 0.9)
+        if fade and self.player.running:
+            self.player.fade_stop_all(fade_s=fade_s, wait=False)
+        else:
+            self.player.stop()
         self.mode = "idle"
 
     def _next_busy_pcm(self) -> bytes:
@@ -83,12 +90,12 @@ class SessionTunes:
         pcm = self.flock.render(
             sheep, amplitude=amp, sample_rate=int(cfg["sample_rate"])
         )
-        self.player.play(
+        self.player.play_solo(
             pcm,
             sample_rate=int(cfg["sample_rate"]),
             pulse_volume=int(cfg["pulse_volume"]),
             stream_name=kind,
-            loop=False,
+            fade_s=float(cfg.get("fade_s") or 0.9),
         )
         self.last_sheep = sheep.sheep_id
         self.mode = kind
@@ -97,6 +104,17 @@ class SessionTunes:
         self.alert_hold_until = now + float(cfg["attention_hold_s"])
 
     def desired(self, cfg: dict) -> str:
+        if cfg.get("yield_on_call", True):
+            fps = call_fingerprints()
+            new = fps - self._calls
+            if new:
+                print(
+                    "session-tunes yield call " + " ".join(sorted(new)),
+                    flush=True,
+                )
+            self._calls = fps
+            if fps:
+                return "idle"
         agg = aggregate()
         fb = fallback_busy(float(cfg["activity_window_s"]))
         if agg in {"attention", "error"}:
@@ -164,7 +182,8 @@ def main() -> int:
 
     def _shutdown(_signum: int, _frame: object) -> None:
         app._stop.set()
-        app.stop_audio()
+        app.stop_audio(fade=True)
+        app.player.wait_idle(2.0)
 
     signal.signal(signal.SIGTERM, _shutdown)
     signal.signal(signal.SIGINT, _shutdown)

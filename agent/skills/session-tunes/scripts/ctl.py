@@ -14,6 +14,7 @@ from pathlib import Path
 SCRIPTS = Path(__file__).resolve().parent
 sys.path.insert(0, str(SCRIPTS))
 
+from calls import call_fingerprints
 from config import CONFIG_PATH, MUTE_PATH, SKILL_DIR, load_config, muted, set_muted
 from flock import get_flock
 from generate import mint_rtttl
@@ -58,6 +59,10 @@ def cmd_status() -> int:
     print(f"muted: {muted()} ({MUTE_PATH})")
     print(f"aggregate: {aggregate(data)}")
     print(f"fallback_busy: {fallback_busy(float(cfg['activity_window_s']))}")
+    calls = call_fingerprints()
+    print(
+        f"yield_on_call: {cfg.get('yield_on_call', True)}  call: {sorted(calls) or '(none)'}"
+    )
     print(f"config: {CONFIG_PATH}")
     print(f"state: {STATE_PATH}")
     print(
