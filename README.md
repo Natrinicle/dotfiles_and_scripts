@@ -36,7 +36,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 41 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 99 skills → ~/.claude/skills + ~/.grok/skills
-│   ├── hooks/                     # spawn-subagent-local-pin.py, mempalace-postcompact-index.py (register in settings.json)
+│   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/

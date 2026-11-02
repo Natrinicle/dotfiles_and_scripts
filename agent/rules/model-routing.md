@@ -53,12 +53,15 @@ On Grok Build / Grok CLI:
 4. Parent stays on a capable model for planning, MCP, implementation, and
    synthesis.
 
-Pins match the **exact** `subagent_type`. Plugin ids such as
-`feature-dev:code-explorer` miss a `code-explorer` pin. PreToolUse hook
-`spawn-subagent-local-pin` rewrites an omitted `model` on explore-class types
-to the suffix pin or the host T0 local id, and warns the parent. Explicit
-cloud `model` is left in place. Reviewers and `general-purpose` are
-untouched. Restart the session after hook edits.
+Pins match the **exact** `subagent_type` (`explore`, `code-explorer`,
+`local-search`, …). Plugin ids such as `feature-dev:code-explorer` are **not**
+rewritten to the host T0 local id. Grok's gemma4 model entry is a **16K**
+window; plugin explore inject is ~24K, so that pin overflows before the first
+tool. On Grok Build, unknown-path search: omit `subagent_type` (cloud
+general-purpose) or use the plugin explorer type with **no** local model.
+PreToolUse hook `spawn-subagent-local-pin` pins native explore-class names
+only. Explicit cloud `model` is left in place. Reviewers and
+`general-purpose` are untouched. Restart the session after hook edits.
 
 ## Claude Code / Agent tool path
 
@@ -74,7 +77,10 @@ Before dispatching a subagent via the Agent tool, consult
 - When creating or editing skills, decompose so T0/T1 phases can stay local.
 - **T0 default:** local Ollama. Fall back to a small cloud model only if
   Ollama is down (Claude/T0 curl path); Grok local pins fail closed if Ollama
-  is down.
+  is down. First load into VRAM can take minutes; use a 600s client timeout
+  and `keep_alive=-1`. Preload the T0 tag before a burst of local calls.
+  HTTP 503 is the queue, not a timeout — do not silent-fallback on 503.
+  Details: skill `model-router`.
 
 ## What stays remote (do not pin to 8B local)
 

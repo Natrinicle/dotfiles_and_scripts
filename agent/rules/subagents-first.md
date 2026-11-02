@@ -29,7 +29,11 @@ necessary.
    do not see this conversation.
 2. Omit `model` so `[subagents.models]` pins apply. Do not load skill
    `model-router` or the routing table before spawn.
-3. File-search / extract → `explore` / `code-explorer`.
+3. File-search / extract → native `explore` / `code-explorer` when the
+   harness offers those types. **Grok Build does not:** `spawn_subagent`
+   only lists plugin types. Omit `subagent_type` (cloud general-purpose) for
+   unknown-path search. Do not use `feature-dev:code-explorer` with
+   `ollama-gemma4` (16K window vs ~24K plugin inject).
 4. Implementation, decompile, protocol judgment → `general-purpose` (cloud;
    do not pin to 8B local).
 5. Several independent slices → spawn in parallel.

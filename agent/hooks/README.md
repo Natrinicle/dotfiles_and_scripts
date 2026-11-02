@@ -8,13 +8,18 @@ Install copies scripts to `{AGENT_HOME}/hooks/`. Registration stays in host
 
 `PreToolUse` matcher: `spawn_subagent|Task`
 
-Grok `[subagents.models]` matches the exact `subagent_type`. Plugin ids such
-as `feature-dev:code-explorer` miss a `code-explorer` pin and inherit the
-parent cloud model. This hook:
+Grok `[subagents.models]` matches the exact `subagent_type`. Native
+explore-class names (`explore`, `code-explorer`, `local-search`, …) that omit
+`model` are pinned to the host T0 local id.
 
-- Rewrites an omitted `model` on explore-class types to the suffix pin or the
-  host T0 local id
-- Warns the parent via `additionalContext`
+Plugin ids such as `feature-dev:code-explorer` are **not** rewritten to
+`ollama-gemma4`. Grok's gemma4 model entry is a 16K window; plugin explore
+inject is ~24K, so a local pin overflows before the first tool. Those types
+inherit the parent cloud model. This hook:
+
+- Rewrites an omitted `model` on **native** explore-class types to the host T0
+  local id
+- Warns (no rewrite) on plugin explore types
 - Leaves explicit cloud `model`, reviewers, and `general-purpose` alone
 
 Register (do not also add under `~/.grok/hooks/`):
@@ -33,6 +38,43 @@ Register (do not also add under `~/.grok/hooks/`):
 ```
 
 Restart the session after changing hook registration. Fail-open on errors.
+
+## retarget-grok-plugin-symlinks
+
+`SessionStart` (and `sync-from-claude.sh --verbose`).
+
+`claude plugin update` replaces version dirs (including `unknown`) and deletes
+the old Claude cache folder. Grok `~/.grok/plugins/<name>` symlinks go
+dangling; plugin hooks then fail with `its plugin folder ... is gone`.
+
+This hook retargets those symlinks from `installed_plugins.json` `installPath`.
+Quiet when already correct. Prints healed names on SessionStart. Never
+replaces a native (non-symlink) dest. Fail-open.
+
+Register once in host `settings.json` (do not also add under `~/.grok/hooks/`):
+
+```json
+{
+  "hooks": [
+    {
+      "type": "command",
+      "command": "python3 {AGENT_HOME}/hooks/retarget-grok-plugin-symlinks.py",
+      "timeout": 10
+    }
+  ]
+}
+```
+
+## prefer-spawn-search
+
+`PreToolUse` matcher: `grep|Grep|list_dir|LS|Glob|glob`
+
+Injects `additionalContext` on **wide** searches (missing path, `$HOME`,
+agent config roots, `**` globs). Named-file grep is silent. Does not block.
+Fail-open.
+
+On Grok Build, unknown-path search: omit `subagent_type` (cloud
+general-purpose). Do not pin plugin explorers to `ollama-gemma4`.
 
 ## mempalace-postcompact-index
 

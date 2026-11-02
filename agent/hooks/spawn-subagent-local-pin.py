@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """PreToolUse gate for spawn_subagent / Task.
 
-Grok ``[subagents.models]`` matches the exact ``subagent_type``. Plugin types
-such as ``feature-dev:code-explorer`` miss a ``code-explorer`` pin and inherit
-the parent cloud model. When an explore-class spawn omits ``model``, this hook
-sets it to the suffix pin (or the ``explore`` pin / ``ollama-gemma4``) and
-tells the parent via ``additionalContext``.
+Grok ``[subagents.models]`` matches the exact ``subagent_type``. Native
+explore-class names (``explore``, ``code-explorer``, ``local-search``, …)
+that omit ``model`` are pinned to the host T0 local id.
 
-Explicit cloud ``model`` is left in place. Reviewers and ``general-purpose``
-are untouched. Any error fails open (exit 0, no rewrite).
+Plugin ids such as ``feature-dev:code-explorer`` are **not** rewritten to
+``ollama-gemma4``. Grok's gemma4 model entry is a 16K window; plugin explore
+inject is ~24K, so a local pin overflows before the first tool. Those types
+inherit the parent cloud model. Explicit cloud ``model`` is left in place.
+Reviewers and ``general-purpose`` are untouched. Fail-open (exit 0).
 """
 
 from __future__ import annotations
@@ -104,10 +105,16 @@ def _type_suffix(subagent_type: str) -> str:
 
 
 def _is_explore_class(subagent_type: str) -> bool:
+    """Exact names only. Plugin suffixes must not inherit the 16K T0 pin."""
     name = subagent_type.strip()
     if not name:
         return False
-    return name in EXPLORE_CLASS or _type_suffix(name) in EXPLORE_CLASS
+    return name in EXPLORE_CLASS
+
+
+def _is_plugin_explore(subagent_type: str) -> bool:
+    name = subagent_type.strip()
+    return ":" in name and _type_suffix(name) in EXPLORE_CLASS
 
 
 def _read_toml(path: Path) -> dict[str, Any]:
@@ -213,6 +220,20 @@ def _context_claude(subagent_type: str) -> str:
     )
 
 
+def _context_plugin_explore(subagent_type: str, model: str) -> str:
+    local_note = (
+        f" model {model} is local and will likely overflow Grok's 16K "
+        "ollama-gemma4 window (plugin inject is ~24K)."
+        if model
+        else " Omit model so this child inherits the parent cloud model."
+    )
+    return (
+        f"Plugin explore type {subagent_type} is not pinned to ollama-gemma4."
+        f"{local_note} On Grok, unknown-path search: omit subagent_type "
+        "(general-purpose) or keep this plugin type on the parent model."
+    )
+
+
 def decide(event: dict[str, Any]) -> dict[str, Any] | None:
     tool = _tool_name(event)
     if tool not in GROK_SPAWN_TOOLS and tool not in CLAUDE_SPAWN_TOOLS:
@@ -221,10 +242,17 @@ def decide(event: dict[str, Any]) -> dict[str, Any] | None:
     subagent_type = str(
         _first(tool_input, "subagent_type", "subagentType", default="") or ""
     ).strip()
-    if not _is_explore_class(subagent_type):
-        return None
     raw_model = _first(tool_input, "model", default="")
     model = str(raw_model).strip() if raw_model is not None else ""
+    if _is_plugin_explore(subagent_type) and tool in GROK_SPAWN_TOOLS:
+        return {
+            "hookSpecificOutput": {
+                "hookEventName": "PreToolUse",
+                "additionalContext": _context_plugin_explore(subagent_type, model),
+            }
+        }
+    if not _is_explore_class(subagent_type):
+        return None
     models, roles = _pin_tables()
     exact_pin, fallback_pin = _lookup_pin(subagent_type, models, roles)
 
