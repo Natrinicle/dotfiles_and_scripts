@@ -9,8 +9,15 @@ A prompt is one message. A **loop** makes one unit correct. A **graph**
 decides which units exist, which run together, and where results go back.
 
 Layers stack. They do not replace each other: prompt → context → harness
-→ loop → graph. Procedure: skill `agent-graphs`. Inner retry: skill
-`loop-until-green`.
+→ loop → graph. Procedure: skill `agent-graphs` (Grok workflow
+`agent-graph`). Inner retry: skill `loop-until-green`.
+
+When several units do not consume each other's output, or a gate / named
+output sits between steps, this layer is the better shape than one
+`spawn_subagent`. One unit still uses `spawn_subagent` (rule
+**subagents-first**). Parent-wide grep / list / `rg` is **denied** by
+hook `prefer-spawn-search`; do not search the tree on the parent to
+feed the graph.
 
 ## Shape
 

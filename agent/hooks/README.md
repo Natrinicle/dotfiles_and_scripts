@@ -67,11 +67,17 @@ Register once in host `settings.json` (do not also add under `~/.grok/hooks/`):
 
 ## prefer-spawn-search
 
-`PreToolUse` matcher: `grep|Grep|list_dir|LS|Glob|glob`
+`PreToolUse` matcher:
+`grep|Grep|list_dir|LS|Glob|glob|Bash|bash|run_terminal_command`
 
-Injects `additionalContext` on **wide** searches (missing path, `$HOME`,
-agent config roots, `**` globs). Named-file grep is silent. Does not block.
-Fail-open.
+**Denies** wide parent search (missing path, directory/`**` grep, git
+toplevel, `$HOME` / agent roots / `~/repos`, shell `rg`/`grep`/`find`
+without a named file). Named-file grep and `git status` stay allowed.
+Fail-open. Escape: `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`.
+
+The deny reason tells the parent to pick a **shape**: one unit →
+`spawn_subagent`; several independent units or a gate / named output →
+skill `agent-graphs`. Bug hunt stays `find-patch-loop`.
 
 On Grok Build, unknown-path search: omit `subagent_type` (cloud
 general-purpose). Do not pin plugin explorers to `ollama-gemma4`.

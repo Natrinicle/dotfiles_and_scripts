@@ -7,7 +7,22 @@ paths:
 
 When a step can be finished in a child session, spawn it (`spawn_subagent`).
 The interactive parent orchestrates, summarizes, and verifies only where
-necessary.
+necessary. The user does **not** have to say “use subagents”.
+
+Hook `prefer-spawn-search` **denies** parent-wide grep / list / `rg`. A nag
+is not enough. Named-file grep (1–2 exact files) stays on the parent.
+
+## Shape (do not collapse)
+
+| Work | Run |
+|------|-----|
+| One child-capable unit | `spawn_subagent` |
+| Several units that do not consume each other's output, or a gate / named output between steps | skill **agent-graphs** (workflow `agent-graph`). Inner retry is **loop-until-green**. |
+| Bug hunt | **find-patch-loop** |
+| Session-complete verify | **check-work** |
+
+Do not grow this rule into graph topology. Do not grep the tree on the
+parent “so the graph has context”.
 
 ## Spawn for
 
@@ -48,6 +63,8 @@ own edge.
 ## Do not
 
 - Do child-capable work on the parent because “context is already here”.
+- Search the tree on the parent. Wide grep / `rg` / list is **denied**;
+  spawn or graph instead. Escape: `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`.
 - Re-read the model-routing table to pick a child model.
 - Pin decompile or implementation to 8B local.
 

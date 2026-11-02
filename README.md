@@ -155,7 +155,7 @@ is the commit; later sessions query the palace first),
 (file necessary pieces to MemPalace before parent compact so later lookup
 has full drawers; the compact summary is not filing; PostCompact mines
 `compaction/INDEX.md` as a pointer only),
-`subagents-first` (if a child can finish the step, spawn it; parent orchestrates, summarizes, verifies),
+`subagents-first` (if a child can finish the step, spawn it; parent orchestrates, summarizes, verifies; hook `prefer-spawn-search` denies wide parent grep/`rg`/list; several independent units → `agent-graphs`),
 `expected-value` (take an expensive action only with an edge; ledger is USD, tokens, wall-clock, context-window, and parent compaction; spawn value is parent context saved vs re-ingest),
 `agent-graphs` (shape of multi-agent work: splitter, isolated workers, code nodes, blast-radius gate; inner retry is `loop-until-green`),
 `cups-custom-backend` (KDE Printers list is configured dests; last-seen discovery; `retry-job` holds jobs while the printer is off), etc.

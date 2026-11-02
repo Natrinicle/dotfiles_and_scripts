@@ -37,7 +37,7 @@ result when it is usable.
 Skip the child when the user named 1–2 exact files, or the work is a write /
 install / MCP / browser / review / judgment call.
 
-Offload: rule **subagents-first**. If a child can finish the step, spawn it (including write / MCP / REA / judgment). Parent summarizes and verifies.
+Offload: rule **subagents-first**. If a child can finish the step, spawn it (including write / MCP / REA / judgment). Parent summarizes and verifies. Hook `prefer-spawn-search` **denies** parent-wide grep/`rg`/list. One unit → `spawn_subagent`. Several units that do not share a window → skill **agent-graphs**.
 
 ## Grok CLI short-circuit
 
