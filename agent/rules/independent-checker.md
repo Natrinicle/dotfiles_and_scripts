@@ -18,3 +18,5 @@ Use **bug-skeptic** to refute a report or a patch.
 Use **check-work** to verify a whole session.
 Use **claim-source-check** when a research claim must be checked against a
 cited source (checker gets claim + source only, never producer reasoning).
+Use **agent-graphs** when the work is a multi-agent graph. Inner retry is
+**loop-until-green**.

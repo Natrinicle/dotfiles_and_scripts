@@ -22,7 +22,8 @@ known: BLE MCP.
 When the **REA** MCP server is connected, load **reverse-engineer-anything**
 for shipped-artifact analysis (native, JS/Electron, Android, firmware,
 runtime). This dispatcher stays for `unpack_artifact.py` then the decompile
-sub-skills.
+sub-skills. Clean-room reconstruct (SPEC.md → oracle → retry) is
+**clean-room-reconstruct**.
 
 ## Classify
 

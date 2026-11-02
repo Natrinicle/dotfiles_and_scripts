@@ -34,8 +34,8 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 40 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 96 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # 41 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # 99 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── hooks/                     # spawn-subagent-local-pin.py, mempalace-postcompact-index.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
@@ -85,7 +85,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | Script | Benefit to others |
 |--------|-------------------|
 | `check_all_drives_health` | SMART + FS health table for all disks |
-| `adf-ocr.sh` / `adf-ocr-file.py` | ADF scan → OCR → file-and-route (duplex blank-back drop, blank-sheet split, dHash/OCR duplicate drop, double-feed overlay quarantine, mixed-mail split on barcode/account/page-N-of-M/text, CLI heuristic classify then local LLM if needed, identity-index duplicate skip, PDF Info/XMP metadata, local ICS). Taxonomy `${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml` (example `share/adf-ocr/taxonomy.example.yaml`). `ADF_OCR_DEVICE`, `SCAN_DUPLEX=true`, `ADF_OCR_CONTENT_SPLIT`, `ADF_OCR_KEEP_CACHE`, `ADF_OCR_OUT_ROOT`, `ADF_OCR_CLASSIFY_MODEL`, `ADF_OCR_NO_LLM`. |
+| `adf-ocr.sh` / `adf-ocr-file.py` | ADF scan → OCR → file-and-route (duplex blank-back drop, blank-sheet split, dHash/OCR duplicate drop, double-feed overlay quarantine, mixed-mail split on barcode/account/page-N-of-M/text, CLI heuristic classify then local LLM if needed, identity-index duplicate skip, PDF Info/XMP metadata, local ICS). Taxonomy `${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml` (example `share/adf-ocr/taxonomy.example.yaml`). `ADF_OCR_DEVICE`, `SCAN_DUPLEX=true`, `ADF_OCR_CONTENT_SPLIT`, `ADF_OCR_KEEP_CACHE`, `ADF_OCR_OUT_ROOT`, `ADF_OCR_CLASSIFY_MODEL`, `ADF_OCR_NO_LLM`, `ADF_OCR_LLM_TIMEOUT` (seconds, default 180). |
 | `voice-recorder` / `run-voice-recorder.sh` | Ambient mic capture (Silero VAD) → WAV segments; deps in `bin/requirements-voice-recorder.txt` |
 | `morning-data-gather` | Batch morning triage (PRs/tickets/IM; calendar if configured) |
 | `speakr-api` / `speakr-poll` / `speakr-notes-append` | Speakr recording API helpers |
@@ -117,10 +117,12 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 first; copy skill/rule edits into the general pack; specialized packs are
 domain-only — no prompt unless the artifact belongs there), `skill-composition` (sub-skills, do not
 broaden one skill across IR vs APK vs firmware, or across finder vs
-patcher vs skeptic; thin companions for server-admin reuse of forensic cores;
+patcher vs skeptic, or across graph vs loop vs hunt; thin companions for
+server-admin reuse of forensic cores;
 check upstream callers on updates; research claims vs a cited source →
-`claim-source-check`), `independent-checker` (the agent that produced a
-claim does not grade it), `claim-source-check` (cheap checker gets claim +
+`claim-source-check`; graph topology → `agent-graphs`; reconstruct loop →
+`clean-room-reconstruct`), `independent-checker` (the agent that produced a
+claim does not grade it; graphs use `agent-graphs`), `claim-source-check` (cheap checker gets claim +
 source only; vault `supported` pages), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
 `employer-pr-findings-gate` (hard gate before PRs in the current employer's
@@ -151,13 +153,14 @@ has full drawers; the compact summary is not filing; PostCompact mines
 `compaction/INDEX.md` as a pointer only),
 `subagents-first` (if a child can finish the step, spawn it; parent orchestrates, summarizes, verifies),
 `expected-value` (take an expensive action only with an edge; ledger is USD, tokens, wall-clock, context-window, and parent compaction; spawn value is parent context saved vs re-ingest),
+`agent-graphs` (shape of multi-agent work: splitter, isolated workers, code nodes, blast-radius gate; inner retry is `loop-until-green`),
 `cups-custom-backend` (KDE Printers list is configured dests; last-seen discovery; `retry-job` holds jobs while the printer is off), etc.
 
 Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (96) include packaging (`package-toolkit` classifies generic pack
+**Skills** (99) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -174,6 +177,8 @@ compiled-app unpack (`reverse-engineering-protocols`, then
 `decompile-mobile-app` / `decompile-firmware`),
 shipped-artifact RE via Reverse Engineer Anything (`reverse-engineer-anything`,
 REA MCP `rea-agents`; skill snapshot v42 / package 6.5.0),
+clean-room reconstruct (`clean-room-reconstruct`: SPEC.md → rebuild →
+oracle → retry; inner check is `loop-until-green`),
 printable pages (`printable-webpage`),
 Meld-style side-by-side diffs plus dyff for YAML/JSON (`meld-style-diff`),
 illustrated brochures (`illustrated-brochure`, landscape PDF with Dia and Graphviz),
@@ -181,6 +186,8 @@ resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
 a find-patch loop (`find-patch-loop`, then `bug-finder` / `bug-skeptic` /
 `bug-patcher`, queue CLI `find-patch-queue`),
+agent graphs (`agent-graphs`, then `loop-until-green` for the inner check;
+Grok workflow `agent-graph`),
 `decision-judge` (parent-as-judge, 2- or 4-advocate court),
 `session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works),
 `update-contacts-from-sources` (address-book create/patch from dumps; some

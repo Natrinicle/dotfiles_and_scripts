@@ -12,7 +12,8 @@ Use REA when a claim depends on a shipped binary or package, decompilation,
 passive application runtime evidence, or comparison with
 behavior not established by available source. For ordinary analysis of a
 complete source repository, use normal repository tools and do not run REA
-readiness or provider commands.
+readiness or provider commands. Reconstruct from a spec until an oracle
+matches is **clean-room-reconstruct**; analysis procedures stay here.
 
 ## Connect only when needed
 

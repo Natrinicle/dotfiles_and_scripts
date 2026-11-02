@@ -148,3 +148,4 @@ skill.
 - `subagents-first` — child-capable work goes to a child; this skill scores that spawn's context-window and parent compaction
 - `mempalace-compact-filing` — durability hedge: file necessary pieces to MemPalace before compact so later `C_reingest` is a palace lookup. This skill scores the compact **cost** (`C_compact_parent`); that rule owns filing.
 - `decision-judge` — user-facing A vs B court (skip when no tradeoff)
+- `agent-graphs` / `loop-until-green` — shape of multi-agent work and the inner programmable check; this skill still scores each spawn

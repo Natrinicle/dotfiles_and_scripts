@@ -53,5 +53,16 @@ unrelated media or artifact kinds.
 9. **Research claims vs a cited source** → **claim-source-check**. Do not
    grow **independent-checker** into the swarm/vault procedure. Bug hunt
    stays **find-patch-loop**.
+10. **Graph vs loop vs hunt** → **agent-graphs** for the shape of work
+    (splitter, isolated workers, code nodes, blast-radius gate, learning
+    edge). Inner produce-check-correct is **loop-until-green**. Bug hunt
+    stays **find-patch-loop**. Session-complete stays **check-work**.
+    Landing stays **ask-before-remote-actions**. Do not grow
+    **subagents-first** into graph topology.
+11. **Reconstruct vs unpack vs REA MCP** → **clean-room-reconstruct** for
+    SPEC.md → rebuild → oracle → retry. Unpack classification stays
+    **reverse-engineering-protocols**. Shipped-artifact analysis stays
+    **reverse-engineer-anything**. Inner retry is **loop-until-green**.
+    Do not dump a studio catalog of GitHub URLs into any of those skills.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

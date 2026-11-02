@@ -17,6 +17,8 @@ not hunt, fix, and declare victory.
 
 Session-complete verification is **check-work**, not this loop.
 The always-on rule **independent-checker** applies to every role.
+General graphs (not a bug hunt) are **agent-graphs**. Inner
+produce-check-correct is **loop-until-green**.
 
 ## Roles
 
