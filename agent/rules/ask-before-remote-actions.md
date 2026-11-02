@@ -32,4 +32,7 @@ a rule change.
 One approval is not a blank check (commit ≠ push ≠ PR comment ≠ next server
 change).
 
+Signed `git commit`: run `gpg-git-commit` (rule `prefer-helper-scripts`).
+Never `--no-gpg-sign`. Never paste a passphrase into chat.
+
 Full detail: `{MEMORY_ROOT}/feedback-ask-before-commit-push-comment-server.md`

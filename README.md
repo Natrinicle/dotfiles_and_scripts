@@ -31,10 +31,10 @@ out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue)
+├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 41 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── rules/                     # 42 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 100 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
@@ -96,6 +96,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work; fade-out, solo sting, yields on a video call (`install`/`status`/`mute`/`test`) |
 | `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |
 | `rperks-activate-coupons/` | Puppeteer-core app (own RPerks account). Units in `share/rperks-activate-coupons/` |
+| `gpg-git-commit` | Signed `git commit` via kdialog / loopback when gpg-agent has no cached passphrase (never `--no-gpg-sign`) |
 
 Skills reference these as **PATH commands**, not a vendor-specific scripts directory.
 See `agent/PATHS.md` for `{MEMORY_ROOT}`, `{AGENT_HOME}`, etc.
@@ -137,7 +138,10 @@ a bind-mount driver; short-syntax binds are sockets and `/etc/localtime`),
 case history are background; ask only when the words support two readings),
 `public-api-auth` (WAN/public APIs need strong auth; a reverse proxy is not
 auth), `ask-before-remote-actions` (local-first: ask before commit, push, PR
-comment, or server mutate), `prefer-updates-before-workarounds` (check for a
+comment, or server mutate; signed commits use `gpg-git-commit`),
+`prefer-helper-scripts` (if pinentry or session dbus is a repeatable sequence,
+write or call a PATH helper instead of re-deriving it in the parent),
+`prefer-updates-before-workarounds` (check for a
 newer version of the installed wrapper before extract-and-run),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; directory
 mines use `mempalace mine DIR --daemon`; harness skills/rules stay on disk;

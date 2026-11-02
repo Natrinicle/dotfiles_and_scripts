@@ -5,9 +5,10 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
 
 ## Contents
 
-- **Rules** (41) including `code-quality`, `security`, `subagents-first`,
+- **Rules** (42) including `code-quality`, `security`, `subagents-first`,
   `public-api-auth`, `ask-before-remote-actions`,
-  `prefer-updates-before-workarounds`, `toolkit-residual-identity`,
+  `prefer-helper-scripts`, `prefer-updates-before-workarounds`,
+  `toolkit-residual-identity`,
   `expected-value`, `agent-graphs`, `cups-custom-backend`, `mempalace-compact-filing`,
   `claim-source-check`.
 - **Skills** (100) covering packaging, scanners, PII detection, MemPalace,

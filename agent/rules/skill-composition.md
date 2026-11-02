@@ -64,5 +64,9 @@ unrelated media or artifact kinds.
     **reverse-engineering-protocols**. Shipped-artifact analysis stays
     **reverse-engineer-anything**. Inner retry is **loop-until-green**.
     Do not dump a studio catalog of GitHub URLs into any of those skills.
+12. **Repeatable host procedure vs thought loop** → **prefer-helper-scripts**.
+    If pinentry, dialogs, or session dbus can be a shell script, write or
+    call that helper. Do not grow a skill into a dump of one-off compound
+    commands.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

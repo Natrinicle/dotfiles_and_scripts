@@ -1,0 +1,394 @@
+#!/usr/bin/env bash
+# Signed git commit helper for agent ttys (kdialog + loopback; never --no-gpg-sign).
+# Rule: prefer-helper-scripts. Call this instead of re-deriving pinentry.
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Usage: gpg-git-commit [-C repo] [--title STR] [--cached] [--self-test] [--] [git commit args...]
+
+Signed git commit when gnome3 pinentry times out from an agent tty.
+If gpg-agent already has the passphrase, runs git commit as-is.
+Otherwise prompts with kdialog --password on the user session, raises the
+dialog via KWin when possible, and signs through a loopback gpg wrapper.
+
+  -C repo       Repository (default: current git toplevel)
+  --title STR   kdialog / notification title (default: Git GPG sign)
+  --cached      Exit 0 if the signing key passphrase is cached, 1 if not
+  --self-test   Parser and wrapper checks; no dialog; no git commit
+  -h, --help    This help
+
+Never pass --no-gpg-sign. Never print the passphrase.
+Passphrase file is mode 600 under /dev/shm (or /tmp) and shredded on exit.
+EOF
+}
+
+# KEYINFO cached flag (GnuPG 2.4.9 observed):
+#   S KEYINFO <grip> D - - <cached> P - - -
+#   field index 6 is "1" when cached, "-" when not.
+# Some builds document cached at index 7 (... <prot> <cached>).
+keyinfo_line_is_cached() {
+	local line=$1
+	local -a f=()
+	read -r -a f <<<"$line"
+	[[ ${f[0]:-} == S && ${f[1]:-} == KEYINFO ]] || return 1
+	[[ ${f[6]:-} == 1 || ${f[7]:-} == 1 ]]
+}
+
+args_contain_no_gpg_sign() {
+	local a
+	for a in "$@"; do
+		[[ $a == --no-gpg-sign ]] && return 0
+	done
+	return 1
+}
+
+wrapper_body() {
+	local gpg_bin=$1 passfile=$2
+	printf '%s\n' '#!/usr/bin/env bash' \
+		"exec $(printf '%q' "$gpg_bin") --batch --pinentry-mode loopback --passphrase-file $(printf '%q' "$passfile") \"\$@\""
+}
+
+js_escape() {
+	local s=$1
+	s=${s//\\/\\\\}
+	s=${s//\"/\\\"}
+	s=${s//$'\n'/ }
+	printf '%s' "$s"
+}
+
+ensure_session_env() {
+	export DISPLAY="${DISPLAY:-:0}"
+	export WAYLAND_DISPLAY="${WAYLAND_DISPLAY:-wayland-0}"
+	if [[ -z ${DBUS_SESSION_BUS_ADDRESS:-} ]]; then
+		DBUS_SESSION_BUS_ADDRESS="unix:path=/run/user/$(id -u)/bus"
+		export DBUS_SESSION_BUS_ADDRESS
+	fi
+}
+
+primary_keygrip() {
+	local key=${1:-}
+	local -a gpg_args=(--batch --with-colons --with-keygrip --list-secret-keys)
+	[[ -n $key ]] && gpg_args+=("$key")
+	gpg "${gpg_args[@]}" 2>/dev/null | awk -F: '
+		$1 == "sec" { insec = 1; next }
+		insec && $1 == "grp" { print $10; exit }
+	'
+}
+
+fetch_keyinfo_line() {
+	local grip=$1
+	printf 'KEYINFO --no-ask %s\n' "$grip" | gpg-connect-agent 2>/dev/null | awk '/^S KEYINFO / { print; exit }'
+}
+
+passphrase_is_cached() {
+	local grip=$1 line
+	line=$(fetch_keyinfo_line "$grip")
+	keyinfo_line_is_cached "$line"
+}
+
+notify_user() {
+	local body=$1
+	if command -v notify-send >/dev/null 2>&1; then
+		notify-send --app-name=gpg-git-commit "$TITLE" "$body" || true
+	elif command -v gdbus >/dev/null 2>&1; then
+		gdbus call --session \
+			--dest org.freedesktop.Notifications \
+			--object-path /org/freedesktop/Notifications \
+			--method org.freedesktop.Notifications.Notify \
+			gpg-git-commit 0 '' "$TITLE" "$body" '[]' '{}' 8000 >/dev/null || true
+	fi
+}
+
+raise_kdialog() {
+	local js_path=$1
+	python3 - "$js_path" <<'PY' || true
+import sys
+
+js_path = sys.argv[1]
+try:
+    import dbus
+except ImportError:
+    sys.exit(0)
+
+try:
+    bus = dbus.SessionBus()
+    scripting = dbus.Interface(
+        bus.get_object("org.kde.KWin", "/Scripting"),
+        "org.kde.kwin.Scripting",
+    )
+    sid = int(scripting.loadScript(js_path))
+    script = dbus.Interface(
+        bus.get_object("org.kde.KWin", "/Scripting/Script%d" % sid),
+        "org.kde.kwin.Script",
+    )
+    script.run()
+    try:
+        scripting.unloadScript(js_path)
+    except Exception:
+        pass
+except Exception:
+    sys.exit(0)
+PY
+}
+
+write_kwin_js() {
+	local path=$1 title=$2
+	local needle
+	needle=$(js_escape "$title")
+	cat >"$path" <<EOF
+(function () {
+    var needle = "${needle}";
+    var list = [];
+    if (typeof workspace.windowList === "function") {
+        list = workspace.windowList();
+    } else if (typeof workspace.clientList === "function") {
+        list = workspace.clientList();
+    }
+    for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        var cap = (c.caption || "").toString();
+        var cls = (c.resourceClass || "").toString();
+        if (cls.indexOf("kdialog") !== -1 || cap.indexOf(needle) !== -1) {
+            workspace.activeWindow = c;
+        }
+    }
+})();
+EOF
+}
+
+self_test() {
+	local fail=0 tmpl
+	if ! keyinfo_line_is_cached "S KEYINFO ABCDEF D - - 1 P - - -"; then
+		echo "self-test: observed cached KEYINFO should be cached" >&2
+		fail=1
+	fi
+	if keyinfo_line_is_cached "S KEYINFO ABCDEF D - - - P - - -"; then
+		echo "self-test: observed uncached KEYINFO should not be cached" >&2
+		fail=1
+	fi
+	if ! keyinfo_line_is_cached "S KEYINFO ABCDEF D - - P 1 - - -"; then
+		echo "self-test: documented cached KEYINFO should be cached" >&2
+		fail=1
+	fi
+	if keyinfo_line_is_cached "S KEYINFO ABCDEF D - - P - - - -"; then
+		echo "self-test: documented uncached KEYINFO should not be cached" >&2
+		fail=1
+	fi
+	if ! args_contain_no_gpg_sign -F /tmp/msg --no-gpg-sign; then
+		echo "self-test: must detect --no-gpg-sign" >&2
+		fail=1
+	fi
+	if args_contain_no_gpg_sign -F /tmp/msg -S; then
+		echo "self-test: must not flag ordinary commit args" >&2
+		fail=1
+	fi
+	tmpl=$(wrapper_body /usr/bin/gpg /dev/shm/fake.pass)
+	if [[ $tmpl != *"--pinentry-mode loopback"* ]]; then
+		echo "self-test: wrapper must use pinentry-mode loopback" >&2
+		fail=1
+	fi
+	if [[ $tmpl != *"--passphrase-file"* ]]; then
+		echo "self-test: wrapper must use --passphrase-file" >&2
+		fail=1
+	fi
+	if [[ $tmpl == *"--no-gpg-sign"* ]]; then
+		echo "self-test: wrapper must not mention --no-gpg-sign" >&2
+		fail=1
+	fi
+	if [[ $fail -eq 0 ]]; then
+		echo "gpg-git-commit --self-test ok"
+		return 0
+	fi
+	return "$fail"
+}
+
+cleanup() {
+	local f
+	for f in "${PASSFILE:-}" "${WRAPPER:-}" "${KWIN_JS:-}"; do
+		[[ -n ${f:-} && -e $f ]] || continue
+		if command -v shred >/dev/null 2>&1; then
+			shred -u "$f" 2>/dev/null || rm -f "$f"
+		else
+			rm -f "$f"
+		fi
+	done
+}
+
+REPO=""
+TITLE="Git GPG sign"
+CACHED_ONLY=0
+SELF_TEST=0
+GIT_ARGS=()
+
+while [[ $# -gt 0 ]]; do
+	case $1 in
+	-C)
+		[[ $# -ge 2 ]] || {
+			echo "gpg-git-commit: -C needs a path" >&2
+			exit 2
+		}
+		REPO=$2
+		shift 2
+		;;
+	--title)
+		[[ $# -ge 2 ]] || {
+			echo "gpg-git-commit: --title needs a string" >&2
+			exit 2
+		}
+		TITLE=$2
+		shift 2
+		;;
+	--cached)
+		CACHED_ONLY=1
+		shift
+		;;
+	--self-test)
+		SELF_TEST=1
+		shift
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--)
+		shift
+		GIT_ARGS+=("$@")
+		break
+		;;
+	--no-gpg-sign)
+		echo "gpg-git-commit: refusing --no-gpg-sign" >&2
+		exit 2
+		;;
+	*)
+		GIT_ARGS+=("$1")
+		shift
+		;;
+	esac
+done
+
+if args_contain_no_gpg_sign "${GIT_ARGS[@]+"${GIT_ARGS[@]}"}"; then
+	echo "gpg-git-commit: refusing --no-gpg-sign" >&2
+	exit 2
+fi
+
+if [[ $SELF_TEST -eq 1 ]]; then
+	self_test
+	exit $?
+fi
+
+ensure_session_env
+
+if [[ -z $REPO ]]; then
+	if REPO=$(git rev-parse --show-toplevel 2>/dev/null); then
+		:
+	elif [[ $CACHED_ONLY -eq 1 ]]; then
+		REPO=""
+	else
+		echo "gpg-git-commit: not a git repository (pass -C)" >&2
+		exit 2
+	fi
+fi
+
+if [[ $CACHED_ONLY -eq 0 && ${#GIT_ARGS[@]} -eq 0 ]]; then
+	echo "gpg-git-commit: missing git commit args (example: -F /tmp/msg.txt)" >&2
+	usage >&2
+	exit 2
+fi
+
+SHM=/dev/shm
+if [[ ! -d $SHM || ! -w $SHM ]]; then
+	SHM=${TMPDIR:-/tmp}
+fi
+
+LOCK=$SHM/gpg-git-commit.lock
+exec 9>"$LOCK"
+if ! flock -n 9; then
+	echo "gpg-git-commit: another instance is running" >&2
+	exit 3
+fi
+
+trap cleanup EXIT
+
+SIGNINGKEY=""
+if [[ -n $REPO ]]; then
+	SIGNINGKEY=$(git -C "$REPO" config --get user.signingkey || true)
+fi
+if [[ -z $SIGNINGKEY ]]; then
+	SIGNINGKEY=$(git config --global --get user.signingkey || true)
+fi
+
+GRIP=$(primary_keygrip "$SIGNINGKEY")
+if [[ -z $GRIP ]]; then
+	echo "gpg-git-commit: could not resolve a secret-key keygrip" >&2
+	exit 2
+fi
+
+if [[ $CACHED_ONLY -eq 1 ]]; then
+	if passphrase_is_cached "$GRIP"; then
+		exit 0
+	fi
+	exit 1
+fi
+
+run_git_commit() {
+	local -a cmd=(git)
+	[[ -n $REPO ]] && cmd+=(-C "$REPO")
+	cmd+=(-c commit.gpgsign=true)
+	if [[ -n ${WRAPPER:-} ]]; then
+		cmd+=(-c "gpg.program=$WRAPPER")
+	fi
+	cmd+=(commit "${GIT_ARGS[@]}")
+	"${cmd[@]}"
+}
+
+if passphrase_is_cached "$GRIP"; then
+	run_git_commit
+	exit $?
+fi
+
+if ! command -v kdialog >/dev/null 2>&1; then
+	echo "gpg-git-commit: kdialog not found; gnome pinentry times out from agent ttys. Install kdialog or cache the passphrase in a real terminal. Refusing --no-gpg-sign." >&2
+	exit 2
+fi
+
+if ! command -v gpg >/dev/null 2>&1; then
+	echo "gpg-git-commit: gpg not found" >&2
+	exit 2
+fi
+
+PASSFILE=$(mktemp -p "$SHM" gpg-git-commit.pass.XXXXXX)
+WRAPPER=$(mktemp -p "$SHM" gpg-git-commit.gpg.XXXXXX)
+KWIN_JS=$(mktemp -p "$SHM" gpg-git-commit.kwin.XXXXXX)
+chmod 600 "$PASSFILE" "$WRAPPER" "$KWIN_JS"
+
+wrapper_body "$(command -v gpg)" "$PASSFILE" >"$WRAPPER"
+chmod 700 "$WRAPPER"
+write_kwin_js "$KWIN_JS" "$TITLE"
+
+notify_user "Enter the GPG passphrase in the dialog."
+
+set +e
+kdialog --title "$TITLE" --password "GPG passphrase for git commit:" >"$PASSFILE" &
+kpid=$!
+for _ in 1 2 3 4 5 6 7 8; do
+	sleep 0.35
+	raise_kdialog "$KWIN_JS"
+	if ! kill -0 "$kpid" 2>/dev/null; then
+		break
+	fi
+done
+wait "$kpid"
+krc=$?
+set -e
+
+if [[ $krc -ne 0 ]]; then
+	echo "gpg-git-commit: passphrase dialog cancelled or failed" >&2
+	exit 2
+fi
+if [[ ! -s $PASSFILE ]]; then
+	echo "gpg-git-commit: empty passphrase" >&2
+	exit 2
+fi
+
+run_git_commit
