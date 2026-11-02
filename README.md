@@ -35,7 +35,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 41 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 99 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 100 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
@@ -160,7 +160,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (99) include packaging (`package-toolkit` classifies generic pack
+**Skills** (100) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -201,6 +201,7 @@ stay on `thread-screenshots-*`),
 `ai-security-rules` (slopsquatting, secrets, prompt injection),
 `license-provenance` (SPDX / copy-risk checklist),
 `claim-source-check` (cheap checker: claim + source only; vault supported pages),
+`leftover-account-sessions` (own-device ADB privacy audit: IME, appops, XPL-EX overlay, KDE Connect trusted names),
 `nate-writing-style` (`{user}` placeholder voice notes; replace with your own),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,

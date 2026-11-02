@@ -43,6 +43,8 @@ LLM_SERVER_URL="http://127.0.0.1:11434/v1/chat/completions"
 LLM_MODEL="gemma4:e2b"
 LLM_TEMPERATURE=0.3
 LLM_MAX_TOKENS=2000
+# gemma4:e2b on CPU often needs more than urllib's old 60s classify timeout.
+LLM_TIMEOUT="${ADF_OCR_LLM_TIMEOUT:-${LLM_TIMEOUT:-180}}"
 # =============================================================================
 
 SCAN_DEVICE=""
@@ -298,7 +300,7 @@ fi
 
 echo "=== OCR, classify, and file ==="
 export MARGIN_TO_SHAVE BLUR_RADIUS FUZZ_PERCENT MIN_CONTENT_WIDTH MIN_CONTENT_HEIGHT
-export OCR_ROTATE_THRESHOLD LLM_SERVER_URL LLM_MODEL LLM_TEMPERATURE LLM_MAX_TOKENS
+export OCR_ROTATE_THRESHOLD LLM_SERVER_URL LLM_MODEL LLM_TEMPERATURE LLM_MAX_TOKENS LLM_TIMEOUT
 export SCAN_FORMAT SCAN_DUPLEX
 file_args=(python3 "$FILE_PY" --pages-dir "$WORK_DIR")
 if [[ "${SELECTED_SOURCE}" == "ADF Duplex" ]]; then

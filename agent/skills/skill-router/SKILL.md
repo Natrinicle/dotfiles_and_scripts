@@ -46,12 +46,17 @@ grep/read loop.
 Direct generate pattern (same as `model-router`):
 
 ```bash
-curl -s http://localhost:11434/api/generate \
+curl -sS --max-time 600 http://localhost:11434/api/generate \
   -d "$(python3 -c "import json; print(json.dumps({
     'model':'gemma4','prompt':PROMPT,'stream':False,
+    'keep_alive':-1,
     'options':{'temperature':0.1,'num_predict':256}}))")" \
   | python3 -c "import json,sys; print(json.load(sys.stdin).get('response',''))"
 ```
+
+First generate after idle can take minutes while weights load into VRAM.
+Use a 600s client timeout and `keep_alive=-1`. HTTP 503 is the Ollama
+queue, not a timeout — see skill `model-router`.
 
 ## Mixed turns
 

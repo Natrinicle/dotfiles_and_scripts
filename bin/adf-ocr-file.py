@@ -237,6 +237,17 @@ def env_flag(name: str, default: bool = True) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def llm_timeout_seconds() -> int:
+    raw = (
+        os.environ.get("ADF_OCR_LLM_TIMEOUT") or os.environ.get("LLM_TIMEOUT") or "180"
+    )
+    try:
+        value = int(str(raw).strip())
+    except ValueError:
+        return 180
+    return max(30, value)
+
+
 def run(
     cmd: list[str], *, timeout: int = 60, check: bool = False
 ) -> subprocess.CompletedProcess[str]:
@@ -1150,7 +1161,7 @@ def llm_complete(
         method="POST",
     )
     try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
+        with urllib.request.urlopen(req, timeout=llm_timeout_seconds()) as resp:
             body = json.loads(resp.read().decode())
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
         eprint(f"adf-ocr-file: LLM request failed ({exc})")
@@ -1479,7 +1490,8 @@ def read_pdf_filing_meta(path: Path) -> dict[str, Any] | None:
                 "doc_date": doc_date,
                 "identity": ident,
             }
-    except (OSError, ValueError, TypeError):
+    except (OSError, ValueError, TypeError, pikepdf.PasswordError, pikepdf.PdfError):
+        # Skip encrypted, corrupt, or otherwise unreadable PDFs in the index.
         return None
 
 
@@ -1756,6 +1768,7 @@ def process_pages_dir(
         or os.environ.get("LLM_SERVER_URL")
         or "http://127.0.0.1:11434/v1/chat/completions"
     )
+    eprint(f"LLM timeout {llm_timeout_seconds()}s model={models[0] if models else '?'}")
     review_groups: list[list[Path]] = []
     if content_split and groups:
         fronts = sheet_fronts(pages, duplex=duplex)
@@ -2027,6 +2040,13 @@ def self_test() -> int:
     check(heur["due_date"] == "2026-10-15", "CLI classify keeps due date")
     check(heur["classify_source"] == "heuristic", "CLI classify skips LLM")
     check(float(heur["confidence"]) >= 0.85, "mapped CLI classify is high confidence")
+    saved_timeout = os.environ.get("ADF_OCR_LLM_TIMEOUT")
+    os.environ["ADF_OCR_LLM_TIMEOUT"] = "240"
+    check(llm_timeout_seconds() == 240, "LLM timeout env")
+    if saved_timeout is None:
+        os.environ.pop("ADF_OCR_LLM_TIMEOUT", None)
+    else:
+        os.environ["ADF_OCR_LLM_TIMEOUT"] = saved_timeout
     hit = prior_identity_hit(
         ["acct:1111111111"],
         "2026-09-30",
@@ -2108,6 +2128,14 @@ def self_test() -> int:
         check(
             rec is not None and rec["doc_date"] == "2026-09-30", "PDF metadata doc date"
         )
+        locked = Path(td) / "2026-09-21 - Locked - Proof.pdf"
+        secret = _pikepdf.new()
+        secret.add_blank_page()
+        secret.save(
+            locked,
+            encryption=_pikepdf.Encryption(owner="adf-ocr-test", user="adf-ocr-test"),
+        )
+        check(read_pdf_filing_meta(locked) is None, "encrypted PDF skipped")
     name = build_filename(
         {
             "doc_date": "2026-10-27",

@@ -78,7 +78,7 @@ def classify_with_ollama(bundle: str) -> str:
     host = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
     if not host.startswith("http"):
         host = "http://" + host
-    timeout = float(os.environ.get("IDENTITY_SUBAGENT_TIMEOUT", "180"))
+    timeout = float(os.environ.get("IDENTITY_SUBAGENT_TIMEOUT", "600"))
     payload = {
         "model": model,
         "prompt": (
@@ -86,6 +86,7 @@ def classify_with_ollama(bundle: str) -> str:
         ),
         "stream": False,
         "think": False,
+        "keep_alive": -1,
         "options": {"temperature": 0.1, "num_predict": 1024},
     }
     req = urllib.request.Request(

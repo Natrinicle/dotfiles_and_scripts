@@ -40,8 +40,30 @@ parent when tools are required): skill `skill-router`.
 3. **Critical** tasks: escalate immediately on fail.  
 4. **Non-critical:** accept with warning; bump tier next time.  
 
-**T0 → T1 silent fallback:** if Ollama is down, model missing, or response empty,
-retry on a small cloud model without drama. Local is best-effort.
+**T0 → T1 silent fallback:** if Ollama is down (`/api/tags` fails) or the
+response is empty after a finished generate, retry on a small cloud model
+without drama. Local is best-effort. Do **not** treat a slow VRAM load or
+HTTP 503 (queue) as “model missing”; wait a 600s client timeout, then retry
+with backoff.
+
+## Ollama VRAM load
+
+The T0 chat model takes a while to copy weights into VRAM (multimodal CLIP
+warmup). First `/api/generate` after unload can take minutes; a warm ping is
+~1–2s. Treat a slow first byte as load, not as Ollama being down.
+
+- Client timeout **600s** (`curl --max-time 600`, `CLAIM_SOURCE_TIMEOUT`,
+  `IDENTITY_SUBAGENT_TIMEOUT`).
+- Preload before a burst: `POST /api/generate` with `"keep_alive": -1`.
+- `"keep_alive": -1` disables the idle unload timer. The scheduler still
+  evicts when `OLLAMA_MAX_LOADED_MODELS` or VRAM requires it.
+- HTTP **503** `maximum pending requests exceeded` is the **queue**, not a
+  client timeout. Back off and retry. Do not silent-fallback on 503.
+
+The Ollama **server** is often a system unit (`User=ollama`) with
+`OLLAMA_KEEP_ALIVE` (default 5m) for clients that omit `keep_alive`. A
+user-owned keepalive sidecar can re-pin already-loaded models. Changing the
+systemd drop-in needs root.
 
 Escalation path: T0 → T1 → T2 → T3. Log outcomes when practical.
 

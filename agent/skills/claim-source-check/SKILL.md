@@ -43,7 +43,10 @@ python3 "${AGENT_HOME}/skills/claim-source-check/scripts/claim_source_check.py" 
 
 `--source-text` for inline text. Default model is local `gemma4` at
 `http://127.0.0.1:11434/v1/chat/completions`. Override with
-`CLAIM_SOURCE_MODEL` / `--model`.
+`CLAIM_SOURCE_MODEL` / `--model`. Client timeout default **600s**
+(`CLAIM_SOURCE_TIMEOUT`) so a cold VRAM load can finish; the payload sends
+`keep_alive: -1`. HTTP 503 is the Ollama queue, not a timeout — see
+`model-router`.
 
 ## Verdict
 

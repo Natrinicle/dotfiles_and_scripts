@@ -158,9 +158,12 @@ python3 agent/skills/package-toolkit/scripts/identity-subagent-scan.py \
 ```
 
 That POSTs `references/identity-subagent-prompt.md` plus the bundle to
-Ollama `gemma4` (`/api/generate`). Do **not** spawn `general-purpose` for this
-(16K overflow). If Ollama is down, spawn `local-extract` / `explore` (omit
-`model`) with **only** the prompt file plus the bundle.
+Ollama `gemma4` (`/api/generate`) with `keep_alive: -1` and a **600s**
+timeout (`IDENTITY_SUBAGENT_TIMEOUT`) so a cold VRAM load can finish. Do
+**not** spawn `general-purpose` for this (16K overflow). If Ollama is down,
+spawn `local-extract` / `explore` (omit `model`) with **only** the prompt
+file plus the bundle. HTTP 503 is the queue, not a timeout — see
+`model-router`.
 
 Keep public interface names (AWS, GitHub, Docker, Traefik, Flipper, Kubernetes)
 and README **Vendor-specific bits**. Replace person names, employer/customer

@@ -39,6 +39,7 @@ def extract_json_object(text: str) -> dict[str, Any]:
 
 
 def complete(url: str, model: str, user: str) -> str:
+    timeout = float(os.environ.get("CLAIM_SOURCE_TIMEOUT", "600"))
     payload = json.dumps(
         {
             "model": model,
@@ -48,6 +49,7 @@ def complete(url: str, model: str, user: str) -> str:
             ],
             "temperature": 0.0,
             "max_tokens": 400,
+            "keep_alive": -1,
         }
     ).encode()
     req = urllib.request.Request(
@@ -56,7 +58,7 @@ def complete(url: str, model: str, user: str) -> str:
         headers={"Content-Type": "application/json"},
         method="POST",
     )
-    with urllib.request.urlopen(req, timeout=120) as resp:
+    with urllib.request.urlopen(req, timeout=timeout) as resp:
         body = json.loads(resp.read().decode())
     return str(body["choices"][0]["message"]["content"])
 
