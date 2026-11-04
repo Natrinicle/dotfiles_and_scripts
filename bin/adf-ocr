@@ -21,7 +21,7 @@ MULTI_LOAD_TIMEOUT=30
 SCANNER_MATCH="${SCANNER_MATCH:-ES-C320W}"
 # Skip scanimage -L when set (exact SANE id, e.g. escl:https://192.168.49.2:443).
 ADF_OCR_DEVICE="${ADF_OCR_DEVICE:-}"
-# File-and-route (adf-ocr-file.py): taxonomy, destination root, classify model.
+# File-and-route (lib/adf-ocr.py): taxonomy, destination root, classify model.
 # ADF_OCR_TAXONOMY="${ADF_OCR_TAXONOMY:-$HOME/.config/adf-ocr/taxonomy.yaml}"
 # ADF_OCR_OUT_ROOT="${ADF_OCR_OUT_ROOT:-$HOME/Documents}"
 # ADF_OCR_CLASSIFY_MODEL="${ADF_OCR_CLASSIFY_MODEL:-gemma4:12b}"
@@ -183,7 +183,7 @@ count_pages() {
 
 usage() {
 	cat <<'EOF'
-Usage: adf-ocr.sh [options]
+Usage: adf-ocr [options]
 
   Default: one PDF for the whole ADF load (blank backs dropped).
   --multiple            Stack has more than one document. Split when pages
@@ -194,7 +194,7 @@ Usage: adf-ocr.sh [options]
   --keep-cache          Leave page_*.png under ~/.cache/adf-ocr/scan_*.
   --no-llm              Heuristic classify only.
   --pages-dir DIR       Reprocess an existing scan cache (skip scanimage).
-  --self-test           Run adf-ocr-file.py checks (skip scanner).
+  --self-test           Run helper checks (skip scanner).
   --help                This text (does not open the scanner).
 
 Env: ADF_OCR_CONTENT_SPLIT=1 enables mixed-mail split without --multiple.
@@ -250,12 +250,19 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-FILE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/adf-ocr-file.py"
-if [[ ! -f "$FILE_PY" ]]; then
-	FILE_PY="$(command -v adf-ocr-file.py || true)"
-fi
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FILE_PY=""
+for cand in \
+	"${ADF_OCR_PY:-}" \
+	"$HERE/../lib/adf-ocr.py" \
+	"${HOME}/.local/lib/adf-ocr.py"; do
+	if [[ -n "$cand" && -f "$cand" ]]; then
+		FILE_PY="$cand"
+		break
+	fi
+done
 if [[ ! -f "${FILE_PY}" ]]; then
-	echo "ERROR: adf-ocr-file.py not found next to adf-ocr.sh (install both to ~/.local/bin)."
+	echo "ERROR: adf-ocr.py not found (install pack lib/adf-ocr.py to ~/.local/lib)."
 	exit 1
 fi
 
@@ -392,6 +399,10 @@ if [[ -z "${PAGES_DIR}" ]]; then
 	else
 		file_args+=(--no-duplex)
 	fi
+elif [[ "${SCAN_DUPLEX}" == "true" ]]; then
+	file_args+=(--duplex)
+else
+	file_args+=(--no-duplex)
 fi
 if [[ -n "${ADF_OCR_TAXONOMY:-}" ]]; then
 	file_args+=(--taxonomy "$ADF_OCR_TAXONOMY")

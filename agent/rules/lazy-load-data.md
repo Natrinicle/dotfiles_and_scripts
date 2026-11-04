@@ -64,7 +64,7 @@ names it. Do not `mempalace sync` in a way that prunes those drawers.
 | Model routing / cost audits | `{MEMORY_ROOT}/model-routing-table.md` |
 | Packaging a toolkit | `toolkit-homes.md`; classify first; rule `toolkit-residual-identity` (host denylist, never pack real names) |
 | Reverse Engineer Anything / `rea-agents` / REA MCP | `{MEMORY_ROOT}/reverse-engineer-anything-2026-10-16.md` |
-| ADF scan file-and-route | `bin/adf-ocr.sh` + `bin/adf-ocr-file.py`; taxonomy `${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml` (copy `share/adf-ocr/taxonomy.example.yaml`) |
+| ADF scan file-and-route | PATH `adf-ocr` (`bin/adf-ocr`) + helper `lib/adf-ocr.py` → `~/.local/lib`; taxonomy `${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml` (copy `share/adf-ocr/taxonomy.example.yaml`) |
 | Research claims vs a cited source before vaulting | skill `claim-source-check`; rule `claim-source-check` |
 | Opening a PR in the current employer's GitHub org | rule `employer-pr-findings-gate`; `{MEMORY_ROOT}/employer-pr-findings-gate.md` |
 | Repo has a pre-commit config | rule `pre-commit-gate`; `{MEMORY_ROOT}/pre-commit-gate.md` |

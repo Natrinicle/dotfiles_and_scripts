@@ -31,7 +31,8 @@ out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # Authored scripts (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit)
+├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr)
+├── lib/                           # Off-PATH helpers (adf-ocr.py → ~/.local/lib)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 42 rules → ~/.claude/rules + ~/.grok/rules
@@ -85,7 +86,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | Script | Benefit to others |
 |--------|-------------------|
 | `check_all_drives_health` | SMART + FS health table for all disks |
-| `adf-ocr.sh` / `adf-ocr-file.py` | ADF scan → OCR → file-and-route. **Default is one PDF per ADF load** (duplex blank backs dropped). `--multiple` / `--content-split` (or `ADF_OCR_CONTENT_SPLIT=1`) splits mixed mail using layout (plain vs n-up 2/4/8/16-up vs slip), issuer, identity, booklet page-N-of-M, related text, and header dates — not transaction/footnote dates. `--help` does not open the scanner; `--pages-dir` reprocesses a cache. CLI heuristic classify then local LLM if needed; identity-index duplicate skip; PDF Info/XMP; local ICS. Taxonomy `${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml` (example `share/adf-ocr/taxonomy.example.yaml`). `ADF_OCR_DEVICE`, `SCAN_DUPLEX=true`, `ADF_OCR_KEEP_CACHE`, `ADF_OCR_OUT_ROOT`, `ADF_OCR_CLASSIFY_MODEL`, `ADF_OCR_NO_LLM`, `ADF_OCR_LLM_TIMEOUT` (seconds, default 180). |
+| `adf-ocr` | ADF scan → OCR → file-and-route. PATH command is `adf-ocr`; helper is `lib/adf-ocr.py` (`~/.local/lib`, off PATH). **Default is one PDF per ADF load** (duplex blank backs dropped). `--multiple` / `--content-split` (or `ADF_OCR_CONTENT_SPLIT=1`) splits mixed mail using layout (plain vs n-up 2/4/8/16-up vs slip), issuer, identity, booklet page-N-of-M, related text, and header dates — not transaction/footnote dates. `--help` does not open the scanner; `--pages-dir` reprocesses a cache. CLI heuristic classify then local LLM if needed; identity-index duplicate skip; PDF Info/XMP; local ICS. Taxonomy `${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml` (example `share/adf-ocr/taxonomy.example.yaml`). `ADF_OCR_DEVICE`, `SCAN_DUPLEX=true`, `ADF_OCR_KEEP_CACHE`, `ADF_OCR_OUT_ROOT`, `ADF_OCR_CLASSIFY_MODEL`, `ADF_OCR_NO_LLM`, `ADF_OCR_LLM_TIMEOUT` (seconds, default 180). |
 | `voice-recorder` / `run-voice-recorder.sh` | Ambient mic capture (Silero VAD) → WAV segments; deps in `bin/requirements-voice-recorder.txt` |
 | `morning-data-gather` | Batch morning triage (PRs/tickets/IM; calendar if configured) |
 | `speakr-api` / `speakr-poll` / `speakr-notes-append` | Speakr recording API helpers |
@@ -321,7 +322,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 |------|---------|
 | **pipx / uv tool shims** (ruff, yt-dlp, esptool, semgrep, …) | Install via package managers; do not vendor symlinks |
 | **claude / grok / agent** | CLI installs; not source packs |
-| **adf-ocr / check_all_drives_health / voice-recorder / rperks-activate** | **Shipped** under `bin/` (RPerks units in `share/`; ADF taxonomy example in `share/adf-ocr/`) |
+| **adf-ocr / check_all_drives_health / voice-recorder / rperks-activate** | **Shipped** (`adf-ocr` in `bin/`, helper `lib/adf-ocr.py`; RPerks units in `share/`; ADF taxonomy example in `share/adf-ocr/`) |
 | **Backup / sync-conflict copies of scripts** | Skip |
 | **reimage-kdialog** | Useful KDE image batch helper, but **upstream third-party** (GPL); install from upstream / distro packaging if needed |
 | **blisp** | Binary firmware tool; distribute upstream |

@@ -20,7 +20,7 @@ Usage: $(basename "$0") [options]
 Options:
   --all           Install shell + bin + agent packs (default if no target flags)
   --shell         Install bashrc / bash_aliases / bash_aliases.d
-  --bin           Install bin/* -> ~/.local/bin
+  --bin           Install bin/* -> ~/.local/bin and lib/* -> ~/.local/lib
   --agent         Install shared agent/rules + skills + hooks into Claude; link Grok
   --force         Overwrite existing files (backs up first). Default is skip.
   --dry-run       Print actions only
@@ -34,8 +34,10 @@ Shell installs:
   shell/bashrc          -> ~/.bashrc
   shell/bash_aliases    -> ~/.bash_aliases
   shell/bash_aliases.d  -> ~/.bash_aliases.d/  (merge; does not delete extras)
-  bin/*                 -> ~/.local/bin/  (files)
+  bin/*                 -> ~/.local/bin/  (files; PATH commands, no extra suffixes)
   bin/<dir>/            -> ~/.local/bin/<dir>/
+  lib/*                 -> ~/.local/lib/  (files; helpers, not on PATH)
+  lib/<dir>/            -> ~/.local/lib/<dir>/
   share/**/*.service,.timer -> ~/.config/systemd/user/  (does not enable)
 
 Agent installs (single shared trees):
@@ -245,6 +247,20 @@ if [[ $DO_BIN -eq 1 ]]; then
 			chmod +x "$dest/systemd/install-user-units.sh"
 		fi
 	done
+	if [[ -d $ROOT/lib ]]; then
+		run mkdir -p "$HOME/.local/lib"
+		for f in "$ROOT/lib"/*; do
+			[[ -f $f ]] || continue
+			base=$(basename "$f")
+			install_file "$f" "$HOME/.local/lib/$base" "lib/$base"
+		done
+		for d in "$ROOT/lib"/*; do
+			[[ -d $d ]] || continue
+			name=$(basename "$d")
+			[[ $name == __pycache__ ]] && continue
+			install_tree_merge "$d" "$HOME/.local/lib/$name" "lib/$name"
+		done
+	fi
 	if [[ -d $ROOT/share ]]; then
 		run mkdir -p "$HOME/.config/systemd/user"
 		while IFS= read -r -d '' unit; do

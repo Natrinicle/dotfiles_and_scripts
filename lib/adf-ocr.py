@@ -1502,7 +1502,7 @@ def llm_complete(
         with urllib.request.urlopen(req, timeout=llm_timeout_seconds()) as resp:
             body = json.loads(resp.read().decode())
     except (urllib.error.URLError, TimeoutError, json.JSONDecodeError, OSError) as exc:
-        eprint(f"adf-ocr-file: LLM request failed ({exc})")
+        eprint(f"adf-ocr: LLM request failed ({exc})")
         return ""
     try:
         return str(body["choices"][0]["message"]["content"])
@@ -2693,7 +2693,7 @@ def build_parser() -> argparse.ArgumentParser:
         description="Split, classify, and file ADF-OCR pages"
     )
     parser.add_argument(
-        "--pages-dir", type=Path, help="Directory of page_*.png from adf-ocr.sh"
+        "--pages-dir", type=Path, help="Directory of page_*.png from adf-ocr"
     )
     parser.add_argument("--taxonomy", help="YAML taxonomy path")
     parser.add_argument(
