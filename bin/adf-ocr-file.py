@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""File-and-route for ADF-OCR: duplex-aware split, OCR, classify, PDF metadata, local ICS."""
+"""File-and-route for ADF-OCR: duplex-aware split, OCR, classify, PDF metadata, local ICS.
+
+Default is one PDF per ADF load (blank backs dropped). Pass --multiple /
+--content-split (or ADF_OCR_CONTENT_SPLIT=1) to split a mixed stack.
+"""
 
 from __future__ import annotations
 
@@ -237,6 +241,17 @@ def env_flag(name: str, default: bool = True) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def content_split_enabled(args: argparse.Namespace | None = None) -> bool:
+    """Mixed-mail split is off unless --multiple / --content-split / env."""
+    if args is not None:
+        explicit = getattr(args, "content_split", None)
+        if explicit is False:
+            return False
+        if explicit is True or getattr(args, "multiple", False):
+            return True
+    return env_flag("ADF_OCR_CONTENT_SPLIT", False)
+
+
 def llm_timeout_seconds() -> int:
     raw = (
         os.environ.get("ADF_OCR_LLM_TIMEOUT") or os.environ.get("LLM_TIMEOUT") or "180"
@@ -407,6 +422,11 @@ class PageSignals:
     barcodes: tuple[str, ...]
     identity: frozenset[str]
     tokens: frozenset[str]
+    n_up: int = 1
+    layout: str = "full"
+    color_hist: tuple[int, ...] = ()
+    page_span: tuple[int, int, int] | None = None
+    doc_date: str | None = None
 
 
 def hamming64(left: int, right: int) -> int:
@@ -460,6 +480,211 @@ def dhash_int(path: Path, size: int = 8) -> int:
             right = data[row * width + col + 1]
             bits = (bits << 1) | int(left > right)
     return bits
+
+
+def color_histogram(thumb: Any) -> tuple[int, ...]:
+    bins = [0] * 64
+    for red, green, blue in thumb.getdata():
+        bins[(red >> 6) * 16 + (green >> 6) * 4 + (blue >> 6)] += 1
+    return tuple(bins)
+
+
+def color_cosine(left: tuple[int, ...], right: tuple[int, ...]) -> float:
+    if not left or not right or len(left) != len(right):
+        return 0.0
+    dot = sum(a * b for a, b in zip(left, right, strict=True))
+    norm_a = sum(a * a for a in left) ** 0.5
+    norm_b = sum(b * b for b in right) ** 0.5
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return dot / (norm_a * norm_b)
+
+
+def _smooth_profile(values: list[float], radius: int = 1) -> list[float]:
+    length = len(values)
+    smoothed: list[float] = []
+    for index in range(length):
+        lo = max(0, index - radius)
+        hi = min(length, index + radius + 1)
+        smoothed.append(sum(values[lo:hi]) / (hi - lo))
+    return smoothed
+
+
+def _trough_span(smoothed: list[float], index: int, cap: float) -> int:
+    lo = hi = index
+    last = len(smoothed) - 1
+    while lo > 0 and smoothed[lo - 1] <= cap:
+        lo -= 1
+    while hi < last and smoothed[hi + 1] <= cap:
+        hi += 1
+    return hi - lo + 1
+
+
+def _best_gutter(
+    smoothed: list[float],
+    *,
+    depth: int,
+    min_width: int | None,
+    center_only: bool,
+) -> tuple[int | None, int]:
+    """Return (gutter index, width) for the strongest interior ink trough."""
+    length = len(smoothed)
+    min_cell = 18 if depth == 0 else 14
+    if length < min_cell * 2 + 6:
+        return None, 0
+    edge = max(2, int(0.04 * length))
+    peak = max(smoothed[edge : length - edge] or smoothed) or 1.0
+    if center_only:
+        lo, hi = int(0.38 * length), int(0.62 * length)
+    else:
+        lo, hi = int(0.16 * length), int(0.84 * length)
+    need_w = min_width if min_width is not None else (6 if depth == 0 else 4)
+    best_i: int | None = None
+    best_score = 0.0
+    best_w = 0
+    for index in range(lo, hi + 1):
+        left_peak = max(smoothed[edge:index] or [0.0])
+        right_peak = max(smoothed[index + 1 : length - edge] or [0.0])
+        floor = smoothed[index]
+        if left_peak < 0.12 * peak or right_peak < 0.12 * peak:
+            continue
+        side = min(left_peak, right_peak)
+        if floor > 0.28 * side:
+            continue
+        cap = floor + 0.22 * (side - floor)
+        width = _trough_span(smoothed, index, cap)
+        if width < need_w or width > 0.28 * length:
+            continue
+        if min(index, length - index) / max(index, length - index) < 0.38:
+            continue
+        depth_s = 1.0 - floor / (side or 1.0)
+        center = 1.0 - abs(index - length / 2) / (length / 2)
+        score = depth_s * (width**0.5) * (0.45 + 0.55 * center)
+        if score > best_score:
+            best_score = score
+            best_i = index
+            best_w = width
+    return best_i, best_w
+
+
+def _axis_gutters(
+    smoothed: list[float],
+    *,
+    depth: int = 0,
+    max_depth: int = 3,
+    parent_width: int | None = None,
+) -> list[int]:
+    """Split an ink profile on page gutters (2/4/8 cells per axis)."""
+    min_width = None if parent_width is None else max(4, int(0.70 * parent_width))
+    gutter, width = _best_gutter(
+        smoothed,
+        depth=depth,
+        min_width=min_width,
+        center_only=parent_width is not None,
+    )
+    if gutter is None:
+        return []
+    if parent_width is not None and width < 0.70 * parent_width:
+        return []
+    if depth + 1 >= max_depth:
+        return [gutter]
+    left = _axis_gutters(
+        smoothed[:gutter],
+        depth=depth + 1,
+        max_depth=max_depth,
+        parent_width=width,
+    )
+    right = [
+        gutter + 1 + pos
+        for pos in _axis_gutters(
+            smoothed[gutter + 1 :],
+            depth=depth + 1,
+            max_depth=max_depth,
+            parent_width=width,
+        )
+    ]
+    if left and right:
+        return sorted(left + [gutter] + right)
+    return [gutter]
+
+
+def _nup_from_bbox(gray: Any, min_x: int, max_x: int, min_y: int, max_y: int) -> int:
+    """Count mini-pages in a content box (2-up, 4-up, 8-up, 16-up, …)."""
+    box_w = max_x - min_x + 1
+    box_h = max_y - min_y + 1
+    if box_w < 70 or box_h < 70:
+        return 1
+    pixels = gray.load()
+    col_ink = [0.0] * box_w
+    row_ink = [0.0] * box_h
+    for row in range(min_y, max_y + 1):
+        for col in range(min_x, max_x + 1):
+            if pixels[col, row] < 240:
+                col_ink[col - min_x] += 1
+                row_ink[row - min_y] += 1
+    v_gutters = _axis_gutters(_smooth_profile(col_ink))
+    h_gutters = _axis_gutters(_smooth_profile(row_ink))
+    cols = len(v_gutters) + 1
+    rows = len(h_gutters) + 1
+    n_up = cols * rows
+    if n_up < 2:
+        return 1
+    xs = [0, *v_gutters, box_w]
+    ys = [0, *h_gutters, box_h]
+    cells: list[int] = []
+    for row_i in range(len(ys) - 1):
+        for col_i in range(len(xs) - 1):
+            cell_w = xs[col_i + 1] - xs[col_i]
+            cell_h = ys[row_i + 1] - ys[row_i]
+            if cell_w < 14 or cell_h < 14:
+                return 1
+            ink = 0
+            for row in range(min_y + ys[row_i], min_y + ys[row_i + 1]):
+                for col in range(min_x + xs[col_i], min_x + xs[col_i + 1]):
+                    if pixels[col, row] < 240:
+                        ink += 1
+            cells.append(ink)
+    peak = max(cells) or 1
+    ratio = min(cells) / peak
+    size_x = [xs[i + 1] - xs[i] for i in range(len(xs) - 1)]
+    size_y = [ys[i + 1] - ys[i] for i in range(len(ys) - 1)]
+    size_ratio = (min(size_x) / max(size_x)) * (min(size_y) / max(size_y))
+    if n_up == 2:
+        stacked = cols == 1
+        need = 0.55 if stacked else 0.38
+        if ratio < need or size_ratio < 0.50:
+            return 1
+    elif ratio < 0.08:
+        return 1
+    return n_up
+
+
+def visual_features(path: Path) -> tuple[int, str, tuple[int, ...]]:
+    """Return (n_up, layout, color_hist). layout is full, nup, or slip."""
+    if Image is None or not path.is_file():
+        return 1, "full", ()
+    try:
+        image = Image.open(path).convert("RGB")
+    except OSError:
+        return 1, "full", ()
+    thumb = image.resize((160, 208), Image.BILINEAR)
+    gray = thumb.convert("L")
+    width, height = thumb.size
+    pixels = list(gray.getdata())
+    ink = [pix < 240 for pix in pixels]
+    tight = [pix < 190 for pix in pixels]
+    hist = color_histogram(thumb)
+    if sum(ink) < 80:
+        return 1, "full", hist
+    marked = tight if sum(tight) >= 40 else ink
+    xs = [index % width for index, on in enumerate(marked) if on]
+    ys = [index // width for index, on in enumerate(marked) if on]
+    min_x, max_x, min_y, max_y = min(xs), max(xs), min(ys), max(ys)
+    box_w, box_h = max_x - min_x + 1, max_y - min_y + 1
+    if box_h < height * 0.55 and box_w < width * 0.72:
+        return 1, "slip", hist
+    n_up = _nup_from_bbox(gray, min_x, max_x, min_y, max_y)
+    return n_up, ("nup" if n_up >= 2 else "full"), hist
 
 
 def usable_barcode(raw: str) -> bool:
@@ -524,6 +749,35 @@ def page_of(text: str) -> tuple[int, int] | None:
     return current, total
 
 
+def page_span_from_text(text: str) -> tuple[int, int, int] | None:
+    found: list[tuple[int, int]] = []
+    for match in PAGE_OF.finditer(text or ""):
+        current, total = int(match.group(1)), int(match.group(2))
+        if current > 0 and total > 0:
+            found.append((current, total))
+    if not found:
+        return None
+    totals = {total for _current, total in found}
+    if len(totals) != 1:
+        return None
+    total = next(iter(totals))
+    numbers = [current for current, _total in found]
+    return min(numbers), max(numbers), total
+
+
+def nup_from_text(text: str) -> int:
+    """Count mini-pages from repeated Page N of M markers (2, 4, 8, 16, …)."""
+    span = page_span_from_text(text)
+    if span is None:
+        return 1
+    low, high, _total = span
+    count = high - low + 1
+    matches = len(list(PAGE_OF.finditer(text or "")))
+    if matches >= 2:
+        return max(count, matches)
+    return 1
+
+
 def _year(value: int) -> int:
     if value < 100:
         return value + 2000 if value < 70 else value + 1900
@@ -577,18 +831,26 @@ def extract_due_date(text: str) -> str | None:
 
 
 def extract_doc_date(text: str, due: str | None) -> str | None:
+    """Prefer statement-cue and header dates over later transaction/footnote dates."""
     for match in STATEMENT_CUE.finditer(text):
         window = text[match.end() : match.end() + 80]
         for iso, _, _ in extract_date_spans(window):
             if iso != due and plausible_iso(iso, allow_future_days=14):
                 return iso
     today = date.today().isoformat()
-    past = [
-        iso
-        for iso, _, _ in extract_date_spans(text)
-        if iso != due and iso <= today and plausible_iso(iso, allow_future_days=14)
-    ]
-    return max(past) if past else None
+
+    def newest_past(chunk: str) -> str | None:
+        past = [
+            iso
+            for iso, _, _ in extract_date_spans(chunk)
+            if iso != due and iso <= today and plausible_iso(iso, allow_future_days=14)
+        ]
+        return max(past) if past else None
+
+    header = newest_past(text[:800])
+    if header:
+        return header
+    return newest_past(text)
 
 
 def extract_amount(text: str) -> str | None:
@@ -693,6 +955,9 @@ def make_signals(
     *,
     text: str | None = None,
     text_of: Callable[[Path], str] | None = None,
+    layout: str | None = None,
+    n_up: int | None = None,
+    color_hist: tuple[int, ...] | None = None,
 ) -> PageSignals:
     raw = (
         text
@@ -700,6 +965,16 @@ def make_signals(
         else (text_of(path) if text_of else tesseract_text(path))
     )
     codes = zbar_barcodes(path)
+    img_nup, img_layout, hist = visual_features(path)
+    text_nup = nup_from_text(raw)
+    resolved_nup = n_up if n_up is not None else max(text_nup, img_nup)
+    if layout is not None:
+        resolved_layout = layout
+    elif text_nup >= 2:
+        resolved_layout = "nup"
+    else:
+        resolved_layout = img_layout
+    due = extract_due_date(raw)
     return PageSignals(
         path=path,
         text=raw,
@@ -707,6 +982,11 @@ def make_signals(
         barcodes=codes,
         identity=identity_keys(raw, codes),
         tokens=distinctive_tokens(raw),
+        n_up=resolved_nup,
+        layout=resolved_layout,
+        color_hist=color_hist if color_hist is not None else hist,
+        page_span=page_span_from_text(raw),
+        doc_date=extract_doc_date(raw, due),
     )
 
 
@@ -722,6 +1002,37 @@ def token_coverage(source: frozenset[str], dest: frozenset[str]) -> float:
     return len(source & dest) / len(source)
 
 
+def layout_family(sig: PageSignals) -> str:
+    if sig.layout == "slip":
+        return "slip"
+    if sig.n_up >= 2 or sig.layout == "nup":
+        return "nup"
+    return "full"
+
+
+def text_related(prev: PageSignals, curr: PageSignals) -> bool:
+    if not prev.tokens or not curr.tokens:
+        return False
+    jac = token_jaccard(prev.tokens, curr.tokens)
+    cov = max(
+        token_coverage(prev.tokens, curr.tokens),
+        token_coverage(curr.tokens, prev.tokens),
+    )
+    if jac >= 0.18 or cov >= 0.22:
+        return True
+    return len(prev.tokens & curr.tokens) >= 8
+
+
+def booklet_continue(prev: PageSignals, curr: PageSignals) -> bool:
+    if not prev.page_span or not curr.page_span:
+        return False
+    pmin, pmax, ptot = prev.page_span
+    cmin, _cmax, ctot = curr.page_span
+    if ptot != ctot or ptot < 2:
+        return False
+    return cmin >= pmax or (cmin > pmin and cmin <= pmax + 12)
+
+
 def relate_pages(
     prev: PageSignals, curr: PageSignals, taxonomy: dict[str, Any]
 ) -> tuple[str, str]:
@@ -732,7 +1043,9 @@ def relate_pages(
     dist = hamming64(prev.dhash, curr.dhash) if prev.dhash and curr.dhash else 64
     same_id = bool(prev.identity and curr.identity and (prev.identity & curr.identity))
     extra_needed = max(8, int(0.15 * max(len(prev.tokens), 1)))
-    if coverage >= 0.5 and len(extra) >= extra_needed:
+    fam_prev = layout_family(prev)
+    fam_curr = layout_family(curr)
+    if coverage >= 0.5 and len(extra) >= extra_needed and len(prev.tokens) >= 16:
         return "quarantine", f"double-feed overlay of {prev.path.name}"
     po_prev = page_of(prev.text)
     po_curr = page_of(curr.text)
@@ -743,32 +1056,54 @@ def relate_pages(
         and po_curr[0] == po_prev[0] + 1
     ):
         return "keep", "page sequence"
+    if booklet_continue(prev, curr):
+        return "keep", "booklet sequence"
     if identity_conflict(prev.identity, curr.identity):
         return "split", "different identity (barcode/account)"
     if (
-        dist <= 6
+        (dist <= 6 and jac >= 0.7)
         or (jac >= 0.88 and len(extra) < 8)
         or (same_id and jac >= 0.75 and len(extra) < 8)
     ):
         return "drop", f"duplicate of {prev.path.name}"
     curr_head = curr.text[:800]
-    if CONTINUATION.search(curr_head) and (same_id or jac >= 0.3):
+    if fam_prev == "slip" and fam_curr == "slip":
+        if jac >= 0.4 or same_id:
+            return "keep", "same slip form"
+        return "split", "different slip"
+    if fam_prev != fam_curr:
+        return "split", f"layout {fam_prev} vs {fam_curr}"
+    if CONTINUATION.search(curr_head) and (
+        same_id or jac >= 0.3 or text_related(prev, curr)
+    ):
         return "keep", "continuation"
+    if same_id:
+        return "keep", "shared identity"
     prev_iss = issuer_folder(prev.text, taxonomy)
     curr_iss = issuer_folder(curr.text, taxonomy)
     if prev_iss and curr_iss and prev_iss != curr_iss:
         return "split", "issuer map"
+    related = (
+        text_related(prev, curr)
+        or color_cosine(prev.color_hist, curr.color_hist) >= 0.88
+    )
     if (
         NEW_DOC_START.search(curr_head)
         and not NEW_DOC_START.search(prev.text[:800])
         and not CONTINUATION.search(curr_head)
+        and not related
     ):
         return "split", "page-1 start"
+    same_doc_date = bool(
+        prev.doc_date and curr.doc_date and prev.doc_date == curr.doc_date
+    )
     if (
         jac < 0.18
         and not CONTINUATION.search(curr_head)
         and prev.tokens
         and curr.tokens
+        and not related
+        and not same_doc_date
     ):
         return "split", f"text jaccard {jac:.2f}"
     return "keep", f"jaccard {jac:.2f}"
@@ -886,6 +1221,9 @@ def segment_stack(
                     action == "keep"
                     and llm_new_doc is not None
                     and token_jaccard(last.tokens, info.tokens) < 0.35
+                    and layout_family(last) == layout_family(info)
+                    and not text_related(last, info)
+                    and not booklet_continue(last, info)
                     and llm_new_doc(last.text, info.text)
                 ):
                     action, reason = "split", "llm new document"
@@ -1743,16 +2081,19 @@ def process_pages_dir(
         )
 
     duplex = args.duplex if args.duplex is not None else env_flag("SCAN_DUPLEX", True)
-    content_split = (
-        args.content_split
-        if args.content_split is not None
-        else env_flag("ADF_OCR_CONTENT_SPLIT", True)
-    )
+    content_split = content_split_enabled(args)
     groups = group_pages(pages, blank, duplex=duplex)
     eprint(
         f"=== Grouped {len(pages)} page(s) → {len(groups)} blank-split stack(s) "
         f"(duplex={duplex}) ==="
     )
+    if not content_split:
+        stitched = [page for group in groups for page in group]
+        groups = [stitched] if stitched else []
+        eprint(
+            f"=== Single document ({len(stitched)} page(s)); "
+            "pass --multiple to split mixed mail ==="
+        )
     models: list[str] = []
     for model in (
         args.classify_model
@@ -1942,7 +2283,8 @@ def self_test() -> int:
     check(mixed == [[a, b], [c]], "content split at next sheet front")
     avidia = (
         "Sample Mutual Demo Health Savings Account statement account number 2222222222 "
-        "paper surcharge benefit admin interest payment"
+        "paper surcharge benefit admin interest payment deposits withdrawals "
+        "routing trustee fiduciary quarterly dividend"
     )
     overlay = (
         "escalated Japan violating directive harm prevention imperative ranked higher "
@@ -1983,6 +2325,59 @@ def self_test() -> int:
             Image.new("RGB", (64, 64), (240, 240, 240)).save(two)
             check(dhash_int(one) == dhash_int(two), "identical images share dHash")
             check(hamming64(dhash_int(one), dhash_int(two)) == 0, "dHash hamming 0")
+
+            def paint_grid(path: Path, cols: int, rows: int) -> None:
+                canvas = Image.new("RGB", (160, 208), (255, 255, 255))
+                pix = canvas.load()
+                margin, gutter = 6, 8
+                cell_w = (160 - 2 * margin - gutter * (cols - 1)) / cols
+                cell_h = (208 - 2 * margin - gutter * (rows - 1)) / rows
+                for row in range(rows):
+                    for col in range(cols):
+                        x0 = int(margin + col * (cell_w + gutter))
+                        y0 = int(margin + row * (cell_h + gutter))
+                        x1 = int(x0 + cell_w - 1)
+                        y1 = int(y0 + cell_h - 1)
+                        for x in range(x0, x1 + 1):
+                            for y in range(y0, y1 + 1):
+                                pix[x, y] = (20, 20, 20)
+                canvas.save(path)
+
+            for cols, rows in ((2, 1), (1, 2), (2, 2), (2, 4), (4, 4)):
+                grid = tdir / f"nup_{cols}x{rows}.png"
+                paint_grid(grid, cols, rows)
+                n_up, layout, _hist = visual_features(grid)
+                expect = cols * rows
+                check(
+                    layout == "nup" and n_up == expect,
+                    f"{cols}x{rows} grid is {expect}-up",
+                )
+            letter = tdir / "letter.png"
+            lines = Image.new("RGB", (160, 208), (255, 255, 255))
+            lpix = lines.load()
+            for y in range(16, 150, 8):
+                for x in range(12, 141):
+                    for dy in range(3):
+                        lpix[x, y + dy] = (20, 20, 20)
+            lines.save(letter)
+            n_up, layout, _hist = visual_features(letter)
+            check(layout == "full" and n_up == 1, "text lines are not n-up")
+            col = tdir / "column.png"
+            left = Image.new("RGB", (160, 208), (255, 255, 255))
+            for x in range(10, 70):
+                for y in range(12, 190):
+                    left.putpixel((x, y), (20, 20, 20))
+            left.save(col)
+            n_up, layout, _hist = visual_features(col)
+            check(layout == "full" and n_up == 1, "left text column is not n-up")
+            slip = tdir / "slip.png"
+            card = Image.new("RGB", (160, 208), (230, 230, 230))
+            for x in range(40, 120):
+                for y in range(8, 70):
+                    card.putpixel((x, y), (10, 10, 10))
+            card.save(slip)
+            _n_up, layout, _hist = visual_features(slip)
+            check(layout == "slip", "small item on the bed is a slip")
     check(
         clean_issuer_name("WSCU (implied bank financial institution)") == "WSCU",
         "strip implied issuer gloss",
@@ -1996,6 +2391,25 @@ def self_test() -> int:
         extract_doc_date(stmt, extract_due_date(stmt)) == "2026-09-30",
         "CLI statement date",
     )
+    dated = (
+        "Memo January 15, 2026 county notice\n"
+        + ("lorem notes filler line\n" * 80)
+        + "Posted October 30, 2026 appendix"
+    )
+    check(
+        extract_doc_date(dated, None) == "2026-01-15",
+        "header date beats later body dates",
+    )
+    stmt2 = (
+        "account number 1111111111 September 2, 2026 grocery 12.00 "
+        "September 8, 2026 fuel 40.00 previous balance ending"
+    )
+    act, why = relate_pages(
+        make_signals(Path("page_0001.png"), text=stmt),
+        make_signals(Path("page_0002.png"), text=stmt2),
+        split_tax,
+    )
+    check(act == "keep", f"statement transaction dates stay ({why})")
     check(extract_due_date(stmt) == "2026-10-15", "CLI due date")
     check(extract_amount(stmt) == "42.00", "CLI amount due")
     check(guess_doc_type(stmt) == "statement", "CLI doc type statement")
@@ -2019,6 +2433,90 @@ def self_test() -> int:
         split_tax,
     )
     check(act == "keep" and why == "page sequence", "page N of M stays together")
+    nup_a = (
+        "State sample ballot Page 7 of 30 "
+        "Question 6 explanation Page 8 of 30 Page 9 of 30 Page 10 of 30"
+    )
+    nup_b = (
+        "State sample ballot Page 15 of 30 "
+        "Question 6 fiscal Page 16 of 30 Page 17 of 30 Page 18 of 30"
+    )
+    act, why = relate_pages(
+        make_signals(Path("page_0011.png"), text=nup_a),
+        make_signals(Path("page_0013.png"), text=nup_b),
+        split_tax,
+    )
+    check(act == "keep", f"n-up booklet stays together ({why})")
+    check(nup_from_text(nup_a) == 4, "four Page N of M is 4-up text")
+    check(
+        nup_from_text(" ".join(f"Page {i} of 32" for i in range(1, 9))) == 8,
+        "eight Page N of M is 8-up text",
+    )
+    check(
+        nup_from_text(" ".join(f"Page {i} of 64" for i in range(1, 17))) == 16,
+        "sixteen Page N of M is 16-up text",
+    )
+    check(nup_from_text("Page 1 of 4 more Page 2 of 4") == 2, "two Page N of M is 2-up")
+    grok = (
+        "Here's a more in-depth summary of the Example County 2026 "
+        "General Election sample ballot contested nonpartisan races "
+        "judicial voters board regents November 3, 2026 Question 6"
+    )
+    act, why = relate_pages(
+        make_signals(Path("page_0001.png"), text=grok),
+        make_signals(Path("page_0011.png"), text=nup_a),
+        split_tax,
+    )
+    check(act == "split", f"plain text vs n-up splits ({why})")
+    grok2 = (
+        "focused information on contested nonpartisan races Example "
+        "County voters board regents judicial general election "
+        "sample ballot District 8"
+    )
+    act, why = relate_pages(
+        make_signals(Path("page_0001.png"), text=grok),
+        make_signals(Path("page_0007.png"), text=grok2),
+        split_tax,
+    )
+    check(act == "keep", f"related full-page text stays ({why})")
+    act, why = relate_pages(
+        make_signals(
+            Path("page_0019.png"),
+            text="VOTING RECEIPT GENERAL ELECTION WHITE PINE COUNTY NEVADA",
+            layout="slip",
+        ),
+        make_signals(
+            Path("page_0021.png"),
+            text="PROVISIONAL documentation required voter name polling place",
+            layout="slip",
+        ),
+        split_tax,
+    )
+    check(act == "split", f"different slips split ({why})")
+    saved_split = os.environ.pop("ADF_OCR_CONTENT_SPLIT", None)
+    try:
+        check(
+            content_split_enabled(
+                argparse.Namespace(content_split=None, multiple=False)
+            )
+            is False,
+            "content split default off",
+        )
+        check(
+            content_split_enabled(argparse.Namespace(content_split=None, multiple=True))
+            is True,
+            "--multiple enables content split",
+        )
+        check(
+            content_split_enabled(
+                argparse.Namespace(content_split=False, multiple=True)
+            )
+            is False,
+            "--no-content-split wins over --multiple",
+        )
+    finally:
+        if saved_split is not None:
+            os.environ["ADF_OCR_CONTENT_SPLIT"] = saved_split
     heur_tax = {
         "issuers": [{"match": ["sample mutual"], "folder": "Bills"}],
         "folders": ["Bills", "."],
@@ -2211,10 +2709,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="ADF Duplex page order (front, back). Default SCAN_DUPLEX or true.",
     )
     parser.add_argument(
+        "--multiple",
+        action="store_true",
+        help="ADF load has more than one document. Enables mixed-mail split "
+        "(layout, issuer, identity). Default is one PDF for the whole load.",
+    )
+    parser.add_argument(
         "--content-split",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="Split mixed letters by issuer/LLM after blank gates. Default on.",
+        help="Split mixed letters by layout/issuer/identity after blank gates. "
+        "Default off (one PDF). Alias: --multiple. Env ADF_OCR_CONTENT_SPLIT.",
     )
     parser.add_argument(
         "--keep-cache",

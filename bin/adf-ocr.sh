@@ -181,105 +181,191 @@ count_pages() {
 	printf '%s\n' "${#files[@]}"
 }
 
+usage() {
+	cat <<'EOF'
+Usage: adf-ocr.sh [options]
+
+  Default: one PDF for the whole ADF load (blank backs dropped).
+  --multiple            Stack has more than one document. Split when pages
+                        look like different documents (layout, issuer,
+                        identity). Alias for --content-split.
+  --content-split       Same as --multiple.
+  --no-content-split    Force a single PDF (default).
+  --keep-cache          Leave page_*.png under ~/.cache/adf-ocr/scan_*.
+  --no-llm              Heuristic classify only.
+  --pages-dir DIR       Reprocess an existing scan cache (skip scanimage).
+  --self-test           Run adf-ocr-file.py checks (skip scanner).
+  --help                This text (does not open the scanner).
+
+Env: ADF_OCR_CONTENT_SPLIT=1 enables mixed-mail split without --multiple.
+     ADF_OCR_DEVICE, SCAN_DUPLEX, ADF_OCR_KEEP_CACHE, ADF_OCR_NO_LLM,
+     ADF_OCR_TAXONOMY, ADF_OCR_OUT_ROOT, ADF_OCR_CLASSIFY_MODEL,
+     ADF_OCR_LLM_TIMEOUT.
+EOF
+}
+
 # -------------------------- Main Script --------------------------
-echo "=== EPSON ES-C320W Continuous Multi-Load Scanner with AI Naming ==="
-
-if ! command -v scanimage >/dev/null 2>&1; then
-	echo "ERROR: scanimage not found (install sane-utils)."
-	exit 1
-fi
-
-if ! pick_scanner; then
-	exit 1
-fi
-
-CACHE_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/adf-ocr"
-mkdir -p "$CACHE_ROOT"
-WORK_DIR="${CACHE_ROOT}/scan_$(date +%Y%m%d_%H%M%S)"
-mkdir -p "$WORK_DIR"
-cd "$WORK_DIR"
+FILE_ARGS=()
+PAGES_DIR=""
+RUN_SELF_TEST=false
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	-h | --help)
+		usage
+		exit 0
+		;;
+	--multiple | --content-split)
+		FILE_ARGS+=(--content-split)
+		shift
+		;;
+	--no-content-split)
+		FILE_ARGS+=(--no-content-split)
+		shift
+		;;
+	--keep-cache)
+		FILE_ARGS+=(--keep-cache)
+		shift
+		;;
+	--no-llm)
+		FILE_ARGS+=(--no-llm)
+		shift
+		;;
+	--pages-dir)
+		if [[ $# -lt 2 ]]; then
+			echo "ERROR: --pages-dir needs a directory."
+			exit 1
+		fi
+		PAGES_DIR="$2"
+		shift 2
+		;;
+	--self-test)
+		RUN_SELF_TEST=true
+		shift
+		;;
+	*)
+		echo "ERROR: unknown option $1"
+		usage
+		exit 1
+		;;
+	esac
+done
 
 FILE_PY="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/adf-ocr-file.py"
 if [[ ! -f "$FILE_PY" ]]; then
 	FILE_PY="$(command -v adf-ocr-file.py || true)"
 fi
-
-if command -v curl >/dev/null 2>&1; then
-	echo "=== Preloading ${LLM_MODEL} LLM ==="
-	curl -s -X POST "$LLM_SERVER_URL" -H "Content-Type: application/json" -d '{"model": "'"$LLM_MODEL"'"}' >/dev/null 2>&1
+if [[ ! -f "${FILE_PY}" ]]; then
+	echo "ERROR: adf-ocr-file.py not found next to adf-ocr.sh (install both to ~/.local/bin)."
+	exit 1
 fi
 
-echo "=== Starting continuous ADF scan ==="
+if [[ "${RUN_SELF_TEST}" == true ]]; then
+	exec python3 "$FILE_PY" --self-test
+fi
 
-last_successful_scan=""
-scan_started=$(date +%s)
+echo "=== EPSON ES-C320W Continuous Multi-Load Scanner with AI Naming ==="
 
-while true; do
-	if [[ -z "${SCAN_DEVICE}" ]]; then
-		if ! pick_scanner; then
-			echo "Retrying scanner detection in 2s..."
-			sleep 2
-			continue
+if [[ -n "${PAGES_DIR}" ]]; then
+	if [[ ! -d "${PAGES_DIR}" ]]; then
+		echo "ERROR: --pages-dir ${PAGES_DIR} is not a directory."
+		exit 1
+	fi
+	WORK_DIR="$(cd "${PAGES_DIR}" && pwd)"
+else
+	if ! command -v scanimage >/dev/null 2>&1; then
+		echo "ERROR: scanimage not found (install sane-utils)."
+		exit 1
+	fi
+
+	if ! pick_scanner; then
+		exit 1
+	fi
+
+	CACHE_ROOT="${XDG_CACHE_HOME:-$HOME/.cache}/adf-ocr"
+	mkdir -p "$CACHE_ROOT"
+	WORK_DIR="${CACHE_ROOT}/scan_$(date +%Y%m%d_%H%M%S)"
+	mkdir -p "$WORK_DIR"
+	cd "$WORK_DIR"
+
+	if command -v curl >/dev/null 2>&1; then
+		echo "=== Preloading ${LLM_MODEL} LLM ==="
+		curl -s -X POST "$LLM_SERVER_URL" -H "Content-Type: application/json" -d '{"model": "'"$LLM_MODEL"'"}' >/dev/null 2>&1
+	fi
+
+	echo "=== Starting continuous ADF scan ==="
+
+	last_successful_scan=""
+	scan_started=$(date +%s)
+
+	while true; do
+		if [[ -z "${SCAN_DEVICE}" ]]; then
+			if ! pick_scanner; then
+				echo "Retrying scanner detection in 2s..."
+				sleep 2
+				continue
+			fi
 		fi
-	fi
 
-	old_count=$(count_pages)
+		old_count=$(count_pages)
 
-	scan_cmd=(
-		scanimage
-		--batch="page_%04d.${SCAN_FORMAT}"
-		--format="${SCAN_FORMAT}"
-		--mode="${SCAN_MODE}"
-		--resolution="${SCAN_RESOLUTION}"
-		--batch-count=0
-		--batch-start="$((old_count + 1))"
-		-d "${SCAN_DEVICE}"
-	)
-	if [[ -n "${SELECTED_SOURCE}" ]]; then
-		scan_cmd+=(--source="${SELECTED_SOURCE}")
-	fi
-
-	scan_err=$(mktemp)
-	if ! "${scan_cmd[@]}" 2>"$scan_err"; then
-		if grep -qiE 'invalid argument|error during device i/o|device busy' "$scan_err"; then
-			echo "   Scan failed ($(tr '\n' ' ' <"$scan_err")). Re-detecting..."
-			FAILED_DEVICES+=("${SCAN_DEVICE}")
-			SCAN_DEVICE=""
-			SELECTED_SOURCE=""
-			rm -f "$scan_err"
-			sleep 2
-			continue
+		scan_cmd=(
+			scanimage
+			--batch="page_%04d.${SCAN_FORMAT}"
+			--format="${SCAN_FORMAT}"
+			--mode="${SCAN_MODE}"
+			--resolution="${SCAN_RESOLUTION}"
+			--batch-count=0
+			--batch-start="$((old_count + 1))"
+			-d "${SCAN_DEVICE}"
+		)
+		if [[ -n "${SELECTED_SOURCE}" ]]; then
+			scan_cmd+=(--source="${SELECTED_SOURCE}")
 		fi
-	fi
-	if [[ -s "$scan_err" ]]; then
-		# ADF empty / document-feeder out of documents is expected between loads.
-		grep -viE 'rounded value of br-' "$scan_err" || true
-	fi
-	rm -f "$scan_err"
 
-	new_count=$(count_pages)
-	scanned_this_batch=$((new_count - old_count))
+		scan_err=$(mktemp)
+		if ! "${scan_cmd[@]}" 2>"$scan_err"; then
+			if grep -qiE 'invalid argument|error during device i/o|device busy' "$scan_err"; then
+				echo "   Scan failed ($(tr '\n' ' ' <"$scan_err")). Re-detecting..."
+				FAILED_DEVICES+=("${SCAN_DEVICE}")
+				SCAN_DEVICE=""
+				SELECTED_SOURCE=""
+				rm -f "$scan_err"
+				sleep 2
+				continue
+			fi
+		fi
+		if [[ -s "$scan_err" ]]; then
+			# ADF empty / document-feeder out of documents is expected between loads.
+			grep -viE 'rounded value of br-' "$scan_err" || true
+		fi
+		rm -f "$scan_err"
 
-	if [[ "$scanned_this_batch" -gt 0 ]]; then
-		echo "   Scanned ${scanned_this_batch} page(s)"
-		last_successful_scan=$(date +%s)
-	else
-		echo "   ADF appears empty."
-	fi
+		new_count=$(count_pages)
+		scanned_this_batch=$((new_count - old_count))
 
-	current_time=$(date +%s)
-	if [[ -n "$last_successful_scan" ]] &&
-		[[ $((current_time - last_successful_scan)) -ge $MULTI_LOAD_TIMEOUT ]]; then
-		echo "   Timeout reached. Proceeding..."
-		break
-	fi
-	if [[ -z "$last_successful_scan" ]] &&
-		[[ $((current_time - scan_started)) -ge $MULTI_LOAD_TIMEOUT ]]; then
-		echo "   No pages after ${MULTI_LOAD_TIMEOUT}s. ADF stayed empty."
-		break
-	fi
-	sleep 5
-done
+		if [[ "$scanned_this_batch" -gt 0 ]]; then
+			echo "   Scanned ${scanned_this_batch} page(s)"
+			last_successful_scan=$(date +%s)
+		else
+			echo "   ADF appears empty."
+		fi
+
+		current_time=$(date +%s)
+		if [[ -n "$last_successful_scan" ]] &&
+			[[ $((current_time - last_successful_scan)) -ge $MULTI_LOAD_TIMEOUT ]]; then
+			echo "   Timeout reached. Proceeding..."
+			break
+		fi
+		if [[ -z "$last_successful_scan" ]] &&
+			[[ $((current_time - scan_started)) -ge $MULTI_LOAD_TIMEOUT ]]; then
+			echo "   No pages after ${MULTI_LOAD_TIMEOUT}s. ADF stayed empty."
+			break
+		fi
+		sleep 5
+	done
+fi
+
+cd "$WORK_DIR"
 
 # -------------------------- File and route --------------------------
 shopt -s nullglob
@@ -288,13 +374,10 @@ shopt -u nullglob
 
 if [[ ${#pages[@]} -eq 0 ]]; then
 	echo "ERROR: No pages scanned (ADF stayed empty)."
-	cd /
-	rm -rf "$WORK_DIR" 2>/dev/null || true
-	exit 1
-fi
-
-if [[ ! -f "${FILE_PY}" ]]; then
-	echo "ERROR: adf-ocr-file.py not found next to adf-ocr.sh (install both to ~/.local/bin)."
+	if [[ -z "${PAGES_DIR}" ]]; then
+		cd /
+		rm -rf "$WORK_DIR" 2>/dev/null || true
+	fi
 	exit 1
 fi
 
@@ -303,10 +386,12 @@ export MARGIN_TO_SHAVE BLUR_RADIUS FUZZ_PERCENT MIN_CONTENT_WIDTH MIN_CONTENT_HE
 export OCR_ROTATE_THRESHOLD LLM_SERVER_URL LLM_MODEL LLM_TEMPERATURE LLM_MAX_TOKENS LLM_TIMEOUT
 export SCAN_FORMAT SCAN_DUPLEX
 file_args=(python3 "$FILE_PY" --pages-dir "$WORK_DIR")
-if [[ "${SELECTED_SOURCE}" == "ADF Duplex" ]]; then
-	file_args+=(--duplex)
-else
-	file_args+=(--no-duplex)
+if [[ -z "${PAGES_DIR}" ]]; then
+	if [[ "${SELECTED_SOURCE}" == "ADF Duplex" ]]; then
+		file_args+=(--duplex)
+	else
+		file_args+=(--no-duplex)
+	fi
 fi
 if [[ -n "${ADF_OCR_TAXONOMY:-}" ]]; then
 	file_args+=(--taxonomy "$ADF_OCR_TAXONOMY")
@@ -320,21 +405,24 @@ fi
 case "${ADF_OCR_NO_LLM:-}" in
 1 | true | yes | on) file_args+=(--no-llm) ;;
 esac
+file_args+=("${FILE_ARGS[@]+"${FILE_ARGS[@]}"}")
 if ! "${file_args[@]}"; then
 	echo "ERROR: file-and-route failed. Pages kept in $WORK_DIR"
 	exit 1
 fi
 
-if [[ -f "$WORK_DIR/.keep" ]]; then
-	echo "=== Keeping scan cache (review or --keep-cache) ==="
+if [[ -f "$WORK_DIR/.keep" || -n "${PAGES_DIR}" ]]; then
+	echo "=== Keeping scan cache (review, --keep-cache, or --pages-dir) ==="
 	echo "   $WORK_DIR"
+	echo "======================================================================"
+	echo "DONE"
+	echo "======================================================================"
 else
 	echo "=== Cleaning up scan cache ==="
 	cd /
 	rm -rf "$WORK_DIR" 2>/dev/null || true
+	echo "======================================================================"
+	echo "DONE"
+	echo "   Cache removed: $WORK_DIR"
+	echo "======================================================================"
 fi
-
-echo "======================================================================"
-echo "DONE"
-echo "   Cache removed: $WORK_DIR"
-echo "======================================================================"
