@@ -63,7 +63,21 @@ class IdentitySubagentScanTests(unittest.TestCase):
             self.assertIn("ExampleSubjectName", proc.stdout)
             self.assertIn("notes.md", proc.stdout)
 
-    def test_skips_python_identifiers_by_default(self) -> None:
+    def test_prose_only_skips_python_identifiers(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "README.md").write_text(
+                "When accessing AWS, use IAM roles.\n", encoding="utf-8"
+            )
+            (root / "hook.py").write_text(
+                "class ParsedHit:\n    raise TypeError\n", encoding="utf-8"
+            )
+            proc = self._run(["--root", str(root), "--prose-only"], cwd=root)
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self.assertNotIn("ParsedHit", proc.stdout)
+            self.assertNotIn("hook.py", proc.stdout)
+
+    def test_default_includes_code_identifiers(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             (root / "README.md").write_text(
@@ -74,8 +88,8 @@ class IdentitySubagentScanTests(unittest.TestCase):
             )
             proc = self._run(["--root", str(root)], cwd=root)
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-            self.assertNotIn("ParsedHit", proc.stdout)
-            self.assertNotIn("hook.py", proc.stdout)
+            self.assertIn("ParsedHit", proc.stdout)
+            self.assertIn("hook.py", proc.stdout)
 
     def test_print_prompt(self) -> None:
         proc = self._run(["--print-prompt"])
