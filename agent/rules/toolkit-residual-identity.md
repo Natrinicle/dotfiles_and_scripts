@@ -7,7 +7,9 @@ paths:
 
 Hard gate on **toolkit** commits (a tree with `toolkit.yaml` / `TOOLKIT.md`,
 or `agent/skills/` + pack README). Shareable packs must not name real people,
-case parties, employers, personal domains, or emails.
+case parties, employers, personal domains, or emails. Examples,
+self-tests, and docs must use **synthetic** identifiers invented from
+scratch — not lightly masked real account/mail data.
 
 ## Before commit / push / `gh pr create` in a toolkit repo
 
@@ -21,10 +23,12 @@ case parties, employers, personal domains, or emails.
    email/home scan without a host file.
 3. `sanitize-copy.py` applies the same denylist at copy time (`{subject}`).
 4. Authoring: `scripts/identity-subagent-scan.py --root . --out FILE --ollama`
-   (local gemma4 `/api/generate`). If Ollama is down, spawn `local-extract` /
+   (local gemma4 `/api/generate`; **includes code/tests by default**, use
+   `--prose-only` to narrow). If Ollama is down, spawn `local-extract` /
    `explore` with the prompt plus bundle only — not `general-purpose`. Keep
    vendor-locked names (`When accessing AWS…`, GitHub, Docker, Traefik,
-   Flipper). Follow `hits` for people and specific employers. CI skips this pass.
+   Flipper). Follow `hits` for people, employers, and non-synthetic fixtures.
+   CI skips this pass.
 5. **Follow** hits: replace with `{subject}`, `{account}`, `{company}`,
    `{user}`, `{company_domain}`, or drop the sentence. Re-run until PASS.
 6. Do **not** put denylist tokens into the pack, the example YAML, tests, or
@@ -36,6 +40,9 @@ case parties, employers, personal domains, or emails.
 - Emails outside `example.com` / documented placeholders
 - Absolute `/home/<login>` and `/Users/<login>` except example/container
   logins (`alice`, `worker`, `node`, …). Keep `${HOME}`.
+- Non-synthetic `account number` digit runs in any text/code file
+- IMB-like mail barcodes whose id lacks a demo prefix (`9ZZ`, `9SYN`,
+  `9TEST`, `9DEMO`, `9SAMPLE`, `9FAKE`)
 
 Vendor-locked interface names already listed under README **Vendor-specific
 bits** stay. Forensic example lines use `{subject}` / `{account}`.

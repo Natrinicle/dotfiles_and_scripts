@@ -7,7 +7,8 @@ subagent with references/identity-subagent-prompt.md.
 
 Usage:
   identity-subagent-scan.py [--root DIR] [--out FILE] [--max-hits N]
-  identity-subagent-scan.py --root DIR --include-code   # also scan .py/.json
+  identity-subagent-scan.py --root DIR                  # prose + code (default)
+  identity-subagent-scan.py --root DIR --prose-only     # md/yaml/txt only
   identity-subagent-scan.py --root DIR --ollama         # classify via local gemma4
 """
 
@@ -152,8 +153,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--max-hits", type=int, default=100)
     parser.add_argument(
         "--include-code",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Scan code (.py/.json/…) as well as prose (default: on)",
+    )
+    parser.add_argument(
+        "--prose-only",
         action="store_true",
-        help="Also scan .py/.json (noisy; default is prose only)",
+        help="Scan prose only (md/yaml/txt); disables --include-code",
     )
     parser.add_argument(
         "--print-prompt",
@@ -187,7 +194,8 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     root = (args.root or Path.cwd()).resolve()
-    rows = collect_rows(root, max(1, args.max_hits), include_code=args.include_code)
+    include_code = False if args.prose_only else bool(args.include_code)
+    rows = collect_rows(root, max(1, args.max_hits), include_code=include_code)
     bundle = format_bundle(rows, max_hits=args.max_hits)
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)

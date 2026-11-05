@@ -62,3 +62,21 @@ Never copy values. Replace with:
   (dotfiles become dots again at install time via `install.sh`).
 - Keep category files for aliases.d (`git`, `network`, …).
 - Put employer-specific leftovers under `examples/` with `.example` suffix.
+
+
+## Fixtures and self-tests
+
+Invent **synthetic** examples from scratch. Do not paste real OCR, bank/HSA
+statements, credit-union mailers, barcodes, or lightly masked copies of them.
+
+| Need | Pack form |
+|------|-----------|
+| Account / member number in a test | Obviously fake digits (all same, `1234567890`, or leading `0000`) |
+| Mail barcode / IMB-like id | Demo prefix `9ZZ` / `9SYN` / `9TEST` / `9DEMO` / `9SAMPLE` / `9FAKE` |
+| Person or street in a mailer sample | Fictional (`Sampleton Resident`, `{subject}`) |
+| Issuer name in a classifier test | Fictional brand or public vendor you already document |
+
+Keep public interface/vendor names (`kubectl`, GitHub, AWS). Residual scan flags
+non-synthetic account numbers and non-allowlisted IMB-like tokens in the tree.
+Never commit host denylist tokens or the original sensitive strings into tests,
+docs, or example YAML.

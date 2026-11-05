@@ -2,7 +2,8 @@
 """Fail if toolkit files contain residual personal or company identity tokens.
 
 Hard gate before committing a shareable pack. Tokens live in a *host* denylist
-(not in the public pack) plus optional repo-local gitignored files.
+(not in the public pack) plus optional repo-local gitignored files. Also flags
+non-synthetic account numbers and mail IMB-like barcodes in fixtures/code.
 
 Usage:
   residual-identity-scan.py [--root DIR] [--denylist FILE] [FILE ...]
@@ -94,6 +95,48 @@ HOME_ALLOW_LOGINS = {
 PLACEHOLDER_MARKERS = ("{user}", "{company_domain}", "${HOME}", "$USER")
 
 
+# Self-test / example fixtures must use obviously synthetic account numbers and
+# allowlisted demo IMB prefixes. Do not paste real mail, bank, or HSA identifiers.
+ACCOUNT_NUMBER_RE = re.compile(
+    r"\baccount\s*numbers?\s*[#:]?\s*(\d{8,12})\b",
+    re.IGNORECASE,
+)
+IMB_HUMAN_RE = re.compile(
+    r"\b([A-Z0-9]{6,12})[ \-](\d{3,5})[ \-](\d{5,7})\b",
+)
+IMB_COMPACT_RE = re.compile(
+    r"\bimb:([A-Z0-9]{12,24})\b",
+    re.IGNORECASE,
+)
+# Demo IMB ids invented for pack self-tests (not USPS-assigned).
+IMB_ALLOW_PREFIXES = (
+    "9ZZ",
+    "9SYN",
+    "9TEST",
+    "9DEMO",
+    "9SAMPLE",
+    "9FAKE",
+)
+
+
+def account_number_is_synthetic(digits: str) -> bool:
+    if len(digits) < 8:
+        return True
+    if len(set(digits)) == 1:
+        return True
+    if digits in {"1234567890", "0123456789", "9876543210", "0987654321"}:
+        return True
+    if digits.startswith("0000"):
+        return True
+    return False
+
+
+def imb_id_is_synthetic(token: str) -> bool:
+    upper = token.upper()
+    return any(upper.startswith(p) for p in IMB_ALLOW_PREFIXES)
+
+
+
 def should_skip_file(path: Path, root: Path) -> bool:
     try:
         rel = path.relative_to(root)
@@ -181,6 +224,7 @@ def scan_text(
     *,
     check_email: bool,
     check_home: bool,
+    check_fixtures: bool = True,
 ) -> list[tuple[int, str, str]]:
     """Return (lineno, kind, redacted_snippet) hits."""
     hits: list[tuple[int, str, str]] = []
@@ -189,6 +233,25 @@ def scan_text(
             m = token_re.search(line)
             if m:
                 hits.append((i, "denylist", redact(line, m.group(0))))
+                continue
+        if check_fixtures:
+            acct = ACCOUNT_NUMBER_RE.search(line)
+            if acct and not account_number_is_synthetic(acct.group(1)):
+                hits.append(
+                    (i, "fixture-account", redact(line, acct.group(1)))
+                )
+                continue
+            imb = IMB_HUMAN_RE.search(line)
+            if imb and not imb_id_is_synthetic(imb.group(1)):
+                hits.append(
+                    (i, "fixture-imb", redact(line, imb.group(0)))
+                )
+                continue
+            compact = IMB_COMPACT_RE.search(line)
+            if compact and not imb_id_is_synthetic(compact.group(1)):
+                hits.append(
+                    (i, "fixture-imb", redact(line, compact.group(0)))
+                )
                 continue
         if check_email:
             for em in EMAIL_RE.findall(line):
@@ -232,7 +295,11 @@ def scan_paths(
         except ValueError:
             rel = path
         for lineno, kind, snippet in scan_text(
-            text, token_re, check_email=check_email, check_home=check_home
+            text,
+            token_re,
+            check_email=check_email,
+            check_home=check_home,
+            check_fixtures=True,
         ):
             reports.append(f"{rel}:{lineno}:{kind}: {snippet}")
     return reports
@@ -280,6 +347,50 @@ def self_test() -> int:
         print(
             f"self-test: unexpected example-home hits {allowed_home}", file=sys.stderr
         )
+        return 1
+    # Build negative examples at runtime so this source file stays scan-clean.
+    bad_digits = "4099" + "123477"
+    bad_acct = scan_text(
+        f"sample account number {bad_digits} in a fixture\n",
+        token_re,
+        check_email=False,
+        check_home=False,
+        check_fixtures=True,
+    )
+    if not any(h[1] == "fixture-account" for h in bad_acct):
+        print("self-test: expected fixture-account hit", file=sys.stderr)
+        return 1
+    good_acct = scan_text(
+        "sample account number " + ("2" * 10) + " in a fixture\n"
+        "account number 1234567890 also synthetic\n",
+        token_re,
+        check_email=False,
+        check_home=False,
+        check_fixtures=True,
+    )
+    if good_acct:
+        print(f"self-test: unexpected synthetic-account hits {good_acct}", file=sys.stderr)
+        return 1
+    bad_imb_id = "9ABCD" + "EF1"
+    bad_imb = scan_text(
+        f"mailer {bad_imb_id} 0004 001234\nimb:{bad_imb_id}0004001234\n",
+        token_re,
+        check_email=False,
+        check_home=False,
+        check_fixtures=True,
+    )
+    if not any(h[1] == "fixture-imb" for h in bad_imb):
+        print("self-test: expected fixture-imb hit", file=sys.stderr)
+        return 1
+    good_imb = scan_text(
+        "mailer 9ZZDEMOA 0004 001111\nimb:9ZZDEMOA0004001111\n",
+        token_re,
+        check_email=False,
+        check_home=False,
+        check_fixtures=True,
+    )
+    if good_imb:
+        print(f"self-test: unexpected synthetic-imb hits {good_imb}", file=sys.stderr)
         return 1
     print("self-test: ok")
     return 0

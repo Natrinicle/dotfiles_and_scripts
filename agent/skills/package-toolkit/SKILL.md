@@ -109,6 +109,20 @@ Never pack:
 - Company-specific LDAP/SSO helpers that cannot be abstracted — either drop or
   replace with `examples/*.example` using placeholders
 
+## Fixtures and self-tests (synthetic from scratch)
+
+Examples, self-tests, docs, and sample OCR/mail strings must be **invented
+synthetic data**, not reversible masks of real personal, company, account, or
+mail identifiers. Do not paste live ADF scans, bank/HSA statements, or
+credit-union mailers into the pack.
+
+- Use obviously fake account digits (all same digit, `1234567890`, leading `0000`)
+- Use demo IMB prefixes listed under residual scan
+- Use fictional people/places (`Sampleton Resident`) or `{subject}` / `{account}`
+- Keep task-specific **public** vendor/API names and documented Vendor-specific bits
+- Do **not** commit host denylist tokens or the original sensitive strings into
+  tracked tests, docs, or example YAML — see `references/abstraction-rules.md`
+
 ## Residual scan (required before commit)
 
 Hard gate. From the pack root:
@@ -135,6 +149,10 @@ Also search the tree for:
 - Absolute homes (`/home/…`, `/Users/…`) except in docs explaining `${HOME}`
 - Hard-coded profile IDs (Firefox profile dirs)
 - Tokens, passphrases, private keys
+- **Non-synthetic fixture identifiers** in code/tests/docs: `account number`
+  digit runs that are not obviously fake, and IMB-like mail barcodes whose id
+  does not use a demo prefix (`9ZZ` / `9SYN` / `9TEST` / `9DEMO` / `9SAMPLE` /
+  `9FAKE`)
 
 If any hit is intentional vendor text, document it in README under
 **Vendor-specific bits**. Case-party names in forensic example lines are not
@@ -147,7 +165,7 @@ After the residual scan PASSes, hunt names the denylist missed. CI skips this.
 ```bash
 python3 agent/skills/package-toolkit/scripts/identity-subagent-scan.py \
   --root . --out /tmp/identity-bundle.md
-# prose (md/yaml) by default; --include-code adds .py/.json
+# default includes CODE/tests (.py/.json) as well as prose; --prose-only to narrow
 ```
 
 Classify the bundle on a **local** model. Prefer:

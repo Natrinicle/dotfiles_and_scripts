@@ -233,6 +233,64 @@ class ResidualIdentityScanTests(unittest.TestCase):
             )
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
 
+    def test_flags_nonsynthetic_account_and_imb(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            denylist = root / "denylist.yaml"
+            denylist.write_text("forbidden:\n  - AcmeCorpXYZ\n", encoding="utf-8")
+            dirty = root / "fixture_selftest.py"
+            # Temp file holds the bad patterns; this test source stays scan-clean.
+            bad_acct = "4099" + "123477"
+            bad_imb = "9ABCD" + "EF1"
+            dirty.write_text(
+                f'text = "account number {bad_acct}"\n'
+                f'mail = "{bad_imb} 0004 001234"\n',
+                encoding="utf-8",
+            )
+            proc = self._run(
+                [
+                    "--root",
+                    str(root),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                    str(dirty),
+                ],
+                cwd=root,
+            )
+            self.assertEqual(proc.returncode, 1, proc.stdout + proc.stderr)
+            self.assertTrue(
+                "fixture-account" in proc.stderr or "fixture-imb" in proc.stderr,
+                proc.stderr,
+            )
+            self.assertNotIn(bad_acct, proc.stderr)
+
+    def test_allows_synthetic_account_and_demo_imb(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            denylist = root / "denylist.yaml"
+            denylist.write_text("forbidden:\n  - AcmeCorpXYZ\n", encoding="utf-8")
+            clean = root / "fixture_selftest.py"
+            clean.write_text(
+                'text = "account number 2222222222"\n'
+                'mail = "9ZZDEMOA 0004 001111"\n'
+                'compact = "imb:9ZZDEMOA0004001111"\n',
+                encoding="utf-8",
+            )
+            proc = self._run(
+                [
+                    "--root",
+                    str(root),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                    str(clean),
+                ],
+                cwd=root,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+
+
 
 if __name__ == "__main__":
     unittest.main()

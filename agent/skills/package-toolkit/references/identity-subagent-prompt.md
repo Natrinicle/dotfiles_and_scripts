@@ -26,6 +26,13 @@ listed in the pack README **Vendor-specific bits** table.
 Replace person names, employer/customer names, personal shops/domains, and
 other leftover PII that is not a public tool/cloud/OSS interface.
 
+Bundles now include **code and self-test fixtures** by default. Flag real
+personal names, company names, account numbers, and mail identifiers in
+examples/tests/docs. Keep public vendor/API names and obvious fictional
+placeholders (`Alice Example`, all-same-digit sample accounts,
+`9ZZ…` demo IMB prefixes). Do **not** invent fixtures by lightly masking
+real OCR/mail — invent synthetic data from scratch.
+
 Documented fake examples used to describe the example denylist (`Alice Example`,
 `Acme Corp`) stay.
 
