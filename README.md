@@ -50,6 +50,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
     ├── mempalace-multi-rw/            # Qdrant + HTTP hub + write daemon (copy yourself)
     ├── n8n/                           # Traefik n8n.localhost compose example (copy yourself)
     ├── rea-mcp/                       # REA MCP client snippets (Claude JSON / Grok TOML)
+    ├── craft-anything-mcp/            # Craft Anything CLI MCP snippets (copy yourself)
     └── pandoc_templates/
 ```
 
@@ -182,8 +183,9 @@ compiled-app unpack (`reverse-engineering-protocols`, then
 `decompile-mobile-app` / `decompile-firmware`),
 shipped-artifact RE via Reverse Engineer Anything (`reverse-engineer-anything`,
 REA MCP `rea-agents`; skill snapshot v42 / package 6.5.0),
-clean-room reconstruct (`clean-room-reconstruct`: SPEC.md → rebuild →
-oracle → retry; inner check is `loop-until-green`),
+clean-room reconstruct (`clean-room-reconstruct`: four rules, SPEC.md →
+rebuild → oracle → retry; optional Craft Anything engine; inner check is
+`loop-until-green`),
 printable pages (`printable-webpage`),
 Meld-style side-by-side diffs plus dyff for YAML/JSON (`meld-style-diff`),
 illustrated brochures (`illustrated-brochure`, landscape PDF with Dia and Graphviz),
@@ -340,6 +342,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 | Calendar | Optional via `CALENDAR_CMD` or `CALENDAR_ICS_URL` (see morning-data-gather) |
 | RPerks runner | Node, Chromium (`CHROME_PATH` or `/usr/bin/chromium`), `npm install --omit=dev` in the app dir |
 | Reverse Engineer Anything | Node.js + `npx -y rea-agents@6.5.0 mcp`. Optional engines (Hopper, Ghidra, JADX, IDA) are caller-supplied; REA setup does not install them. Client snippets: `examples/rea-mcp/` |
+| Craft Anything | Optional reconstruct engine (`craft-anything-cli mcp`). Early alpha; own-copy only. Client snippets: `examples/craft-anything-mcp/`. `install.sh` does not register it. |
 
 ## What is intentionally excluded
 

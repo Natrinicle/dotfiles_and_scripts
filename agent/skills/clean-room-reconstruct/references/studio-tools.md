@@ -15,6 +15,7 @@ table. Do not grow this file into a GitHub list.
 | Recorded traffic / packets | REA `inspect_web_network_capture` / `inspect_packet_capture` |
 | Hex / pattern decode | REA native / firmware guides |
 | Reconstruct until oracle match | **clean-room-reconstruct** |
+| Optional reconstruct engine (clean-room default / Deep) | Craft Anything CLI/MCP (`craft-anything-cli`) — same skill |
 
 Inner retry is **loop-until-green**. Parallel independent claims are
 **agent-graphs**.

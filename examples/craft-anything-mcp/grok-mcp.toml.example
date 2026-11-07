@@ -1,0 +1,9 @@
+# Vendor-specific: Craft Anything.
+# Requires craft-anything-cli on PATH (or AppImage --cli mcp).
+# Copy into ~/.grok/config.toml. Do not register unless you named it.
+
+[mcp_servers.craft-anything]
+command = "craft-anything-cli"
+args = ["mcp"]
+enabled = true
+startup_timeout_sec = 60

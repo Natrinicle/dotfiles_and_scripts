@@ -238,6 +238,8 @@ selected provider. Do not treat those scopes as interchangeable.
 ## Work summary-first
 
 Start with the default result and use its inline Evidence and graph context.
+Map with overview, strings, and xref counts before decompiling. Hottest
+xref functions first; skip a full dump.
 For a JavaScript application or ELF layout whose size is unknown or large,
 call `analyze_javascript_application` or `inspect_binary_layout` with
 `"detail": "summary"`, then inspect the retained `parent_evidence_id` with

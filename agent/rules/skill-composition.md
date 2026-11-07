@@ -60,10 +60,12 @@ unrelated media or artifact kinds.
     Landing stays **ask-before-remote-actions**. Do not grow
     **subagents-first** into graph topology.
 11. **Reconstruct vs unpack vs REA MCP** → **clean-room-reconstruct** for
-    SPEC.md → rebuild → oracle → retry. Unpack classification stays
-    **reverse-engineering-protocols**. Shipped-artifact analysis stays
-    **reverse-engineer-anything**. Inner retry is **loop-until-green**.
-    Do not dump a studio catalog of GitHub URLs into any of those skills.
+    SPEC.md → rebuild → oracle → retry (four rules; spec writer ≠
+    implementer). Optional engine: Craft Anything (clean-room default /
+    Deep). Unpack classification stays **reverse-engineering-protocols**.
+    Shipped-artifact analysis stays **reverse-engineer-anything**. Inner
+    retry is **loop-until-green**. Do not dump a studio catalog of GitHub
+    URLs (Craft app suite included) into any of those skills.
 12. **Repeatable host procedure vs thought loop** → **prefer-helper-scripts**.
     If pinentry, dialogs, session dbus, or any **more-than-one-command** host
     sequence can be a shell script, write or call that helper. Do not spawn a

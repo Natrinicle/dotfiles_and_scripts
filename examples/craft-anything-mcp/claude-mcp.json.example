@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "craft-anything": {
+      "command": "craft-anything-cli",
+      "args": ["mcp"]
+    }
+  }
+}
