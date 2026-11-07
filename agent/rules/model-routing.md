@@ -27,7 +27,8 @@ Spawn `explore` or `code-explorer` when the next work is:
 - File search over **multiple locations** or an unknown forest
 - Extract/summarize from a large file on disk
 
-A single `rg` / `grep` of one tree stays on the parent.
+A single `rg` / `grep` of one tree, or one command piped into grep, stays
+on the parent.
 
 Tool-free T0 text **already in context** → a short local generate (no explore
 child). See skill `skill-router`.
@@ -37,14 +38,16 @@ files that exist: redo on the parent or `general-purpose`. Keep the local
 result when it is usable.
 
 Skip the child when the user named 1–2 exact files, the next step is one
-`rg`/`grep` of one tree, or the work is a single helper, MCP / browser /
-review / judgment call the parent is already doing.
+`rg`/`grep` of one tree or a command piped into grep, or the work is a
+single helper, MCP / browser / review / judgment call the parent is
+already doing.
 
 Offload: rule **subagents-first**. Spawn for software install that includes
 config and service files, multi-location search, decompile, large extract,
 multi-file implementation. Parent summarizes and verifies. Hook
 `prefer-spawn-search` **denies** forest and multi-location search; a single
-`rg` of one tree stays on the parent. One large unit → `spawn_subagent`.
+`rg` of one tree, or a command piped into grep, stays on the parent. One
+large unit → `spawn_subagent`.
 Several units that do not share a window → skill **agent-graphs**.
 
 ## Grok CLI short-circuit

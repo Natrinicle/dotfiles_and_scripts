@@ -11,22 +11,25 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
   `toolkit-residual-identity`,
   `expected-value`, `agent-graphs`, `cups-custom-backend`, `mempalace-compact-filing`,
   `claim-source-check`.
-- **Skills** (100) covering packaging, scanners, PII detection, MemPalace,
+- **Skills** (101) covering packaging, scanners, PII detection, MemPalace,
   Flipper IR, compiled-app unpack, forensic cores plus thin server companions,
   expected-value spend gate, agent graphs (`agent-graphs` / `loop-until-green`),
   clean-room reconstruct (`clean-room-reconstruct`),
   leftover account sessions (`leftover-account-sessions`),
+  Kubernetes control-plane WAN gate (`k8s-control-plane-vpn`),
   CUPS custom-backend persist, claim-source-check,
   and workflow helpers.
 - **Hooks** — `agent/hooks/` copies into `{AGENT_HOME}/hooks/`. Register in
-  host `settings.json` (see `hooks/README.md`).
+  host `settings.json` (see `hooks/README.md`). Includes
+  `control-plane-exposure.py` and `prefer-spawn-search.py`.
 - **Writing style** — `nate-writing-style` ships `{user}` placeholder voice
   notes and a multi-party isolation rule. Replace the reference file with your
   own. Directory name is kept for install-path stability.
 - **Screenshot style tracker** — careful attribution required.
 
-`court-case-monitor`, product bootcamps, and host-only k8s/ops skills stay
-out of this pack. See `examples/EXCLUDED.md`.
+`court-case-monitor`, product bootcamps, and host-only k8s/ops skills
+(CNI, PVC, Helm, …) stay out of this pack. Generic
+`k8s-control-plane-vpn` is packed. See `examples/EXCLUDED.md`.
 
 ## Install
 
