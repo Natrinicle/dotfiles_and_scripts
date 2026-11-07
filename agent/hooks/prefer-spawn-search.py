@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""PreToolUse gate: unknown-path search belongs in a child, not the parent.
+"""PreToolUse gate: forest and multi-location search belongs in a child.
 
-Denies wide grep/list/rg on the parent. Named-file grep stays allowed.
-Fail-open on parse errors. Escape: SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1.
+Allows a single rg/grep/find/list of one tree (including a git repo root).
+Denies $HOME, /, ~/repos, missing-path workspace hunt, and two+ directory
+operands. Fail-open on parse errors. Escape: SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1.
 """
 
 from __future__ import annotations
@@ -55,17 +56,17 @@ FLAGS_WITH_ARG = frozenset(
 )
 
 BLOCK_REASON = (
-    "Parent unknown-path search is blocked (rule subagents-first, hook "
-    "prefer-spawn-search). Do not grep, list, or rg the tree here.\n"
-    "Pick a shape, then run it:\n"
-    "- One child-capable unit (one search, one extract, one implementation "
-    "slice) → spawn_subagent. On Grok Build omit subagent_type (cloud "
-    "general-purpose). Do not pin plugin explorers to ollama-gemma4.\n"
-    "- Several units that do not consume each other's output, or a gate / "
-    "named output between steps → skill agent-graphs (workflow agent-graph). "
+    "Parent forest or multi-location search is blocked (rule subagents-first, "
+    "hook prefer-spawn-search). A single rg/grep/find/list of one tree belongs "
+    "on the parent: spawn tax plus re-ingest exceeds running the command.\n"
+    "Spawn when:\n"
+    "- Searching several locations ($HOME, ~/repos, two+ trees)\n"
+    "- Installing software including config and service files\n"
+    "- Large extract, decompile, or multi-file implementation\n"
+    "Several independent units → skill agent-graphs (workflow agent-graph). "
     "Inner retry is loop-until-green. Bug hunt stays find-patch-loop.\n"
-    "- User named 1–2 exact files → retry this tool with those file paths.\n"
-    "Parent keeps: ask the user, land commit/push/server, synthesize, verify. "
+    "More than a single command: prefer a helper script "
+    "(rule prefer-helper-scripts).\n"
     "Escape hatch: SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1."
 )
 
@@ -101,9 +102,9 @@ def _allow_parent_search() -> bool:
     }
 
 
-def _wide_roots() -> set[Path]:
+def _forest_roots() -> set[Path]:
     home = Path.home()
-    return {home, home / ".grok", home / ".claude", home / "repos", Path("/")}
+    return {home, home / "repos", Path("/")}
 
 
 def _resolve(path: str) -> Path:
@@ -120,20 +121,11 @@ def _is_file(path: str) -> bool:
         return False
 
 
-def _is_git_toplevel(resolved: Path) -> bool:
-    return (resolved / ".git").exists()
-
-
 def _is_wide_dir(path: str) -> bool:
     raw = path.strip()
     if raw in {"", ".", "..", "~", "/"}:
         return True
-    resolved = _resolve(raw)
-    if resolved in _wide_roots():
-        return True
-    if resolved.is_file():
-        return False
-    return bool(resolved.is_dir() and _is_git_toplevel(resolved))
+    return _resolve(raw) in _forest_roots()
 
 
 def _deny_payload() -> dict[str, Any]:
@@ -218,13 +210,16 @@ def is_wide_shell(command: str) -> bool:
         positionals = _positionals(body)
         if binary == "find":
             start = positionals[0] if positionals else "."
-            if _is_wide_dir(start) or not _is_file(start):
+            if _is_wide_dir(start):
                 return True
             continue
         paths = positionals[1:]
         if not paths:
             return True
-        if any(not _is_file(path) for path in paths):
+        if any(_is_wide_dir(path) for path in paths):
+            return True
+        dir_paths = [path for path in paths if not _is_file(path)]
+        if len(dir_paths) > 1:
             return True
     return False
 
@@ -236,8 +231,6 @@ def is_wide_search(tool: str, tool_input: dict[str, Any]) -> bool:
         command = str(_first(tool_input, "command", "cmd", default="") or "")
         return is_wide_shell(command)
     glob = str(_first(tool_input, "glob", default="") or "")
-    if "**" in glob:
-        return True
     path = str(
         _first(
             tool_input,
@@ -248,13 +241,13 @@ def is_wide_search(tool: str, tool_input: dict[str, Any]) -> bool:
         )
         or ""
     ).strip()
+    if "**" in glob and (not path or _is_wide_dir(path)):
+        return True
     if not path:
         return tool in GREP_TOOLS or tool in {"Glob", "glob"}
     if _is_file(path):
         return False
-    if tool in LIST_TOOLS:
-        return _is_wide_dir(path)
-    return True
+    return _is_wide_dir(path)
 
 
 def decide(event: dict[str, Any]) -> dict[str, Any] | None:

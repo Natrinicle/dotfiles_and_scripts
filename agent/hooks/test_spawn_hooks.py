@@ -75,18 +75,41 @@ class PreferSpawnSearchTests(unittest.TestCase):
     def test_globstar_is_wide(self) -> None:
         self.assertTrue(SEARCH.is_wide_search("Glob", {"glob": "**/*.md"}))
 
-    def test_directory_grep_is_wide(self) -> None:
-        self.assertTrue(
+    def test_directory_grep_is_not_wide(self) -> None:
+        self.assertFalse(
             SEARCH.is_wide_search("grep", {"path": str(HOOKS), "pattern": "x"})
         )
 
-    def test_git_toplevel_grep_is_wide(self) -> None:
+    def test_git_toplevel_grep_is_not_wide(self) -> None:
         repo = HOOKS
         while repo != repo.parent and not (repo / ".git").exists():
             repo = repo.parent
         self.assertTrue((repo / ".git").exists())
-        self.assertTrue(
+        self.assertFalse(
             SEARCH.is_wide_search("grep", {"path": str(repo), "pattern": "x"})
+        )
+
+    def test_list_dir_git_toplevel_is_not_wide(self) -> None:
+        repo = HOOKS
+        while repo != repo.parent and not (repo / ".git").exists():
+            repo = repo.parent
+        self.assertFalse(
+            SEARCH.is_wide_search("list_dir", {"target_directory": str(repo)})
+        )
+
+    def test_repos_dir_is_wide(self) -> None:
+        repos = Path.home() / "repos"
+        if not repos.is_dir():
+            self.skipTest("~/repos is not a directory")
+        self.assertTrue(
+            SEARCH.is_wide_search("grep", {"path": str(repos), "pattern": "x"})
+        )
+
+    def test_globstar_scoped_to_one_tree_is_not_wide(self) -> None:
+        self.assertFalse(
+            SEARCH.is_wide_search(
+                "Glob", {"glob": "**/*.md", "target_directory": str(HOOKS)}
+            )
         )
 
     def test_list_dir_of_hooks_is_not_wide(self) -> None:
@@ -112,6 +135,33 @@ class PreferSpawnSearchTests(unittest.TestCase):
             SEARCH.is_wide_search("Bash", {"command": f"rg prefer-spawn-search {path}"})
         )
 
+    def test_shell_rg_one_dir_is_not_wide(self) -> None:
+        self.assertFalse(
+            SEARCH.is_wide_search(
+                "Bash", {"command": f"rg prefer-spawn-search {HOOKS}"}
+            )
+        )
+
+    def test_shell_rg_two_dirs_is_wide(self) -> None:
+        other = HOOKS.parent
+        self.assertTrue(
+            SEARCH.is_wide_search(
+                "Bash", {"command": f"rg prefer-spawn-search {HOOKS} {other}"}
+            )
+        )
+
+    def test_find_one_dir_is_not_wide(self) -> None:
+        self.assertFalse(
+            SEARCH.is_wide_search("run_terminal_command", {"command": f"find {HOOKS}"})
+        )
+
+    def test_find_home_is_wide(self) -> None:
+        self.assertTrue(
+            SEARCH.is_wide_search(
+                "run_terminal_command", {"command": f"find {Path.home()}"}
+            )
+        )
+
     def test_shell_git_status_is_not_wide(self) -> None:
         self.assertFalse(
             SEARCH.is_wide_search("run_terminal_command", {"command": "git status -sb"})
@@ -123,9 +173,10 @@ class PreferSpawnSearchTests(unittest.TestCase):
         self.assertEqual(result["decision"], "block")
         self.assertEqual(result["hookSpecificOutput"]["permissionDecision"], "deny")
         reason = result["reason"]
-        self.assertIn("spawn_subagent", reason)
+        self.assertIn("spawn tax", reason)
         self.assertIn("agent-graphs", reason)
         self.assertIn("loop-until-green", reason)
+        self.assertIn("prefer-helper-scripts", reason)
 
     def test_named_file_decide_is_none(self) -> None:
         path = Path(__file__).resolve()

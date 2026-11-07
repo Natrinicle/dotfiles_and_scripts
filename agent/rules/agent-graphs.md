@@ -15,9 +15,10 @@ Layers stack. They do not replace each other: prompt → context → harness
 When several units do not consume each other's output, or a gate / named
 output sits between steps, this layer is the better shape than one
 `spawn_subagent`. One unit still uses `spawn_subagent` (rule
-**subagents-first**). Parent-wide grep / list / `rg` is **denied** by
-hook `prefer-spawn-search`; do not search the tree on the parent to
-feed the graph.
+**subagents-first**). Forest / multi-location grep / list / `rg` is
+**denied** by hook `prefer-spawn-search`. A single `rg` of one tree may
+run on the parent. Do not dump several trees into the parent to feed
+the graph.
 
 ## Shape
 

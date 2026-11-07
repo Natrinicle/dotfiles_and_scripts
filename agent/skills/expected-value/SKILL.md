@@ -75,8 +75,10 @@ tier; local is the strongest compact hedge. Escalate once if the cheap child
 is empty or shallow.
 
 Low `C_rem` makes a scoped child high value (protects the bankroll).
-Unknown-path search, large-file extract, decompile: `C_parent_do` is large →
-spawn (agrees with `subagents-first`).
+One `rg` of one tree: `C_prompt + C_reingest` exceeds the hits → parent
+(agrees with `subagents-first`). Multi-location search, large-file extract,
+decompile, software install with config+units: `C_parent_do` is large →
+spawn.
 T0 text already in context: `C_inject` of explore is large → direct generate
 (`skill-router`).
 `N` parallel cloud children: each may be +EV alone; the book is −EV when
@@ -87,9 +89,9 @@ lowers `p`. Shrink the brief (`local-brief`) or pick a bigger window.
 
 ## When to run the numbers
 
-Cached +EV (no spreadsheet): palace query, named-file read, one grep,
-direct local generate, the default local `explore` / `code-explorer` for
-unknown-path search.
+Cached +EV (no spreadsheet): palace query, named-file read, one grep of
+one tree, direct local generate, helper script. Local `explore` /
+`code-explorer` for multi-location unknown-path search.
 
 Run the 4-number check (`p`, `s`, `b`, binding resource) before:
 
@@ -120,7 +122,8 @@ skill.
 | Situation | Binding | Call |
 |-----------|---------|------|
 | Palace already has the GATT map | tokens + time | Skip re-decompile |
-| Unknown-path “where is X” | context-window | Local explore (`C_parent_do` ≫ `C_reingest`) |
+| One-tree “where is X” | tokens | Parent `rg` of that tree |
+| Multi-location “where is X” | context-window | Local explore (`C_parent_do` ≫ `C_reingest`) |
 | Parent context 80% full, large extract | context-window + compact | Spawn scoped cheap/local child |
 | Four cloud advocates for a typo | USD + time | Skip court (`decision-judge` no-tradeoff) |
 | User said run the full suite | named bet | Run it |
@@ -134,7 +137,8 @@ skill.
 |--------|---------|
 | “It's only tokens, not money” | Tokens, context-window, and parent compaction are ledger rows |
 | “Spawn is free on local” | Child fill + re-ingest + wait are not free; local compact is |
-| “Context is already here, I'll grep” | Parent-do grows the expensive window; next compact is in+out at parent rate; spawn a cheap/local child |
+| “I'll spawn a child to rg this dir” | Spawn tax + re-ingest exceeds one rg; parent runs the command |
+| “Context is already here, I'll grep several trees” | Multi-location search still dumps the expensive window; spawn a cheap/local child |
 | “Compaction is automatic, keep it on the parent” | Compaction is a billed parent pass (`C_compact_parent`) |
 | “Spawn a cloud T3 child to save compact” | Child work is still billed; the hedge is cheap/local plus small `C_reingest` |
 | “One more child just in case” | Extra child needs its own edge |
@@ -145,7 +149,7 @@ skill.
 ## Related
 
 - `model-routing` / `model-router` / `skill-router` — which model (cheapest viable child; local is the compact hedge)
-- `subagents-first` — child-capable work goes to a child; this skill scores that spawn's context-window and parent compaction
+- `subagents-first` — large child-capable work goes to a child; one `rg` of one tree stays on the parent; this skill scores that spawn's context-window and parent compaction
 - `mempalace-compact-filing` — durability hedge: file necessary pieces to MemPalace before compact so later `C_reingest` is a palace lookup. This skill scores the compact **cost** (`C_compact_parent`); that rule owns filing.
 - `decision-judge` — user-facing A vs B court (skip when no tradeoff)
 - `agent-graphs` / `loop-until-green` — shape of multi-agent work and the inner programmable check; this skill still scores each spawn

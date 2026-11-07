@@ -32,9 +32,9 @@ Use the parent for:
 
 Use local Ollama when the work is extract / classify / summarize of
 **already-in-context** text, or a pinned light subagent. The always-on
-`model-routing` rule requires spawning `explore` / `code-explorer` for code
-exploration and file search over unknown paths — do that before a parent
-grep/read loop.
+`model-routing` rule requires spawning `explore` / `code-explorer` for
+architecture mapping, multi-location search, and large-file extract. A
+single `rg` / `grep` of one tree stays on the parent.
 
 | Path | When |
 |------|------|
@@ -72,6 +72,7 @@ local pins have no automatic small-cloud fallback; Claude T0 curl does.
 
 - Switching the interactive parent to Ollama for a tool-using task
 - Spawning `explore` for tool-free T0 text (instruction-injection tax)
-- Parent running a 3+ step grep/read discovery loop that `explore` /
-  `code-explorer` should have done
+- Parent running a 3+ step grep/read discovery loop **across several
+  trees** that `explore` / `code-explorer` should have done
+- Spawning `explore` to run one `rg` of one tree (instruction-injection tax)
 - Pinning `plan`, `general-purpose`, or reviewers to 8B local

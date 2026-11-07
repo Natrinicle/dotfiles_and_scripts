@@ -7,7 +7,8 @@ paths:
 
 When a host procedure is a **repeatable sequence** (pinentry, dialogs, session
 dbus, PATH bootstrapping, retries around a local binary), **do not re-derive
-it in the parent thought loop**.
+it in the parent thought loop**. Look for a helper **before** inlining or
+spawning a child to run the same steps.
 
 **Do this first:**
 
@@ -15,9 +16,15 @@ it in the parent thought loop**.
    helper.
 2. If it exists, **call it**. Do not inline the same kdialog / pinentry /
    KWin / loopback steps as a one-off compound command.
-3. If it is missing and you are about to reconstruct **3+** of those steps,
-   **write the helper this turn**, copy it into the general pack `bin/` plus
-   `{AGENT_HOME}/scripts/` (and `~/.local/bin`), then call it.
+3. If the work is **more than a single command**, strongly consider writing a
+   helper this turn, then call it. Copy it into the general pack `bin/` plus
+   `{AGENT_HOME}/scripts/` (and `~/.local/bin`).
+4. If it is missing and you are about to reconstruct **3+** of those steps,
+   **write the helper this turn** (same copy path), then call it.
+
+Do not spawn a subagent only to run a short command sequence a helper should
+own. A single command (`rg`, `systemctl status`, `git status`) stays on the
+parent (rule `subagents-first`).
 
 ## Git GPG commits
 

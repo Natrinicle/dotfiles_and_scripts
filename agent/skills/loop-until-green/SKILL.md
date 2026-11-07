@@ -15,9 +15,10 @@ Without something that can fail the work while the user is out of the
 room, this is a scheduler, not a loop.
 
 Graph topology (which units exist, what runs together) is **agent-graphs**.
-This skill is **one unit**. Parent-wide grep / list / `rg` is **denied**
-by hook `prefer-spawn-search`; do not search the tree on the parent to
-feed a loop.
+This skill is **one unit**. Forest / multi-location grep / list / `rg` is
+**denied** by hook `prefer-spawn-search`. A single `rg` of one tree may
+run on the parent. Do not dump several trees into the parent to feed a
+loop.
 
 **REQUIRED:** **independent-checker** — the producer does not grade the
 check. Another model saying "looks good" is two optimists agreeing.
