@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 """PreToolUse gate: forest and multi-location search belongs in a child.
 
-Allows a single rg/grep/find/list of one tree (including a git repo root).
-Denies $HOME, /, ~/repos, missing-path workspace hunt, and two+ directory
-operands. Fail-open on parse errors. Escape: SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1.
+Allows a single rg/grep/find/list of one tree (including a git repo root)
+and a grep-family filter of stdin (`ss | grep 11434`).
+Denies $HOME, /, ~/repos, missing-path workspace hunt, two+ directory
+operands, and unpiped rg/grep with no path. Fail-open on parse errors.
+Escape: SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1.
 """
 
 from __future__ import annotations
@@ -31,7 +33,9 @@ SEARCH_TOOLS = GREP_TOOLS | LIST_TOOLS | SHELL_TOOLS
 SEARCH_BINS = frozenset(
     {"rg", "ripgrep", "grep", "egrep", "fgrep", "ag", "ack", "find"}
 )
-SEP = frozenset({"|", "||", "&&", ";", "&"})
+GREP_BINS = SEARCH_BINS - {"find"}
+SEP = frozenset({"|", "||", "&&", ";", "&", "|&"})
+PIPE = frozenset({"|", "|&"})
 FLAGS_WITH_ARG = frozenset(
     {
         "-e",
@@ -58,7 +62,8 @@ FLAGS_WITH_ARG = frozenset(
 BLOCK_REASON = (
     "Parent forest or multi-location search is blocked (rule subagents-first, "
     "hook prefer-spawn-search). A single rg/grep/find/list of one tree belongs "
-    "on the parent: spawn tax plus re-ingest exceeds running the command.\n"
+    "on the parent: spawn tax plus re-ingest exceeds running the command. "
+    "A single command piped into grep (ss | grep 11434) also stays here.\n"
     "Spawn when:\n"
     "- Searching several locations ($HOME, ~/repos, two+ trees)\n"
     "- Installing software including config and service files\n"
@@ -66,7 +71,9 @@ BLOCK_REASON = (
     "Several independent units → skill agent-graphs (workflow agent-graph). "
     "Inner retry is loop-until-green. Bug hunt stays find-patch-loop.\n"
     "More than a single command: prefer a helper script "
-    "(rule prefer-helper-scripts).\n"
+    "(rule prefer-helper-scripts). One-shot verify (did this open the port) "
+    "stays on the parent. Reusable multi-grep diagnostics "
+    "(router iptables/clients/stats) should be a helper.\n"
     "Escape hatch: SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1."
 )
 
@@ -140,19 +147,30 @@ def _deny_payload() -> dict[str, Any]:
     }
 
 
-def _segments(tokens: list[str]) -> list[list[str]]:
-    segs: list[list[str]] = []
+def _segments_with_seps(tokens: list[str]) -> list[tuple[str | None, list[str]]]:
+    """Yield (separator_before, segment). First segment has separator None.
+
+    Only `|` and `|&` count as pipes. `||`, `&&`, `;`, and `&` are not pipes.
+    shlex splits on spaces, so glued `file|grep` is a known parse limit.
+    """
+    segs: list[tuple[str | None, list[str]]] = []
     cur: list[str] = []
+    sep_before: str | None = None
     for token in tokens:
         if token in SEP:
             if cur:
-                segs.append(cur)
+                segs.append((sep_before, cur))
                 cur = []
+            sep_before = token
         else:
             cur.append(token)
     if cur:
-        segs.append(cur)
+        segs.append((sep_before, cur))
     return segs
+
+
+def _segments(tokens: list[str]) -> list[list[str]]:
+    return [seg for _, seg in _segments_with_seps(tokens)]
 
 
 def _skip_env_and_wrappers(seg: list[str]) -> list[str]:
@@ -197,7 +215,7 @@ def is_wide_shell(command: str) -> bool:
             f" {name} " in f" {lowered} " or lowered.startswith(f"{name} ")
             for name in SEARCH_BINS
         )
-    for seg in _segments(tokens):
+    for sep_before, seg in _segments_with_seps(tokens):
         body = _skip_env_and_wrappers(seg)
         if not body:
             continue
@@ -215,6 +233,8 @@ def is_wide_shell(command: str) -> bool:
             continue
         paths = positionals[1:]
         if not paths:
+            if binary in GREP_BINS and sep_before in PIPE:
+                continue
             return True
         if any(_is_wide_dir(path) for path in paths):
             return True

@@ -68,8 +68,10 @@ unrelated media or artifact kinds.
     URLs (Craft app suite included) into any of those skills.
 12. **Repeatable host procedure vs thought loop** → **prefer-helper-scripts**.
     If pinentry, dialogs, session dbus, or any **more-than-one-command** host
-    sequence can be a shell script, write or call that helper. Do not spawn a
-    child only to run that sequence. Do not grow a skill into a dump of
-    one-off compound commands.
+    sequence can be a shell script, write or call that helper. One-shot pipes
+    (`ss | grep PORT`) stay on the parent. Multiple greps that look reusable
+    (router diagnostics) become a helper. Do not spawn a child only to run
+    that sequence. Do not grow a skill into a dump of one-off compound
+    commands.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

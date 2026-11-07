@@ -31,13 +31,13 @@ out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr)
+├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr, employer-parent-model, employer-grok)
 ├── lib/                           # Off-PATH helpers (adf-ocr.py → ~/.local/lib)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 42 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 100 skills → ~/.claude/skills + ~/.grok/skills
-│   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py (register in settings.json)
+│   ├── skills/                    # 101 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
 │   └── examples/EXCLUDED.md
 ├── config/
@@ -51,6 +51,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
     ├── n8n/                           # Traefik n8n.localhost compose example (copy yourself)
     ├── rea-mcp/                       # REA MCP client snippets (Claude JSON / Grok TOML)
     ├── craft-anything-mcp/            # Craft Anything CLI MCP snippets (copy yourself)
+    ├── employer-parent-model.env.example  # Employer-tree parent model (copy to ~/.config)
     └── pandoc_templates/
 ```
 
@@ -99,6 +100,8 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |
 | `rperks-activate-coupons/` | Puppeteer-core app (own RPerks account). Units in `share/rperks-activate-coupons/` |
 | `gpg-git-commit` | Signed `git commit` via kdialog / loopback when gpg-agent has no cached passphrase (never `--no-gpg-sign`) |
+| `employer-parent-model` | Detect employer-tree cwd and whether the employer parent key env is set (`--check` / `--export` / `--direnv` / `--json` / `--status`). Config `${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env` (example `examples/employer-parent-model.env.example`) |
+| `employer-grok` | Launch `grok -m <employer-parent-slug>`; fail closed if the key env is unset |
 
 Skills reference these as **PATH commands**, not a vendor-specific scripts directory.
 See `agent/PATHS.md` for `{MEMORY_ROOT}`, `{AGENT_HOME}`, etc.
@@ -127,7 +130,9 @@ check upstream callers on updates; research claims vs a cited source →
 `clean-room-reconstruct`), `independent-checker` (the agent that produced a
 claim does not grade it; graphs use `agent-graphs`), `claim-source-check` (cheap checker gets claim +
 source only; vault `supported` pages), `system-security` (WAN bind of kube-apiserver /
-kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review),
+kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review;
+hook `control-plane-exposure` denies opening those ports; procedure is
+`k8s-control-plane-vpn`),
 `employer-pr-findings-gate` (hard gate before PRs in the current employer's
 GitHub org), `pre-commit-gate` (run `pre-commit` when a config exists;
 follow findings or prompt — do not silent SKIP; gitleaks AWS canary is
@@ -157,7 +162,7 @@ is the commit; later sessions query the palace first),
 (file necessary pieces to MemPalace before parent compact so later lookup
 has full drawers; the compact summary is not filing; PostCompact mines
 `compaction/INDEX.md` as a pointer only),
-`subagents-first` (spawn large work; parent runs one `rg`/`grep` of one tree; hook `prefer-spawn-search` denies forest/multi-location search; more than one command → helper script; several independent units → `agent-graphs`),
+`subagents-first` (spawn large work; parent runs one `rg`/`grep` of one tree or one command piped into grep; hook `prefer-spawn-search` denies forest/multi-location search; reusable multi-grep diagnostics → helper script; several independent units → `agent-graphs`),
 `expected-value` (take an expensive action only with an edge; ledger is USD, tokens, wall-clock, context-window, and parent compaction; spawn value is parent context saved vs re-ingest),
 `agent-graphs` (shape of multi-agent work: splitter, isolated workers, code nodes, blast-radius gate; inner retry is `loop-until-green`),
 `cups-custom-backend` (KDE Printers list is configured dests; last-seen discovery; `retry-job` holds jobs while the printer is off), etc.
@@ -166,7 +171,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (100) include packaging (`package-toolkit` classifies generic pack
+**Skills** (101) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -209,6 +214,7 @@ stay on `thread-screenshots-*`),
 `license-provenance` (SPDX / copy-risk checklist),
 `claim-source-check` (cheap checker: claim + source only; vault supported pages),
 `leftover-account-sessions` (own-device ADB privacy audit: IME, appops, XPL-EX overlay, KDE Connect trusted names),
+`k8s-control-plane-vpn` (close Kubernetes API/kubelet/etcd off the WAN; overlay VPN optional; hook `control-plane-exposure`),
 `nate-writing-style` (`{user}` placeholder voice notes; replace with your own),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
@@ -343,6 +349,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 | RPerks runner | Node, Chromium (`CHROME_PATH` or `/usr/bin/chromium`), `npm install --omit=dev` in the app dir |
 | Reverse Engineer Anything | Node.js + `npx -y rea-agents@6.5.0 mcp`. Optional engines (Hopper, Ghidra, JADX, IDA) are caller-supplied; REA setup does not install them. Client snippets: `examples/rea-mcp/` |
 | Craft Anything | Optional reconstruct engine (`craft-anything-cli mcp`). Early alpha; own-copy only. Client snippets: `examples/craft-anything-mcp/`. `install.sh` does not register it. |
+| Employer parent model | Optional. Copy `examples/employer-parent-model.env.example` to `${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env`. Env-var names only. `employer-grok` fails closed if the key env is unset. |
 
 ## What is intentionally excluded
 

@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Launch Grok with the employer parent model. Fail closed if the key env is unset.
+set -euo pipefail
+
+HELPER="${HOME}/.claude/scripts/employer-parent-model"
+if [[ ! -x "${HELPER}" ]]; then
+	HELPER="$(command -v employer-parent-model || true)"
+fi
+if [[ -z "${HELPER}" || ! -x "${HELPER}" ]]; then
+	echo "employer-grok: employer-parent-model not found" >&2
+	exit 127
+fi
+
+mapfile -t _epm < <("${HELPER}" --json | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+print(d.get("model") or "")
+print(d.get("key_env") or "KEY_ENV")
+print("1" if d.get("key_set") else "0")
+')
+EPM_MODEL="${_epm[0]:-}"
+EPM_KEY_ENV="${_epm[1]:-KEY_ENV}"
+EPM_KEY_SET="${_epm[2]:-0}"
+
+if [[ -z "${EPM_MODEL}" ]]; then
+	echo "employer-grok: EMPLOYER_PARENT_MODEL is not configured" >&2
+	exit 2
+fi
+if [[ "${EPM_KEY_SET}" != "1" ]]; then
+	echo "employer-grok: ${EPM_KEY_ENV} is unset — fail closed" >&2
+	exit 2
+fi
+
+if ! command -v grok >/dev/null 2>&1; then
+	echo "employer-grok: grok not on PATH" >&2
+	exit 127
+fi
+
+exec grok -m "${EPM_MODEL}" "$@"

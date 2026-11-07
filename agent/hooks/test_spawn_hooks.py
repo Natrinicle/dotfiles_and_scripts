@@ -129,6 +129,72 @@ class PreferSpawnSearchTests(unittest.TestCase):
             )
         )
 
+    def test_unpiped_grep_cwd_is_wide(self) -> None:
+        self.assertTrue(
+            SEARCH.is_wide_search("run_terminal_command", {"command": "grep foo"})
+        )
+
+    def test_and_grep_cwd_is_wide(self) -> None:
+        self.assertTrue(
+            SEARCH.is_wide_search(
+                "run_terminal_command", {"command": "true && grep foo"}
+            )
+        )
+
+    def test_rg_piped_to_head_is_wide(self) -> None:
+        self.assertTrue(
+            SEARCH.is_wide_search(
+                "run_terminal_command",
+                {"command": "rg prefer-spawn-search | head"},
+            )
+        )
+
+    def test_piped_ss_grep_is_not_wide(self) -> None:
+        self.assertFalse(
+            SEARCH.is_wide_search(
+                "run_terminal_command", {"command": "ss -tnp | grep 11434"}
+            )
+        )
+
+    def test_piped_git_show_grep_is_not_wide(self) -> None:
+        self.assertFalse(
+            SEARCH.is_wide_search(
+                "run_terminal_command",
+                {"command": "git show HEAD:toolkit.yaml | grep version"},
+            )
+        )
+
+    def test_piped_journalctl_rg_is_not_wide(self) -> None:
+        self.assertFalse(
+            SEARCH.is_wide_search(
+                "run_terminal_command",
+                {"command": "journalctl -u x | rg error"},
+            )
+        )
+
+    def test_piped_stderr_grep_is_not_wide(self) -> None:
+        self.assertFalse(
+            SEARCH.is_wide_search(
+                "run_terminal_command", {"command": "ss -tnp |& grep 11434"}
+            )
+        )
+
+    def test_double_piped_grep_is_not_wide(self) -> None:
+        self.assertFalse(
+            SEARCH.is_wide_search(
+                "run_terminal_command",
+                {"command": "ss -tnp | grep 11434 | grep LISTEN"},
+            )
+        )
+
+    def test_piped_grep_forest_path_is_wide(self) -> None:
+        self.assertTrue(
+            SEARCH.is_wide_search(
+                "run_terminal_command",
+                {"command": f"ss -tnp | grep foo {Path.home()}"},
+            )
+        )
+
     def test_shell_rg_named_file_is_not_wide(self) -> None:
         path = Path(__file__).resolve()
         self.assertFalse(

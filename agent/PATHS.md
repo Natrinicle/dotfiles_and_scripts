@@ -14,4 +14,4 @@ Skills use placeholders so Claude Code and Grok can share the same pack.
 
 ## Helper scripts
 
-Install repo `bin/` to **`~/.local/bin`** (on `PATH`) and repo `lib/` to **`~/.local/lib`** (helpers, off PATH). Skills and agents should call bare commands such as `adf-ocr`, `morning-data-gather`, `speakr-api`, `rperks-activate`, `find-patch-queue`, or `gpg-git-commit`, never a vendor-specific scripts directory. Signed git commits use `gpg-git-commit` (rule `prefer-helper-scripts`).
+Install repo `bin/` to **`~/.local/bin`** (on `PATH`) and repo `lib/` to **`~/.local/lib`** (helpers, off PATH). Skills and agents should call bare commands such as `adf-ocr`, `morning-data-gather`, `speakr-api`, `rperks-activate`, `find-patch-queue`, `gpg-git-commit`, `employer-parent-model`, or `employer-grok`, never a vendor-specific scripts directory. Signed git commits use `gpg-git-commit` (rule `prefer-helper-scripts`). Employer-tree parent model: `employer-parent-model` / `employer-grok` (example `examples/employer-parent-model.env.example`).

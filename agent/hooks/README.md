@@ -65,22 +65,58 @@ Register once in host `settings.json` (do not also add under `~/.grok/hooks/`):
 }
 ```
 
+## control-plane-exposure
+
+`PreToolUse` matcher:
+`Bash|bash|run_terminal_command|Write|write|Edit|StrReplace`
+
+`UserPromptSubmit` (no matcher) injects the spin-up evidence gate.
+
+**Denies** `kubeadm init` / `join` (not `kubeadm init phase certs`),
+k3s/rke2 server installers, `ufw allow` / `iptables ACCEPT` / `0.0.0.0/0`
+on API `:6443`, kubelet `:10250`, etcd `:2379`/`:2380`,
+controller-manager `:10257`, scheduler `:10259`, Docker `:2375`/`:2376`.
+DROP/REJECT of those ports, probes, and `kubectl` stay allowed. Fail-open.
+Escape (user must name it): `SYSTEM_SECURITY_ALLOW_WAN_CONTROL_PLANE=1`.
+
+Rule `system-security` + skill `k8s-control-plane-vpn`. Hookify
+`.claude/hookify.*.local.md` is a second deny (project CWD). Register
+once in host `settings.json` (do not also add under `~/.grok/hooks/`):
+
+```json
+{
+  "matcher": "Bash|bash|run_terminal_command|Write|write|Edit|StrReplace",
+  "hooks": [
+    {
+      "type": "command",
+      "command": "python3 {AGENT_HOME}/hooks/control-plane-exposure.py",
+      "timeout": 5
+    }
+  ]
+}
+```
+
+Restart the session after changing hook registration.
+
 ## prefer-spawn-search
 
 `PreToolUse` matcher:
 `grep|Grep|list_dir|LS|Glob|glob|Bash|bash|run_terminal_command`
 
 **Denies** forest and multi-location search (missing path, `$HOME` / `/` /
-`~/repos`, unscoped `**` glob, two+ directory operands, shell `rg`/`grep`/
-`find` with no path). A single `rg` / `grep` / `find` / `list_dir` of **one**
-tree (including a git repo root) stays allowed. Named-file grep and
-`git status` stay allowed. Fail-open. Escape:
-`SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`.
+`~/repos`, unscoped `**` glob, two+ directory operands, unpiped shell
+`rg`/`grep`/`find` with no path). A single `rg` / `grep` / `find` /
+`list_dir` of **one** tree (including a git repo root) stays allowed.
+A grep-family filter of stdin (`ss | grep 11434`, `git show … | grep`)
+stays allowed. Named-file grep and `git status` stay allowed. Fail-open.
+Escape: `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`.
 
 The deny reason tells the parent: one command stays here; spawn for
 multi-location search, software install with config+units, or large extract.
 Several independent units → skill `agent-graphs`. Bug hunt stays
-`find-patch-loop`. More than a single command → helper script.
+`find-patch-loop`. One-shot verify (did this open the port) stays on the
+parent. Reusable multi-grep diagnostics (router iptables/clients/stats)
+→ helper script.
 
 On Grok Build, multi-location unknown-path search: omit `subagent_type`
 (cloud general-purpose). Do not pin plugin explorers to `ollama-gemma4`.

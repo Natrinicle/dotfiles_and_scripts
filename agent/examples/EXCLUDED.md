@@ -5,7 +5,7 @@ general pack.
 
 | Item | Reason |
 |------|--------|
-| Host-only k8s/ops skills (CNI, PVC, Helm, gateway, Tailscale, Vault, …) | Cell/homelab runbooks, not a shareable agent pack |
+| Host-only k8s/ops skills (CNI, PVC, Helm, gateway, Tailscale, Vault, …) | Cell/homelab runbooks, not a shareable agent pack. Generic `k8s-control-plane-vpn` is packed. |
 | `court-case-monitor` | Specialized pack (`court-case-monitor-toolkit`) |
 | `deploy-creator-bootcamp` | Product deploy playbook |
 | Live `adversarial-analysis` / `communication-pattern-analysis` bodies | Pack ships short stubs; live files stay under `{AGENT_HOME}/skills/` |

@@ -16,9 +16,9 @@ When several units do not consume each other's output, or a gate / named
 output sits between steps, this layer is the better shape than one
 `spawn_subagent`. One unit still uses `spawn_subagent` (rule
 **subagents-first**). Forest / multi-location grep / list / `rg` is
-**denied** by hook `prefer-spawn-search`. A single `rg` of one tree may
-run on the parent. Do not dump several trees into the parent to feed
-the graph.
+**denied** by hook `prefer-spawn-search`. A single `rg` of one tree, or
+a command piped into grep, may run on the parent. Do not dump several
+trees into the parent to feed the graph.
 
 ## Shape
 

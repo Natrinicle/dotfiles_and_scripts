@@ -1,0 +1,151 @@
+#!/usr/bin/env bash
+# Detect employer-tree cwd and whether the employer parent key env is set.
+# Used by SessionStart, direnv .envrc, and employer-grok.
+set -euo pipefail
+
+usage() {
+	cat <<'EOF'
+Usage: employer-parent-model [--cwd PATH] [--check|--export|--direnv|--json|--status]
+
+Reads ${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env
+(EMPLOYER_PARENT_MODEL, EMPLOYER_PARENT_OPUS_MODEL, EMPLOYER_PARENT_KEY_ENV,
+EMPLOYER_REPO_ROOTS). No match and no exports when config or roots are empty.
+EOF
+}
+
+CWD="${PWD}"
+MODE="status"
+
+while [[ $# -gt 0 ]]; do
+	case "$1" in
+	--cwd)
+		CWD="${2:-}"
+		shift 2
+		;;
+	--check)
+		MODE="check"
+		shift
+		;;
+	--export)
+		MODE="export"
+		shift
+		;;
+	--direnv)
+		MODE="direnv"
+		shift
+		;;
+	--json)
+		MODE="json"
+		shift
+		;;
+	--status)
+		MODE="status"
+		shift
+		;;
+	-h | --help)
+		usage
+		exit 0
+		;;
+	*)
+		usage >&2
+		exit 2
+		;;
+	esac
+done
+
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env"
+if [[ -f "${CONFIG}" ]]; then
+	# shellcheck disable=SC1090
+	source "${CONFIG}"
+fi
+
+MODEL="${EMPLOYER_PARENT_MODEL:-}"
+OPUS="${EMPLOYER_PARENT_OPUS_MODEL:-}"
+KEY_ENV="${EMPLOYER_PARENT_KEY_ENV:-}"
+ROOTS="${EMPLOYER_REPO_ROOTS:-}"
+
+abs="$(realpath -m "${CWD}")"
+match=0
+matched_root=""
+IFS=':' read -r -a roots <<<"${ROOTS}"
+for root in "${roots[@]}"; do
+	[[ -z "${root}" ]] && continue
+	r="$(realpath -m "${root}")"
+	if [[ "${abs}" == "${r}" || "${abs}" == "${r}/"* ]]; then
+		match=1
+		matched_root="${r}"
+		break
+	fi
+done
+
+key_set=0
+key_val=""
+if [[ -n "${KEY_ENV}" ]]; then
+	key_val="${!KEY_ENV-}"
+	if [[ -n "${key_val}" ]]; then
+		key_set=1
+	fi
+fi
+
+json_out() {
+	python3 -c '
+import json, os, sys
+print(json.dumps({
+    "match": os.environ["EPM_MATCH"] == "1",
+    "cwd": os.environ["EPM_CWD"],
+    "matched_root": os.environ.get("EPM_ROOT", "") or None,
+    "model": os.environ.get("EPM_MODEL") or None,
+    "opus_model": os.environ.get("EPM_OPUS") or None,
+    "key_env": os.environ.get("EPM_KEY_ENV") or None,
+    "key_set": os.environ["EPM_KEY_SET"] == "1",
+}))
+'
+}
+
+export EPM_MATCH="${match}"
+export EPM_CWD="${abs}"
+export EPM_ROOT="${matched_root}"
+export EPM_MODEL="${MODEL}"
+export EPM_OPUS="${OPUS}"
+export EPM_KEY_ENV="${KEY_ENV}"
+export EPM_KEY_SET="${key_set}"
+
+case "${MODE}" in
+check)
+	[[ "${match}" -eq 1 ]]
+	;;
+json)
+	json_out
+	;;
+export | direnv)
+	if [[ "${match}" -eq 1 && "${key_set}" -eq 1 && -n "${MODEL}" ]]; then
+		printf 'export GROK_DEFAULT_MODEL=%q\n' "${MODEL}"
+		printf 'export EMPLOYER_PARENT_MODEL_OWNED=1\n'
+	elif [[ "${match}" -eq 1 ]]; then
+		printf '# employer-parent-model: tree matched; %s unset — fail closed (no GROK_DEFAULT_MODEL)\n' "${KEY_ENV:-KEY_ENV}"
+	fi
+	;;
+status)
+	if [[ "${match}" -eq 0 ]]; then
+		exit 1
+	fi
+	if [[ "${key_set}" -eq 1 ]]; then
+		key_state="SET"
+	else
+		key_state="UNSET"
+	fi
+	printf 'Employer parent: MATCH root=%s model=%s key=%s (%s)\n' \
+		"${matched_root}" "${MODEL:-unset-model}" "${key_state}" "${KEY_ENV:-no-key-env}"
+	if [[ "${key_set}" -eq 0 ]]; then
+		printf 'Key env is empty. New sessions stay on the default parent until it is set.\n'
+	else
+		printf 'New Grok sessions: employer-grok, grok -m %s, or GROK_DEFAULT_MODEL from direnv.\n' "${MODEL}"
+	fi
+	printf 'This session cannot swap the live parent. In an open session use /model %s.\n' "${MODEL:-<slug>}"
+	printf 'T0 explore stays on the local pin. Personal work stays on the default parent.\n'
+	;;
+*)
+	usage >&2
+	exit 2
+	;;
+esac

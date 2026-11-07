@@ -19,12 +19,19 @@ spawning a child to run the same steps.
 3. If the work is **more than a single command**, strongly consider writing a
    helper this turn, then call it. Copy it into the general pack `bin/` plus
    `{AGENT_HOME}/scripts/` (and `~/.local/bin`).
-4. If it is missing and you are about to reconstruct **3+** of those steps,
+4. If **multiple greps** are required **and** the same bundle looks useful
+   later, write a helper this turn. Router diagnostics (iptables, current
+   clients, system statistics) is that shape. A one-shot verify
+   (`ss -tnp | grep 11434` to check a port opened) stays on the parent —
+   spawn tax exceeds the output, and a helper for a one-time check is waste.
+5. If it is missing and you are about to reconstruct **3+** of those steps,
    **write the helper this turn** (same copy path), then call it.
 
 Do not spawn a subagent only to run a short command sequence a helper should
-own. A single command (`rg`, `systemctl status`, `git status`) stays on the
-parent (rule `subagents-first`).
+own. A single command (`rg`, `systemctl status`, `git status`) and a single
+command piped into grep stay on the parent (rule `subagents-first`). The
+hook allows `ss | grep foo | grep bar`; still prefer a helper when that
+pipeline is a reusable diagnostic.
 
 ## Git GPG commits
 
