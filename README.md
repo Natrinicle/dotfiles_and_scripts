@@ -94,7 +94,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | `docker-service-check.sh` | Docker service health check |
 | `unpack-artifact` | Classify APK/XAPK/IPA/ELF/firmware and print likely protocol sources |
 | `find-patch-queue` | File and update `.find-patch-queue.json` for tester / skeptic / patcher agents |
-| `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work; fade-out, solo sting, yields on a video call (`install`/`status`/`mute`/`test`) |
+| `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work; fade-out, solo sting, yields on a video call; compositor/portal video-in is not a call; flock resumes after a sting if another session is still busy (`install`/`status`/`mute`/`test`) |
 | `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |
 | `rperks-activate-coupons/` | Puppeteer-core app (own RPerks account). Units in `share/rperks-activate-coupons/` |
 | `gpg-git-commit` | Signed `git commit` via kdialog / loopback when gpg-agent has no cached passphrase (never `--no-gpg-sign`) |
@@ -194,7 +194,7 @@ a find-patch loop (`find-patch-loop`, then `bug-finder` / `bug-skeptic` /
 agent graphs (`agent-graphs`, then `loop-until-green` for the inner check;
 Grok workflow `agent-graph`),
 `decision-judge` (parent-as-judge, 2- or 4-advocate court),
-`session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works),
+`session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works; compositor/portal video-in is not a call; flock resumes after a sting if another session is still busy),
 `update-contacts-from-sources` (address-book create/patch from dumps; some
 cards are businesses; `Me to` / `Voicemail from` are cruft),
 `rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),

@@ -39,7 +39,27 @@ MEETING_NEEDLES = (
     "zoom",
 )
 IGNORE_BINS = frozenset(
-    {"pacat", "paplay", "pipewire", "pulseaudio", "session-tunes", "wireplumber"}
+    {
+        "gnome-shell",
+        "kwin",
+        "kwin_wayland",
+        "kwin_x11",
+        "mutter",
+        "pacat",
+        "paplay",
+        "pipewire",
+        "plasma",
+        "plasmashell",
+        "pulseaudio",
+        "session-tunes",
+        "spectacle",
+        "wireplumber",
+        "xdg-desktop-portal",
+        "xdg-desktop-portal-gnome",
+        "xdg-desktop-portal-gtk",
+        "xdg-desktop-portal-kde",
+        "xdg-desktop-portal-wlr",
+    }
 )
 
 
@@ -47,8 +67,17 @@ def _norm_bin(raw: str) -> str:
     return Path(raw.strip().strip('"')).name.lower()
 
 
+def _is_ignored(*parts: str) -> bool:
+    """True when any process/node identity is a compositor, portal, or player."""
+    for raw in parts:
+        token = _norm_bin(raw) if raw else ""
+        if token in IGNORE_BINS:
+            return True
+    return False
+
+
 def _is_meeting(binary: str) -> bool:
-    if not binary or binary in IGNORE_BINS:
+    if not binary or _is_ignored(binary):
         return False
     return any(needle in binary for needle in MEETING_NEEDLES)
 
@@ -85,11 +114,16 @@ def fingerprints_from_nodes(objs: list[Any]) -> set[str]:
         if media_class == "Video/Source" and role == "camera" and state == "running":
             fps.add(f"camera:{node_name}")
             camera_on = True
-        if media_class == "Stream/Input/Video" and state in {"running", "idle"}:
-            fps.add(f"video-in:{binary or node_name}")
+        if (
+            media_class == "Stream/Input/Video"
+            and state == "running"
+            and binary
+            and not _is_ignored(binary, node_name)
+        ):
+            fps.add(f"video-in:{binary}")
             camera_on = True
     for state, media_class, role, node_name, binary in parsed:
-        if binary in IGNORE_BINS:
+        if _is_ignored(binary, node_name):
             continue
         if role in CALL_ROLES and "Input" in media_class and state == "running":
             fps.add(f"role:{role}:{binary or node_name}")
@@ -114,7 +148,7 @@ def fingerprints_from_source_outputs(
             or block.get("application.name")
             or ""
         )
-        if binary in IGNORE_BINS:
+        if _is_ignored(binary):
             continue
         role = (block.get("media.role") or "").lower()
         if role in CALL_ROLES:

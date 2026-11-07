@@ -20,7 +20,7 @@ from flock import get_flock
 from generate import mint_rtttl
 from modem import render_modem
 from player import PcmPlayer
-from state import STATE_PATH, aggregate, load_state
+from state import STATE_PATH, aggregate, any_busy, load_state
 from watcher import fallback_busy
 
 
@@ -58,6 +58,7 @@ def cmd_status() -> int:
     print(f"enabled: {cfg.get('enabled', True)}")
     print(f"muted: {muted()} ({MUTE_PATH})")
     print(f"aggregate: {aggregate(data)}")
+    print(f"any_busy: {any_busy(data)}")
     print(f"fallback_busy: {fallback_busy(float(cfg['activity_window_s']))}")
     calls = call_fingerprints()
     print(

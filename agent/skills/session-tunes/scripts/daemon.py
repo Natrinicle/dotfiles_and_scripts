@@ -18,7 +18,7 @@ from config import load_config, muted
 from flock import get_flock
 from generate import mint_rtttl
 from player import PcmPlayer
-from state import CACHE_DIR, aggregate
+from state import CACHE_DIR, aggregate, any_busy, resolve_want
 from watcher import fallback_busy
 
 PID_PATH = CACHE_DIR / "daemon.pid"
@@ -117,20 +117,14 @@ class SessionTunes:
                 return "idle"
         agg = aggregate()
         fb = fallback_busy(float(cfg["activity_window_s"]))
-        if agg in {"attention", "error"}:
-            want = agg
-        elif agg == "busy" or fb:
-            want = "busy"
-        else:
-            want = "idle"
-        now = time.time()
-        if (
-            self.mode in {"attention", "error"}
-            and now < self.alert_hold_until
-            and want == "busy"
-        ):
-            return self.mode
-        return want
+        thinking = agg == "busy" or fb or any_busy()
+        return resolve_want(
+            agg=agg,
+            thinking=thinking,
+            mode=self.mode,
+            hold_until=self.alert_hold_until,
+            now=time.time(),
+        )
 
     def tick(self, cfg: dict) -> None:
         if not cfg.get("enabled", True) or muted():

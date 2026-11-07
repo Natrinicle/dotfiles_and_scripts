@@ -150,11 +150,20 @@ class PcmPlayer:
 
     @property
     def running(self) -> bool:
+        alive = False
         for voice in list(self._voices.values()):
             proc = voice.proc
-            if proc is not None and proc.poll() is None:
-                return True
-        return False
+            if proc is None:
+                continue
+            code = proc.poll()
+            if code is None:
+                alive = True
+            else:
+                try:
+                    proc.wait(timeout=0.05)
+                except subprocess.TimeoutExpired:
+                    pass
+        return alive
 
     def stop(self, name: str | None = None) -> None:
         names = [name] if name else list(self._voices)

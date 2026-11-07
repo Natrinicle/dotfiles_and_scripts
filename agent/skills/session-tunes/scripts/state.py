@@ -101,3 +101,42 @@ def aggregate(data: dict[str, Any] | None = None) -> str:
         if PRIORITY.get(st, 0) > PRIORITY[best]:
             best = st
     return best
+
+
+def any_busy(data: dict[str, Any] | None = None) -> bool:
+    """True when any fresh session is hook-busy (even if aggregate is attention)."""
+    data = data or load_state()
+    now = time.time()
+    for rec in (data.get("sessions") or {}).values():
+        if now - float(rec.get("updated_at") or 0) > 1800:
+            continue
+        if rec.get("state") == "busy":
+            return True
+    return False
+
+
+def resolve_want(
+    *,
+    agg: str,
+    thinking: bool,
+    mode: str,
+    hold_until: float,
+    now: float,
+) -> str:
+    """Pick flock vs sting vs silence.
+
+    Attention/error sting once, hold silent, then resume busy if any
+    session is still thinking. A permission prompt in another window
+    must not mute the flock for the rest of the house.
+    """
+    if agg in {"attention", "error"}:
+        want = agg
+    elif thinking:
+        want = "busy"
+    else:
+        want = "idle"
+    if mode in {"attention", "error"} and now < hold_until:
+        return mode
+    if want in {"attention", "error"} and thinking:
+        return "busy"
+    return want

@@ -16,6 +16,7 @@ from flock import Flock
 from modem import render_modem
 from player import parse_pactl_sections, pulse_fade_levels
 from rtttl import parse_rtttl, render_pcm, serialize_rtttl
+from state import resolve_want
 
 
 def run() -> list[str]:
@@ -167,6 +168,146 @@ def run() -> list[str]:
         errors.append(f"pactl zoom capture missed: {pactl_fps}")
     else:
         print("ok pactl zoom capture")
+    plasma_video = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "idle",
+                "props": {
+                    "media.class": "Stream/Input/Video",
+                    "application.process.binary": "plasmashell",
+                    "node.name": "plasma-thumb",
+                },
+            },
+        },
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "running",
+                "props": {
+                    "media.class": "Stream/Input/Video",
+                    "application.process.binary": "plasmashell",
+                    "node.name": "plasma-preview",
+                },
+            },
+        },
+    ]
+    plasma_fps = fingerprints_from_nodes(plasma_video)
+    if plasma_fps:
+        errors.append(f"plasmashell video-in treated as a call: {plasma_fps}")
+    else:
+        print("ok plasmashell video-in ignored")
+    unnamed_plasma = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "running",
+                "props": {
+                    "media.class": "Stream/Input/Video",
+                    "node.name": "plasmashell",
+                },
+            },
+        }
+    ]
+    unnamed_fps = fingerprints_from_nodes(unnamed_plasma)
+    if unnamed_fps:
+        errors.append(
+            f"node.name plasmashell with empty binary treated as a call: {unnamed_fps}"
+        )
+    else:
+        print("ok unnamed plasmashell video-in ignored")
+    plasma_app_name = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "running",
+                "props": {
+                    "media.class": "Stream/Input/Video",
+                    "application.name": "Plasma",
+                    "node.name": "plasmashell",
+                },
+            },
+        }
+    ]
+    plasma_name_fps = fingerprints_from_nodes(plasma_app_name)
+    if plasma_name_fps:
+        errors.append(f"application.name Plasma treated as a call: {plasma_name_fps}")
+    else:
+        print("ok application.name Plasma video-in ignored")
+    chrome_video = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "running",
+                "props": {
+                    "media.class": "Stream/Input/Video",
+                    "application.process.binary": "chrome",
+                    "node.name": "webrtc",
+                },
+            },
+        }
+    ]
+    chrome_vid_fps = fingerprints_from_nodes(chrome_video)
+    if "video-in:chrome" not in chrome_vid_fps:
+        errors.append(f"chrome video-in missed: {chrome_vid_fps}")
+    else:
+        print("ok chrome video-in fingerprint")
+    idle_chrome_video = [
+        {
+            "type": "PipeWire:Interface:Node",
+            "info": {
+                "state": "idle",
+                "props": {
+                    "media.class": "Stream/Input/Video",
+                    "application.process.binary": "chrome",
+                    "node.name": "webrtc",
+                },
+            },
+        }
+    ]
+    if fingerprints_from_nodes(idle_chrome_video):
+        errors.append("idle Stream/Input/Video treated as a call")
+    else:
+        print("ok idle video-in ignored")
+    if (
+        resolve_want(
+            agg="attention",
+            thinking=True,
+            mode="attention",
+            hold_until=10.0,
+            now=20.0,
+        )
+        != "busy"
+    ):
+        errors.append("attention+thinking after hold did not resume busy")
+    else:
+        print("ok attention hold then busy")
+    if (
+        resolve_want(
+            agg="attention",
+            thinking=True,
+            mode="attention",
+            hold_until=30.0,
+            now=20.0,
+        )
+        != "attention"
+    ):
+        errors.append("attention hold did not stay silent")
+    else:
+        print("ok attention hold silent")
+    if (
+        resolve_want(
+            agg="attention",
+            thinking=False,
+            mode="attention",
+            hold_until=10.0,
+            now=20.0,
+        )
+        != "attention"
+    ):
+        errors.append("solo attention after hold should stay attention")
+    else:
+        print("ok solo attention stays silent")
     return errors
 
 
