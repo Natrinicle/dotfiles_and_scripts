@@ -4,10 +4,9 @@ import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
-import yaml
-
-from mempalace_router.config import ConfigError, Target, Targets, load_targets
+from mempalace_router.config import ConfigError, load_targets
 
 
 class ConfigTest(unittest.TestCase):
@@ -136,7 +135,7 @@ targets:
 
     def test_tilde_expansion(self):
         """~ and $HOME must expand in token_file and palace_path."""
-        content = f"""
+        content = """
 targets:
   local:
     kind: local
@@ -267,6 +266,157 @@ targets:
 
         with self.assertRaises(KeyError):
             targets.get("nonexistent")
+
+    def test_company_rejects_palace_path(self):
+        """Company targets must not have palace_path field."""
+        content = """
+targets:
+  local:
+    kind: local
+    url: http://127.0.0.1:9999
+    token_file: /tmp/token
+  bad:
+    kind: company
+    company: bad
+    url: http://bad.example.com
+    token_file: /tmp/token
+    palace_path: /tmp/palace
+"""
+        path = self._write_yaml(content)
+        with self.assertRaises(ConfigError) as ctx:
+            load_targets(path)
+        self.assertIn("palace_path", str(ctx.exception).lower())
+        self.assertIn("bad", str(ctx.exception).lower())
+
+    def test_local_rejects_company_field(self):
+        """Local targets must not have company field."""
+        content = """
+targets:
+  local:
+    kind: local
+    url: http://127.0.0.1:9999
+    token_file: /tmp/token
+    company: acme
+"""
+        path = self._write_yaml(content)
+        with self.assertRaises(ConfigError) as ctx:
+            load_targets(path)
+        self.assertIn("company", str(ctx.exception).lower())
+        self.assertIn("local", str(ctx.exception).lower())
+
+    def test_hints_null_becomes_empty_dict(self):
+        """hints: null should be treated as an empty dict."""
+        content = """
+targets:
+  local:
+    kind: local
+    url: http://127.0.0.1:9999
+    token_file: /tmp/token
+    hints: null
+"""
+        path = self._write_yaml(content)
+        targets = load_targets(path)
+        self.assertEqual(targets.local.hints, {})
+
+    def test_hints_scalar_rejected(self):
+        """hints as a scalar value must raise ConfigError."""
+        content = """
+targets:
+  local:
+    kind: local
+    url: http://127.0.0.1:9999
+    token_file: /tmp/token
+    hints: "scalar"
+"""
+        path = self._write_yaml(content)
+        with self.assertRaises(ConfigError) as ctx:
+            load_targets(path)
+        self.assertIn("hints", str(ctx.exception).lower())
+
+    def test_hints_with_non_list_values_rejected(self):
+        """hints values must all be lists."""
+        content = """
+targets:
+  local:
+    kind: local
+    url: http://127.0.0.1:9999
+    token_file: /tmp/token
+    hints:
+      cwd_prefixes: /home/user
+"""
+        path = self._write_yaml(content)
+        with self.assertRaises(ConfigError) as ctx:
+            load_targets(path)
+        self.assertIn("hints", str(ctx.exception).lower())
+
+    def test_hints_with_non_string_items_rejected(self):
+        """hints list items must be strings."""
+        content = """
+targets:
+  local:
+    kind: local
+    url: http://127.0.0.1:9999
+    token_file: /tmp/token
+    hints:
+      cwd_prefixes:
+        - /home/user
+        - 123
+"""
+        path = self._write_yaml(content)
+        with self.assertRaises(ConfigError) as ctx:
+            load_targets(path)
+        self.assertIn("hints", str(ctx.exception).lower())
+
+    def test_malformed_yaml_raises_configerror(self):
+        """Malformed YAML must raise ConfigError (not YAMLError)."""
+        fd, path = tempfile.mkstemp(suffix=".yaml")
+        os.close(fd)
+        with open(path, "w") as f:
+            f.write("invalid: yaml: content: [")
+        self.addCleanup(lambda: os.unlink(path))
+
+        with self.assertRaises(ConfigError) as ctx:
+            load_targets(Path(path))
+        self.assertIn("yaml", str(ctx.exception).lower())
+
+    def test_missing_file_raises_configerror(self):
+        """Missing config file must raise ConfigError (not FileNotFoundError)."""
+        with self.assertRaises(ConfigError) as ctx:
+            load_targets(Path("/nonexistent/path/targets.yaml"))
+        self.assertIn("not found", str(ctx.exception).lower())
+
+    def test_tilde_expansion_equality(self):
+        """~ and $HOME must expand to actual home paths."""
+        tmpdir = tempfile.mkdtemp()
+        self.addCleanup(lambda: os.rmdir(tmpdir))
+
+        # Test ~/x form
+        content = """
+targets:
+  local:
+    kind: local
+    url: http://127.0.0.1:9999
+    token_file: ~/test_token
+"""
+        path = self._write_yaml(content)
+        targets = load_targets(path)
+
+        expected = Path.home() / "test_token"
+        self.assertEqual(targets.local.token_file, expected)
+
+        # Test $HOME/x form with mocked HOME
+        with mock.patch.dict(os.environ, {"HOME": tmpdir}):
+            content = """
+targets:
+  local:
+    kind: local
+    palace_path: $HOME/palace
+"""
+            path = self._write_yaml(content)
+            targets = load_targets(path)
+
+            expected_palace = Path(tmpdir) / "palace"
+            self.assertEqual(targets.local.palace_path, expected_palace)
 
 
 if __name__ == "__main__":
