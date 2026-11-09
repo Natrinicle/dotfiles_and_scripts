@@ -73,5 +73,22 @@ unrelated media or artifact kinds.
     (router diagnostics) become a helper. Do not spawn a child only to run
     that sequence. Do not grow a skill into a dump of one-off compound
     commands.
+13. **Security hunt vs hunt-and-patch** → **security-audit** (coverage-ledger,
+    findings.json, no patcher) vs **find-patch-loop** (bug-finder /
+    bug-skeptic / bug-patcher). Do not grow security-audit into a patcher.
+    Do not grow find-patch-loop into an audit coverage ledger.
+14. **Design-doc goldfish review vs session-complete / claim-grade** →
+    **egm-*** plus `agent/agents` personas vs **independent-checker** /
+    **check-work** / **speckit**. A Goldfish is a fresh-context design
+    review. Session-complete verification stays check-work. Claim vs source
+    stays claim-source-check.
+15. **Obsidian Flavored Markdown / Bases / Canvas / CLI vs vault plugin** →
+    **obsidian-markdown**, **obsidian-bases**, **json-canvas**,
+    **obsidian-cli**, **defuddle**, **knap**. Do not grow a vault-host
+    plugin into OFM syntax.
+16. **Interview / grill the user vs grade the stated ask** →
+    **interview-me** / **grilling** vs **grade-stated-ask**. Grilling
+    gathers requirements. Grade-stated-ask quotes the user's words and
+    grades that ask.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

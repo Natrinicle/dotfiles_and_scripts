@@ -21,7 +21,7 @@ Options:
   --all           Install shell + bin + agent packs (default if no target flags)
   --shell         Install bashrc / bash_aliases / bash_aliases.d
   --bin           Install bin/* -> ~/.local/bin and lib/* -> ~/.local/lib
-  --agent         Install shared agent/rules + skills + hooks into Claude; link Grok
+  --agent         Install shared agent/rules + skills + hooks + agents + resources into Claude; link Grok
   --force         Overwrite existing files (backs up first). Default is skip.
   --dry-run       Print actions only
   --backup-dir D  Backup directory (default: timestamped under \$HOME)
@@ -43,9 +43,13 @@ Shell installs:
 Agent installs (single shared trees):
   agent/rules/*         -> ~/.claude/rules/
   agent/skills/*        -> ~/.claude/skills/
+  agent/agents/*        -> ~/.claude/agents/
+  agent/resources/*     -> ~/.claude/resources/
   agent/hooks/*         -> ~/.claude/hooks/  (script only; register in settings.json)
   ~/.grok/rules         -> symlink to ~/.claude/rules  (if missing)
   ~/.grok/skills/<name> -> symlink to ~/.claude/skills/<name>
+  ~/.grok/agents        -> symlink to ~/.claude/agents  (if missing)
+  ~/.grok/resources     -> symlink to ~/.claude/resources  (if missing)
 
 Does not install examples/ unless you copy them yourself.
 EOF
@@ -153,6 +157,17 @@ install_file() {
 install_tree_merge() {
 	local from=$1 to=$2 bsub=$3
 	[[ -d $from ]] || return 0
+	# Dangling or live symlink dest: mkdir -p fails ("Already exists" /
+	# "File exists"). Skip unless --force (same as install_file).
+	if [[ -L $to ]]; then
+		if [[ $FORCE -eq 0 ]]; then
+			echo "skip symlink dest: $to -> $(readlink "$to")"
+			SKIPPED=$((SKIPPED + 1))
+			return 0
+		fi
+		backup_path "$to" "$bsub"
+		run rm -f "$to"
+	fi
 	run mkdir -p "$to"
 	local f base
 	while IFS= read -r -d '' f; do
@@ -321,6 +336,18 @@ if [[ $DO_AGENT -eq 1 ]]; then
 		if [[ $DRY_RUN -eq 0 ]]; then
 			chmod +x "$HOME/.claude/hooks"/*.py "$HOME/.claude/hooks"/*.sh 2>/dev/null || true
 		fi
+	fi
+
+	if [[ -d $ROOT/agent/agents ]]; then
+		run mkdir -p "$HOME/.claude/agents"
+		install_tree_merge "$ROOT/agent/agents" "$HOME/.claude/agents" "agent/agents"
+		ensure_symlink "$HOME/.grok/agents" "$HOME/.claude/agents" "agent/agents-grok"
+	fi
+
+	if [[ -d $ROOT/agent/resources ]]; then
+		run mkdir -p "$HOME/.claude/resources"
+		install_tree_merge "$ROOT/agent/resources" "$HOME/.claude/resources" "agent/resources"
+		ensure_symlink "$HOME/.grok/resources" "$HOME/.claude/resources" "agent/resources-grok"
 	fi
 fi
 

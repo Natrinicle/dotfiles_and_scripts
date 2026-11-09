@@ -36,9 +36,12 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 42 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 101 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 134 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
+│   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
 │   ├── PATHS.md                   # {AGENT_HOME}, {MEMORY_ROOT}, bin helpers
+│   ├── THIRD-PARTY.md             # inbound MIT / Apache-2.0 notices
 │   └── examples/EXCLUDED.md
 ├── config/
 │   ├── local.example.env
@@ -114,6 +117,8 @@ There is **no** separate Claude vs Grok tree. Both products get the same files:
 |-----------|-------------|
 | `agent/rules/*` | `~/.claude/rules/` (Grok `~/.grok/rules` is a symlink to that tree) |
 | `agent/skills/*` | `~/.claude/skills/<name>/` (each Grok skill is a symlink to the Claude copy) |
+| `agent/agents/*` | `~/.claude/agents/` (Grok `~/.grok/agents` is a symlink to that tree) |
+| `agent/resources/*` | `~/.claude/resources/` (Grok `~/.grok/resources` is a symlink to that tree) |
 
 **Rules** include: `code-quality`, `security`, `shell`, `python`, `ansible`,
 `terraform`, `helm-k8s`, `iac-plan-analysis`, `otel-instrumentation`,
@@ -127,7 +132,9 @@ patcher vs skeptic, or across graph vs loop vs hunt; thin companions for
 server-admin reuse of forensic cores;
 check upstream callers on updates; research claims vs a cited source →
 `claim-source-check`; graph topology → `agent-graphs`; reconstruct loop →
-`clean-room-reconstruct`), `independent-checker` (the agent that produced a
+`clean-room-reconstruct`; `security-audit` vs `find-patch-loop`; `egm-*`
+vs `check-work`; Obsidian OFM vs a vault plugin; `grilling` /
+`interview-me` vs `grade-stated-ask`), `independent-checker` (the agent that produced a
 claim does not grade it; graphs use `agent-graphs`), `claim-source-check` (cheap checker gets claim +
 source only; vault `supported` pages), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review;
@@ -171,7 +178,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (101) include packaging (`package-toolkit` classifies generic pack
+**Skills** (134) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -215,6 +222,16 @@ stay on `thread-screenshots-*`),
 `claim-source-check` (cheap checker: claim + source only; vault supported pages),
 `leftover-account-sessions` (own-device ADB privacy audit: IME, appops, XPL-EX overlay, KDE Connect trusted names),
 `k8s-control-plane-vpn` (close Kubernetes API/kubelet/etcd off the WAN; overlay VPN optional; hook `control-plane-exposure`),
+merged public skills (`grilling`, `wait-what`, `wayfinder`, `codebase-design`,
+`writing-for-agents`, `wizard`, `to-questionnaire`, `prototype`, `to-tickets`,
+`domain-modeling`; `interview-me`, `doubt-driven-development`,
+`constraint-driven-development`, `source-driven-development`,
+`code-simplification`, `idea-refine`, `shipping-and-launch`,
+`deprecation-and-migration`, `browser-testing-with-devtools`;
+`security-audit`; `obsidian-markdown`, `obsidian-bases`, `json-canvas`,
+`obsidian-cli`, `defuddle`, `knap`; `egm-brainstorm` / `egm-draft` /
+`egm-review` / `egm-review-loop` / `egm-resolve` / `egm-bootstrap` /
+`egm-drift-report` — notices in `agent/THIRD-PARTY.md`),
 `nate-writing-style` (`{user}` placeholder voice notes; replace with your own),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
@@ -278,6 +295,7 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | `prod.kacu.app` / `ridleys.immapi.com` | Cashback iframe and session origins |
 | Reverse Engineer Anything / `rea-agents` | Third-party MCP + skill (MIT, [morluto/rea](https://github.com/morluto/rea)). Pack ships a skill snapshot (v42, package `rea-agents@6.5.0`). Refresh with `npx -y rea-agents@6.5.0 setup --client claude_code` or `--client grok_build`. |
 | n8n / Traefik / `n8n.localhost` | Workflow UI image, reverse-proxy Host rule, and RFC 6761 editor URL |
+| Matt Pocock / Addy Osmani / Cloudflare / kepano / Google EGM skills | Inbound MIT / Apache-2.0 copies in `agent/skills` (plus `agent/agents` and `agent/resources` for EGM/Addy). Notices in `agent/THIRD-PARTY.md`. Copyright lines in per-skill `LICENSE` files stay. |
 
 Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.
 
