@@ -50,7 +50,7 @@ def build_parser() -> argparse.ArgumentParser:
         help="ledger/outbox directory (default: %(default)s)",
     )
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8766)
+    parser.add_argument("--port", type=int, default=8770)
     parser.add_argument(
         "--token-file", type=Path, default=Path(DEFAULT_CRED_FILE).expanduser(), dest="cred_file",
         help="HTTP bearer credential file, minted 0600 if missing (default: %(default)s)",

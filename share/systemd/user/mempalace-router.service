@@ -4,7 +4,7 @@ After=mempalace-mcp-http.service
 
 [Service]
 Type=simple
-ExecStart=%h/.local/bin/mempalace-router --http --host 127.0.0.1 --port 8766
+ExecStart=%h/.local/bin/mempalace-router --http --host 127.0.0.1 --port 8770
 Restart=always
 RestartSec=5
 StandardOutput=journal

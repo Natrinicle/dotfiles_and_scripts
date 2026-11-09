@@ -167,6 +167,9 @@ systemd.
 
 `/healthz` is unauthenticated. `/mcp` and `/statusz` need `Authorization: Bearer`.
 
+To put a scope router in front of the hub (local plus one company palace),
+see section 9.
+
 ## 8. Confirm multi-RW
 
 While `mempalace daemon status` shows a **running** mine:
@@ -182,6 +185,81 @@ or `CUDA_VISIBLE_DEVICES=""`.
 
 Priority on the daemon queue is **DESC then `created_at`**. A high-priority
 mine runs after the in-flight job, ahead of a pile of session `convos` mines.
+
+## 9. Scope router (mempalace-router)
+
+`mempalace-router` is one MCP surface that fans out to `{local}` plus at most
+one company palace. Clients keep the server key `mempalace`, so tool names stay
+`mcp__mempalace__*`.
+
+Invariants:
+
+- The local target is always present.
+- At most one company target is active.
+- A write to a company palace reports `filed → {company} + local`, tagged so
+  the copy in each palace is traceable.
+- `router_retract` removes a filed item from both palaces.
+- If the company hub is unreachable, writes queue in an offline outbox;
+  `router_flush` replays them.
+- Wing/room taxonomy is mapped between local and company palaces.
+
+### Install
+
+```bash
+pipx inject --include-apps mempalace --editable {PACK}/lib/mempalace-router
+```
+
+Plain `pipx inject` does not expose the `mempalace-router` entry point on
+`PATH`; `--include-apps` does. After `install.sh --bin` the package is at
+`~/.local/lib/mempalace-router` (use that as the editable path).
+
+### Config
+
+`~/.config/mempalace-router/targets.yaml`:
+
+```yaml
+targets:
+  local:
+    palace_path: {PALACE}
+  {company}:
+    kind: company
+    company: {company}
+    url: https://{hub-host}/mcp
+    token_file: ~/.config/mempalace-router/tokens/{company}
+```
+
+The HTTP listener reads its bearer token from
+`~/.config/mempalace-router/token` (mode 0600). Do not print or commit it.
+
+### Unit
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp share/systemd/user/mempalace-router.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now mempalace-router.service
+```
+
+It listens on `127.0.0.1:8770` only. Do not rebind it off loopback.
+
+### Clients
+
+- Claude Code: `clients/claude-router.json.example` (stdio, `--stdio`; the
+  router finds the local hub via `targets.yaml`, no env needed)
+- Grok: `clients/grok-router.toml.example` (HTTP, bearer token file)
+
+Restart both clients after changing their config.
+
+### Verify
+
+```bash
+curl http://127.0.0.1:8770/healthz     # ok
+```
+
+`tools/list` through the router returns the hub's tools plus 6 router tools
+(`router_targets`, `router_retract`, `router_flush`, and the rest of the
+router set). `mempalace_status` includes a top-level `by_target` with a
+`local` key.
 
 ## Do not
 
@@ -202,5 +280,5 @@ mine runs after the in-flight job, ahead of a pile of session `convos` mines.
 | `systemd/*.service` | User hub + write daemon |
 | `systemd/mempalace-mcp-http.service.d/` | Qdrant backend, idle-hours, optional CUDA |
 | `install-units.sh` | Copy units into `~/.config/systemd/user/` |
-| `clients/` | Grok HTTP + Claude stdio snippets |
+| `clients/` | Grok HTTP + Claude stdio snippets (plus `*-router.*` for section 9) |
 | `copy-chroma-to-qdrant.py` | Optional vector copy, no re-mine |
