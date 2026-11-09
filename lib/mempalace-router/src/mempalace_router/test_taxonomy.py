@@ -4,7 +4,7 @@ from pathlib import Path
 
 import yaml
 
-from mempalace_router.taxonomy import TaxonomyMap, canonical
+from mempalace_router.taxonomy import TaxonomyError, TaxonomyMap, canonical
 
 
 class CanonicalTests(unittest.TestCase):
@@ -89,6 +89,34 @@ class TaxonomyMapTests(unittest.TestCase):
         m2.load()
         self.assertEqual(m2.wings, m.wings)
         self.assertEqual(m2.rooms, m.rooms)
+
+    def test_save_is_atomic_no_tmp_left_behind(self):
+        m = self.make()
+        m.to_remote("solar", "bms", {})
+        m.save()
+        self.assertEqual(
+            [p.name for p in (self.state / "taxonomy").iterdir()], ["company.yaml"]
+        )
+        m2 = self.make()
+        m2.load()
+        self.assertEqual(m2.wings, m.wings)
+
+    def _write(self, text):
+        path = self.state / "taxonomy" / "company.yaml"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text)
+
+    def test_load_malformed_yaml_raises_taxonomy_error(self):
+        self._write("wings: {a: [unclosed\n")
+        with self.assertRaises(TaxonomyError) as cm:
+            self.make().load()
+        self.assertIn("company.yaml", str(cm.exception))
+
+    def test_load_wrong_shape_raises_taxonomy_error(self):
+        for text in ("- a\n- b\n", "wings: [x]\n", "wings: {}\nrooms: {w: [x]}\n"):
+            self._write(text)
+            with self.assertRaises(TaxonomyError):
+                self.make().load()
 
     def test_load_missing_file_is_empty(self):
         m = self.make()
