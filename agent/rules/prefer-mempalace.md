@@ -10,6 +10,8 @@ session continuity live in **MemPalace** (knowledge graph + drawers).
 Agents on one host share one HTTP hub. Search and write the palace rather
 than a private `{MEMORY_ROOT}/*.md` copy.
 
+Scope: pick targets per rule `mempalace-scope`; the router adds `local` itself.
+
 ## Lookup
 
 On a named person, project, decision, preference, or interface:

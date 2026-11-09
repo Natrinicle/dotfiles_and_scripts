@@ -22,6 +22,8 @@ File before the parent window is compacted:
 Do not wait for the user to say "save this." Palace `add_drawer` /
 `kg_add` / `kg_supersede` is the commit. It is not a git commit.
 
+Scope: pick targets per rule `mempalace-scope`; the router adds `local` itself.
+
 ## What to file
 
 Decisions, constraints, dirty paths, unique phrases, SHAs, command
