@@ -31,7 +31,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr, employer-parent-model, employer-grok)
+├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr, employer-parent-model, employer-grok, employer-claude, employer-anthropic-api-key)
 ├── lib/                           # Off-PATH helpers (adf-ocr.py → ~/.local/lib)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
@@ -55,6 +55,8 @@ out of exports via `${HOME}` / `{...}` placeholders.
     ├── rea-mcp/                       # REA MCP client snippets (Claude JSON / Grok TOML)
     ├── craft-anything-mcp/            # Craft Anything CLI MCP snippets (copy yourself)
     ├── employer-parent-model.env.example  # Employer-tree parent model (copy to ~/.config)
+    ├── employer-claude-settings.json.example  # Claude Code --settings overlay (no key)
+    ├── employer-claude-shim               # Copy to ~/.config/employer-parent-model/bin/claude
     └── pandoc_templates/
 ```
 
@@ -103,8 +105,10 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |
 | `rperks-activate-coupons/` | Puppeteer-core app (own RPerks account). Units in `share/rperks-activate-coupons/` |
 | `gpg-git-commit` | Signed `git commit` via kdialog / loopback when gpg-agent has no cached passphrase (never `--no-gpg-sign`) |
-| `employer-parent-model` | Detect employer-tree cwd and whether the employer parent key env is set (`--check` / `--export` / `--direnv` / `--json` / `--status`). Config `${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env` (example `examples/employer-parent-model.env.example`) |
-| `employer-grok` | Launch `grok -m <employer-parent-slug>`; fail closed if the key env is unset |
+| `employer-parent-model` | Detect employer-tree cwd and whether the employer parent key env is set (`--check` / `--export` / `--direnv` / `--json` / `--status` / `--fetch-key`). `--fetch-key` writes `secrets.env` (mode 600) from Vault path names in config.env. Config `${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env` (example `examples/employer-parent-model.env.example`) |
+| `employer-grok` | Launch `grok -m <employer-parent-slug>`; sources `secrets.env` when present; fail closed if the key env is unset |
+| `employer-claude` | Launch Claude Code against the official Anthropic API with a mode-600 `--settings` overlay (`apiKeyHelper`, empty `ANTHROPIC_AUTH_TOKEN`). Fail closed if the key env is unset. Do not put the key in settings JSON. Copy `examples/employer-claude-settings.json.example` to `${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/claude-settings.json`. Optional PATH shim: `examples/employer-claude-shim` → that config dir's `bin/claude` (not `~/.local/bin/claude`) |
+| `employer-anthropic-api-key` | POSIX `/bin/sh` helper that prints the employer key to stdout only (Claude Code `apiKeyHelper`) |
 
 Skills reference these as **PATH commands**, not a vendor-specific scripts directory.
 See `agent/PATHS.md` for `{MEMORY_ROOT}`, `{AGENT_HOME}`, etc.
@@ -367,7 +371,7 @@ Audited on a typical developer machine. **Most entries are not portable authored
 | RPerks runner | Node, Chromium (`CHROME_PATH` or `/usr/bin/chromium`), `npm install --omit=dev` in the app dir |
 | Reverse Engineer Anything | Node.js + `npx -y rea-agents@6.5.0 mcp`. Optional engines (Hopper, Ghidra, JADX, IDA) are caller-supplied; REA setup does not install them. Client snippets: `examples/rea-mcp/` |
 | Craft Anything | Optional reconstruct engine (`craft-anything-cli mcp`). Early alpha; own-copy only. Client snippets: `examples/craft-anything-mcp/`. `install.sh` does not register it. |
-| Employer parent model | Optional. Copy `examples/employer-parent-model.env.example` to `${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env`. Env-var names only. `employer-grok` fails closed if the key env is unset. |
+| Employer parent model | Optional. Copy `examples/employer-parent-model.env.example` to `${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env` (env-var and Vault path names only). `--fetch-key` needs the `vault` CLI and writes `secrets.env` mode 600. `employer-grok` / `employer-claude` fail closed if the key env is unset. Claude overlay: copy `examples/employer-claude-settings.json.example` to `claude-settings.json` in that config dir. Optional direnv PATH shim: `examples/employer-claude-shim`. |
 
 ## What is intentionally excluded
 

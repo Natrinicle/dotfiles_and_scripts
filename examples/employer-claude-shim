@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+# Copy to ${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/bin/claude
+# and chmod +x. Do not install as ~/.local/bin/claude (that steals personal
+# `claude`). employer-parent-model --direnv prepends that bin dir when the
+# shim exists so `claude` in a hooked employer tree is employer-claude.
+set -euo pipefail
+exec employer-claude "$@"

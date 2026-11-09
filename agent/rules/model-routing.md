@@ -118,5 +118,15 @@ Grok cannot swap the live parent mid-session. New sessions: direnv
 `GROK_DEFAULT_MODEL`, `employer-grok`, or `grok -m <slug>`. In an open
 session, tell the user to `/model <slug>`. Fail closed if the key env is
 unset. Do not put secrets in config.toml; Anthropic Messages needs
-`env_http_headers` for `x-api-key` (not `env_key` Bearer). Config example:
-`examples/employer-parent-model.env.example`.
+`env_http_headers` for `x-api-key` (not `env_key` Bearer). `--fetch-key`
+writes `secrets.env` (mode 600) from Vault path names in config.env.
+
+Claude Code: keep user settings on the personal gateway. Employer trees
+use `employer-claude` (`--settings` overlay: empty `ANTHROPIC_AUTH_TOKEN`,
+POSIX `apiKeyHelper` `employer-anthropic-api-key`, official
+`ANTHROPIC_BASE_URL`). Do not put the key in settings JSON. `--direnv`
+prepends `${XDG_CONFIG_HOME}/employer-parent-model/bin` when that dir
+has a `claude` shim so `claude` in a hooked employer tree is the
+wrapper. Nested git checkouts without direnv still need `employer-claude`.
+Config example: `examples/employer-parent-model.env.example`. Settings
+example: `examples/employer-claude-settings.json.example`.

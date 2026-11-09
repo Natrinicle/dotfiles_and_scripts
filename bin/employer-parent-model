@@ -1,15 +1,28 @@
 #!/usr/bin/env bash
 # Detect employer-tree cwd and whether the employer parent key env is set.
-# Used by SessionStart, direnv .envrc, and employer-grok.
+# Used by SessionStart, direnv .envrc, employer-grok, and employer-claude.
 set -euo pipefail
 
 usage() {
 	cat <<'EOF'
-Usage: employer-parent-model [--cwd PATH] [--check|--export|--direnv|--json|--status]
+Usage: employer-parent-model [--cwd PATH] [--check|--export|--direnv|--json|--status|--fetch-key]
 
 Reads ${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env
 (EMPLOYER_PARENT_MODEL, EMPLOYER_PARENT_OPUS_MODEL, EMPLOYER_PARENT_KEY_ENV,
-EMPLOYER_REPO_ROOTS). No match and no exports when config or roots are empty.
+EMPLOYER_CLAUDE_MODEL, EMPLOYER_CLAUDE_OPUS_MODEL, EMPLOYER_CLAUDE_HAIKU_MODEL,
+EMPLOYER_REPO_ROOTS, optional EMPLOYER_VAULT_ADDR,
+EMPLOYER_PARENT_KEY_VAULT_PATH, EMPLOYER_PARENT_KEY_VAULT_FIELD).
+
+Sources secrets.env from the same directory when present (export KEY=… only;
+chmod 600). --fetch-key writes that file from Vault (names from config.env).
+No match and no exports when config or roots are empty.
+
+--direnv also unsets Claude Code LiteLLM gateway vars and exports official
+Anthropic model ids when the tree matches and the key env is set. If
+${XDG_CONFIG_HOME}/employer-parent-model/bin/claude exists, --direnv
+prepends that directory so `claude` in a hooked employer tree is
+employer-claude. Nested git checkouts without direnv still need
+employer-claude; user ~/.claude/settings.json stays LiteLLM.
 EOF
 }
 
@@ -42,6 +55,10 @@ while [[ $# -gt 0 ]]; do
 		MODE="status"
 		shift
 		;;
+	--fetch-key)
+		MODE="fetch-key"
+		shift
+		;;
 	-h | --help)
 		usage
 		exit 0
@@ -53,7 +70,10 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/config.env"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model"
+CONFIG="${CONFIG_DIR}/config.env"
+SECRETS="${CONFIG_DIR}/secrets.env"
+
 if [[ -f "${CONFIG}" ]]; then
 	# shellcheck disable=SC1090
 	source "${CONFIG}"
@@ -63,6 +83,83 @@ MODEL="${EMPLOYER_PARENT_MODEL:-}"
 OPUS="${EMPLOYER_PARENT_OPUS_MODEL:-}"
 KEY_ENV="${EMPLOYER_PARENT_KEY_ENV:-}"
 ROOTS="${EMPLOYER_REPO_ROOTS:-}"
+CLAUDE_MODEL="${EMPLOYER_CLAUDE_MODEL:-claude-sonnet-5-5}"
+CLAUDE_OPUS="${EMPLOYER_CLAUDE_OPUS_MODEL:-claude-opus-5-5}"
+CLAUDE_HAIKU="${EMPLOYER_CLAUDE_HAIKU_MODEL:-claude-haiku-4-5-20251001}"
+
+fetch_key() {
+	if [[ -z "${KEY_ENV}" ]]; then
+		echo "employer-parent-model: EMPLOYER_PARENT_KEY_ENV is empty" >&2
+		exit 2
+	fi
+	local vault_addr="${EMPLOYER_VAULT_ADDR:-${VAULT_ADDR:-}}"
+	local vault_path="${EMPLOYER_PARENT_KEY_VAULT_PATH:-}"
+	local vault_field="${EMPLOYER_PARENT_KEY_VAULT_FIELD:-api_key}"
+	if [[ -z "${vault_addr}" || -z "${vault_path}" ]]; then
+		echo "employer-parent-model: set EMPLOYER_VAULT_ADDR and EMPLOYER_PARENT_KEY_VAULT_PATH" >&2
+		exit 2
+	fi
+	if ! command -v vault >/dev/null 2>&1; then
+		echo "employer-parent-model: vault CLI not on PATH" >&2
+		exit 127
+	fi
+	mkdir -p "${CONFIG_DIR}"
+	chmod 700 "${CONFIG_DIR}"
+	CONFIG_DIR="${CONFIG_DIR}" SECRETS="${SECRETS}" KEY_ENV="${KEY_ENV}" \
+		VAULT_ADDR="${vault_addr}" VAULT_PATH="${vault_path}" VAULT_FIELD="${vault_field}" \
+		python3 - <<'PY'
+import os, pathlib, shlex, subprocess, tempfile
+
+cfg = pathlib.Path(os.environ["CONFIG_DIR"])
+dest = pathlib.Path(os.environ["SECRETS"])
+key_env = os.environ["KEY_ENV"]
+path = os.environ["VAULT_PATH"]
+field = os.environ["VAULT_FIELD"]
+env = os.environ.copy()
+proc = subprocess.run(
+    ["vault", "kv", "get", f"-field={field}", path],
+    capture_output=True,
+    text=True,
+    env=env,
+    check=False,
+)
+if proc.returncode != 0:
+    err = (proc.stderr or "").splitlines()
+    print("employer-parent-model: vault kv get failed", file=__import__("sys").stderr)
+    for line in err[:8]:
+        if "hvs." in line:
+            continue
+        print(line, file=__import__("sys").stderr)
+    raise SystemExit(proc.returncode)
+val = proc.stdout[:-1] if proc.stdout.endswith("\n") else proc.stdout
+if len(val) < 20:
+    raise SystemExit("employer-parent-model: vault field empty or too short")
+fd, tmp = tempfile.mkstemp(prefix="secrets.", dir=cfg, text=True)
+try:
+    os.fchmod(fd, 0o600)
+    with os.fdopen(fd, "w") as fh:
+        fh.write(f"export {key_env}={shlex.quote(val)}\n")
+        fh.flush()
+        os.fsync(fh.fileno())
+    os.replace(tmp, dest)
+    os.chmod(dest, 0o600)
+finally:
+    if os.path.exists(tmp):
+        os.unlink(tmp)
+print(f"wrote {dest} mode=600 key_len={len(val)}")
+print(f"source {path} field={field}")
+PY
+}
+
+if [[ "${MODE}" == "fetch-key" ]]; then
+	fetch_key
+	exit 0
+fi
+
+if [[ -f "${SECRETS}" ]]; then
+	# shellcheck disable=SC1090
+	source "${SECRETS}"
+fi
 
 abs="$(realpath -m "${CWD}")"
 match=0
@@ -89,17 +186,39 @@ fi
 
 json_out() {
 	python3 -c '
-import json, os, sys
+import json, os
 print(json.dumps({
     "match": os.environ["EPM_MATCH"] == "1",
     "cwd": os.environ["EPM_CWD"],
     "matched_root": os.environ.get("EPM_ROOT", "") or None,
     "model": os.environ.get("EPM_MODEL") or None,
     "opus_model": os.environ.get("EPM_OPUS") or None,
+    "claude_model": os.environ.get("EPM_CLAUDE_MODEL") or None,
+    "claude_opus_model": os.environ.get("EPM_CLAUDE_OPUS") or None,
+    "claude_haiku_model": os.environ.get("EPM_CLAUDE_HAIKU") or None,
     "key_env": os.environ.get("EPM_KEY_ENV") or None,
     "key_set": os.environ["EPM_KEY_SET"] == "1",
 }))
 '
+}
+
+print_owned_exports() {
+	printf 'export GROK_DEFAULT_MODEL=%q\n' "${MODEL}"
+	printf 'export EMPLOYER_PARENT_MODEL_OWNED=1\n'
+	printf 'export %s=%q\n' "${KEY_ENV}" "${key_val}"
+	printf 'unset ANTHROPIC_AUTH_TOKEN\n'
+	printf 'export ANTHROPIC_API_KEY=%q\n' "${key_val}"
+	printf 'export ANTHROPIC_BASE_URL=%q\n' "https://api.anthropic.com"
+	printf 'export ANTHROPIC_MODEL=%q\n' "${CLAUDE_MODEL}"
+	printf 'export ANTHROPIC_DEFAULT_SONNET_MODEL=%q\n' "${CLAUDE_MODEL}"
+	printf 'export ANTHROPIC_DEFAULT_OPUS_MODEL=%q\n' "${CLAUDE_OPUS}"
+	printf 'export ANTHROPIC_DEFAULT_HAIKU_MODEL=%q\n' "${CLAUDE_HAIKU}"
+	printf 'export ANTHROPIC_SMALL_FAST_MODEL=%q\n' "${CLAUDE_HAIKU}"
+	printf 'export CLAUDE_CODE_ASSUME_FIRST_PARTY_BASE_URL=1\n'
+	printf 'export CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=0\n'
+	if [[ -x "${CONFIG_DIR}/bin/claude" ]]; then
+		printf 'export PATH=%q\n' "${CONFIG_DIR}/bin:${PATH}"
+	fi
 }
 
 export EPM_MATCH="${match}"
@@ -107,6 +226,9 @@ export EPM_CWD="${abs}"
 export EPM_ROOT="${matched_root}"
 export EPM_MODEL="${MODEL}"
 export EPM_OPUS="${OPUS}"
+export EPM_CLAUDE_MODEL="${CLAUDE_MODEL}"
+export EPM_CLAUDE_OPUS="${CLAUDE_OPUS}"
+export EPM_CLAUDE_HAIKU="${CLAUDE_HAIKU}"
 export EPM_KEY_ENV="${KEY_ENV}"
 export EPM_KEY_SET="${key_set}"
 
@@ -119,8 +241,7 @@ json)
 	;;
 export | direnv)
 	if [[ "${match}" -eq 1 && "${key_set}" -eq 1 && -n "${MODEL}" ]]; then
-		printf 'export GROK_DEFAULT_MODEL=%q\n' "${MODEL}"
-		printf 'export EMPLOYER_PARENT_MODEL_OWNED=1\n'
+		print_owned_exports
 	elif [[ "${match}" -eq 1 ]]; then
 		printf '# employer-parent-model: tree matched; %s unset — fail closed (no GROK_DEFAULT_MODEL)\n' "${KEY_ENV:-KEY_ENV}"
 	fi
@@ -134,14 +255,16 @@ status)
 	else
 		key_state="UNSET"
 	fi
-	printf 'Employer parent: MATCH root=%s model=%s key=%s (%s)\n' \
-		"${matched_root}" "${MODEL:-unset-model}" "${key_state}" "${KEY_ENV:-no-key-env}"
+	printf 'Employer parent: MATCH root=%s grok=%s claude=%s key=%s (%s)\n' \
+		"${matched_root}" "${MODEL:-unset-model}" "${CLAUDE_MODEL:-unset-claude}" \
+		"${key_state}" "${KEY_ENV:-no-key-env}"
 	if [[ "${key_set}" -eq 0 ]]; then
 		printf 'Key env is empty. New sessions stay on the default parent until it is set.\n'
 	else
 		printf 'New Grok sessions: employer-grok, grok -m %s, or GROK_DEFAULT_MODEL from direnv.\n' "${MODEL}"
+		printf 'New Claude Code sessions: employer-claude, or claude in a direnv-hooked employer tree (PATH shim). Nested git without direnv still needs the wrapper; user settings.json is LiteLLM.\n'
 	fi
-	printf 'This session cannot swap the live parent. In an open session use /model %s.\n' "${MODEL:-<slug>}"
+	printf 'This session cannot swap the live parent. In an open Grok session use /model %s.\n' "${MODEL:-<slug>}"
 	printf 'T0 explore stays on the local pin. Personal work stays on the default parent.\n'
 	;;
 *)

@@ -1,0 +1,125 @@
+#!/usr/bin/env bash
+# Launch Claude Code against the official Anthropic API with the employer key.
+# Fail closed if the key env is unset. Does not put the key in settings JSON.
+# User ~/.claude/settings.json stays LiteLLM for personal `claude`.
+set -euo pipefail
+
+HELPER="${HOME}/.claude/scripts/employer-parent-model"
+if [[ ! -x "${HELPER}" ]]; then
+	HELPER="$(command -v employer-parent-model || true)"
+fi
+if [[ -z "${HELPER}" || ! -x "${HELPER}" ]]; then
+	echo "employer-claude: employer-parent-model not found" >&2
+	exit 127
+fi
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model"
+SECRETS="${CONFIG_DIR}/secrets.env"
+if [[ -f "${SECRETS}" ]]; then
+	# shellcheck disable=SC1090
+	source "${SECRETS}"
+fi
+
+mapfile -t _epm < <("${HELPER}" --json | python3 -c '
+import json, sys
+d = json.load(sys.stdin)
+print(d.get("claude_model") or "claude-sonnet-5-5")
+print(d.get("claude_haiku_model") or "claude-haiku-4-5-20251001")
+print(d.get("key_env") or "KEY_ENV")
+print("1" if d.get("key_set") else "0")
+print("1" if d.get("match") else "0")
+')
+EPM_CLAUDE_MODEL="${_epm[0]:-claude-sonnet-5-5}"
+EPM_CLAUDE_HAIKU="${_epm[1]:-claude-haiku-4-5-20251001}"
+EPM_KEY_ENV="${_epm[2]:-KEY_ENV}"
+EPM_KEY_SET="${_epm[3]:-0}"
+EPM_MATCH="${_epm[4]:-0}"
+
+if [[ "${EPM_KEY_SET}" != "1" ]]; then
+	echo "employer-claude: ${EPM_KEY_ENV} is unset — fail closed" >&2
+	exit 2
+fi
+
+KEY_HELPER="${HOME}/.claude/scripts/employer-anthropic-api-key"
+if [[ ! -x "${KEY_HELPER}" ]]; then
+	KEY_HELPER="$(command -v employer-anthropic-api-key || true)"
+fi
+if [[ -z "${KEY_HELPER}" || ! -x "${KEY_HELPER}" ]]; then
+	echo "employer-claude: employer-anthropic-api-key not found" >&2
+	exit 127
+fi
+_helper_dir="$(dirname "${KEY_HELPER}")"
+export PATH="${_helper_dir}:${HOME}/.local/bin:${PATH}"
+
+# Skip this wrapper and the direnv PATH shim (~/.config/employer-parent-model/bin/claude).
+find_real_claude() {
+	local cand real base shim_dir
+	shim_dir="${CONFIG_DIR}/bin"
+	if [[ -n "${CLAUDE_BIN:-}" && -x "${CLAUDE_BIN}" ]]; then
+		real="$(readlink -f "${CLAUDE_BIN}" || true)"
+		base="$(basename "${real:-${CLAUDE_BIN}}")"
+		if [[ "${base}" != "employer-claude" && "${CLAUDE_BIN}" != "${shim_dir}/claude" && "${real}" != "${shim_dir}/claude" ]]; then
+			printf '%s' "${CLAUDE_BIN}"
+			return 0
+		fi
+	fi
+	while IFS= read -r cand; do
+		[[ -z "${cand}" ]] && continue
+		real="$(readlink -f "${cand}" || true)"
+		base="$(basename "${real:-${cand}}")"
+		if [[ "${base}" == "employer-claude" ]]; then
+			continue
+		fi
+		if [[ "${cand}" == "${shim_dir}/claude" || "${real}" == "${shim_dir}/claude" ]]; then
+			continue
+		fi
+		printf '%s' "${cand}"
+		return 0
+	done < <(type -aP claude 2>/dev/null || true)
+	return 1
+}
+
+CLAUDE_BIN="$(find_real_claude || true)"
+if [[ -z "${CLAUDE_BIN}" ]]; then
+	echo "employer-claude: claude not on PATH (or only the employer shim)" >&2
+	exit 127
+fi
+
+SETTINGS_TEMPLATE="${CONFIG_DIR}/claude-settings.json"
+if [[ ! -f "${SETTINGS_TEMPLATE}" ]]; then
+	echo "employer-claude: missing ${SETTINGS_TEMPLATE}" >&2
+	exit 2
+fi
+
+if [[ "${EPM_MATCH}" != "1" ]]; then
+	echo "employer-claude: cwd is not an employer tree; still using the employer key (explicit wrapper)." >&2
+fi
+
+RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+SETTINGS="$(mktemp "${RUNTIME_DIR}/employer-claude-settings.XXXXXX.json")"
+chmod 600 "${SETTINGS}"
+KEY_HELPER="${KEY_HELPER}" SETTINGS_TEMPLATE="${SETTINGS_TEMPLATE}" SETTINGS="${SETTINGS}" python3 - <<'PY'
+import json, os, pathlib
+src = pathlib.Path(os.environ["SETTINGS_TEMPLATE"])
+dest = pathlib.Path(os.environ["SETTINGS"])
+helper = os.environ["KEY_HELPER"]
+data = json.loads(src.read_text())
+data["apiKeyHelper"] = helper
+dest.write_text(json.dumps(data, indent=2) + "\n")
+PY
+
+trap 'rm -f "${SETTINGS}"' EXIT
+
+# User settings.json sets ANTHROPIC_AUTH_TOKEN=sk-no-key (LiteLLM). flagSettings
+# from --settings overlays after that. Empty AUTH_TOKEN clears the dummy.
+# apiKeyHelper prints the key; do not put it in the JSON file.
+env -u ANTHROPIC_AUTH_TOKEN \
+	ANTHROPIC_API_KEY="${!EPM_KEY_ENV}" \
+	ANTHROPIC_BASE_URL="https://api.anthropic.com" \
+	ANTHROPIC_MODEL="${EPM_CLAUDE_MODEL}" \
+	ANTHROPIC_SMALL_FAST_MODEL="${EPM_CLAUDE_HAIKU}" \
+	CLAUDE_CODE_ASSUME_FIRST_PARTY_BASE_URL=1 \
+	CLAUDE_CODE_ENABLE_GATEWAY_MODEL_DISCOVERY=0 \
+	"${CLAUDE_BIN}" --settings "${SETTINGS}" --model "${EPM_CLAUDE_MODEL}" "$@"
+status=$?
+exit "${status}"

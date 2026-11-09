@@ -11,6 +11,12 @@ if [[ -z "${HELPER}" || ! -x "${HELPER}" ]]; then
 	exit 127
 fi
 
+SECRETS="${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model/secrets.env"
+if [[ -f "${SECRETS}" ]]; then
+	# shellcheck disable=SC1090
+	source "${SECRETS}"
+fi
+
 mapfile -t _epm < <("${HELPER}" --json | python3 -c '
 import json, sys
 d = json.load(sys.stdin)

@@ -1,0 +1,25 @@
+#!/bin/sh
+# Print the employer Anthropic API key for Claude Code apiKeyHelper.
+# stdout is the key only. No other output. Fail closed if unset.
+# Must stay POSIX: Claude Code runs apiKeyHelper with /bin/sh.
+set -eu
+
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/employer-parent-model"
+if [ -f "${CONFIG_DIR}/config.env" ]; then
+	# shellcheck disable=SC1091
+	. "${CONFIG_DIR}/config.env"
+fi
+if [ -f "${CONFIG_DIR}/secrets.env" ]; then
+	# shellcheck disable=SC1091
+	. "${CONFIG_DIR}/secrets.env"
+fi
+
+KEY_ENV="${EMPLOYER_PARENT_KEY_ENV:-}"
+if [ -z "${KEY_ENV}" ]; then
+	exit 2
+fi
+eval "val=\${${KEY_ENV}-}"
+if [ -z "${val}" ]; then
+	exit 2
+fi
+printf '%s' "${val}"
