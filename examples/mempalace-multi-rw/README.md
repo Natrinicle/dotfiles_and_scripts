@@ -167,6 +167,9 @@ systemd.
 
 `/healthz` is unauthenticated. `/mcp` and `/statusz` need `Authorization: Bearer`.
 
+To put a scope router in front of the hub (local plus one company palace),
+see section 9.
+
 ## 8. Confirm multi-RW
 
 While `mempalace daemon status` shows a **running** mine:
@@ -182,6 +185,106 @@ or `CUDA_VISIBLE_DEVICES=""`.
 
 Priority on the daemon queue is **DESC then `created_at`**. A high-priority
 mine runs after the in-flight job, ahead of a pile of session `convos` mines.
+
+## 9. Scope router (mempalace-router)
+
+`mempalace-router` is one MCP surface that fans out to `{local}` plus at most
+one company palace. Clients keep the server key `mempalace`, so tool names stay
+`mcp__mempalace__*`.
+
+Invariants:
+
+- The local target is always present.
+- At most one company target is active.
+- A write to a company palace returns `filed_to` and the tag
+  `filed → {company} + local` in the response. The tag is not stored in
+  either palace; the router's ledger records which company id came from
+  which call.
+- `router_retract` removes a filed item from the company palace only (and
+  drops it from the outbox if it is still queued). The local copy is kept.
+- If the company hub is unreachable, writes queue in an offline outbox. The
+  outbox drains on router start, before the next write to that company, and
+  on `router_flush`.
+- Wing/room taxonomy is mapped between local and company palaces.
+- Company-scope reads correct only KG predicates listed in
+  `single_valued_predicates` (default `version`, `interface_kind`, `reach`,
+  `status`): the older side is superseded. Other conflicts are reported.
+
+Router tools:
+
+- `router_targets`: targets, reachability, hints, outbox depth and `todo`.
+- `router_status`: targets, outbox depth, ledger size and `todo`.
+- `router_flush(target)`: push one company's queued writes now.
+- `router_retract(ref, target?)`: undo company writes by call id, mine job
+  id, local id or company id; local copies are kept.
+- `router_replicate(ref_or_fact, to)`: copy a local drawer or fact to one or
+  more companies (the only cross-company path; logged).
+- `router_mine(dir, scope, wing?, room?)`: local leg runs
+  `mempalace mine DIR --daemon --background`; a company in scope gets the
+  `.md`/`.txt` files chunked into `add_drawer` calls.
+
+### Install
+
+```bash
+pipx inject --include-apps mempalace --editable {PACK}/lib/mempalace-router
+```
+
+Plain `pipx inject` does not expose the `mempalace-router` entry point on
+`PATH`; `--include-apps` does. After `install.sh --bin` the package is at
+`~/.local/lib/mempalace-router` (use that as the editable path).
+
+### Config
+
+`~/.config/mempalace-router/targets.yaml`:
+
+```yaml
+targets:
+  local:
+    kind: local
+    palace_path: {PALACE}
+  {company}:
+    kind: company
+    company: {company}
+    url: https://{hub-host}/mcp
+    token_file: ~/.config/mempalace-router/tokens/{company}
+# optional; predicates whose read-time conflicts may be corrected
+single_valued_predicates: [version, interface_kind, reach, status]
+```
+
+`url` may be the hub base or the full `.../mcp` endpoint; the router strips a
+trailing `/mcp`.
+
+The HTTP listener reads its bearer token from
+`~/.config/mempalace-router/token` (mode 0600). Do not print or commit it.
+
+### Unit
+
+```bash
+mkdir -p ~/.config/systemd/user
+cp share/systemd/user/mempalace-router.service ~/.config/systemd/user/
+systemctl --user daemon-reload
+systemctl --user enable --now mempalace-router.service
+```
+
+It listens on `127.0.0.1:8770` only. Do not rebind it off loopback.
+
+### Clients
+
+- Claude Code: `clients/claude-router.json.example` (stdio, `--stdio`; the
+  router finds the local hub via `targets.yaml`, no env needed)
+- Grok: `clients/grok-router.toml.example` (HTTP, bearer token file)
+
+Restart both clients after changing their config.
+
+### Verify
+
+```bash
+curl http://127.0.0.1:8770/healthz     # ok
+```
+
+`tools/list` through the router returns the hub's tools plus the 6 router
+tools listed above. `mempalace_status` includes a top-level `by_target` with a
+`local` key.
 
 ## Do not
 
@@ -202,5 +305,5 @@ mine runs after the in-flight job, ahead of a pile of session `convos` mines.
 | `systemd/*.service` | User hub + write daemon |
 | `systemd/mempalace-mcp-http.service.d/` | Qdrant backend, idle-hours, optional CUDA |
 | `install-units.sh` | Copy units into `~/.config/systemd/user/` |
-| `clients/` | Grok HTTP + Claude stdio snippets |
+| `clients/` | Grok HTTP + Claude stdio snippets (plus `*-router.*` for section 9) |
 | `copy-chroma-to-qdrant.py` | Optional vector copy, no re-mine |
