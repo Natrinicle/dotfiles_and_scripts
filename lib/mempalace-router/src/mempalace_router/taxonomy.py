@@ -8,6 +8,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import os
+import tempfile
+
 import yaml
 
 _ABBREVIATIONS = {
@@ -39,6 +42,10 @@ def canonical(name: str) -> str:
     return _ABBREVIATIONS.get(token, token)
 
 
+class TaxonomyError(ValueError):
+    """Raised when a persisted taxonomy file is unreadable or malformed."""
+
+
 class TaxonomyMap:
     """Alias table between local names and one target's remote names.
 
@@ -57,15 +64,46 @@ class TaxonomyMap:
         if not self.path.exists():
             self.wings, self.rooms = {}, {}
             return
-        data = yaml.safe_load(self.path.read_text()) or {}
-        self.wings = dict(data.get("wings") or {})
-        self.rooms = {w: dict(r) for w, r in (data.get("rooms") or {}).items()}
+        try:
+            data = yaml.safe_load(self.path.read_text())
+        except yaml.YAMLError as exc:
+            raise TaxonomyError(f"{self.path}: invalid YAML: {exc}") from exc
+        if data is None:
+            data = {}
+        if not isinstance(data, dict):
+            raise TaxonomyError(f"{self.path}: top level must be a mapping")
+        wings = data.get("wings") or {}
+        rooms = data.get("rooms") or {}
+        if not isinstance(wings, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in wings.items()
+        ):
+            raise TaxonomyError(f"{self.path}: 'wings' must map str to str")
+        if not isinstance(rooms, dict) or not all(
+            isinstance(w, str)
+            and isinstance(r, dict)
+            and all(isinstance(k, str) and isinstance(v, str) for k, v in r.items())
+            for w, r in rooms.items()
+        ):
+            raise TaxonomyError(f"{self.path}: 'rooms' must map str to str-to-str mappings")
+        self.wings = dict(wings)
+        self.rooms = {w: dict(r) for w, r in rooms.items()}
 
     def save(self) -> None:
+        """Atomically write the YAML (temp file, fsync, rename)."""
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(
-            yaml.safe_dump({"wings": self.wings, "rooms": self.rooms}, sort_keys=True)
-        )
+        text = yaml.safe_dump({"wings": self.wings, "rooms": self.rooms}, sort_keys=True)
+        with tempfile.NamedTemporaryFile(
+            "w", dir=self.path.parent, prefix=self.path.name + ".", suffix=".tmp",
+            delete=False,
+        ) as tmp:
+            try:
+                tmp.write(text)
+                tmp.flush()
+                os.fsync(tmp.fileno())
+            except BaseException:
+                os.unlink(tmp.name)
+                raise
+        os.replace(tmp.name, self.path)
 
     @staticmethod
     def _match(local: str, candidates, taken: set[str]) -> str:
@@ -82,14 +120,14 @@ class TaxonomyMap:
         created = False
         rw = self.wings.get(wing)
         if rw is None:
-            taken = {r for l, r in self.wings.items() if l != wing}
+            taken = {r for lw, r in self.wings.items() if lw != wing}
             rw = self._match(wing, remote_taxonomy, taken)
             self.wings[wing] = rw
             created = True
         room_map = self.rooms.setdefault(wing, {})
         rr = room_map.get(room)
         if rr is None:
-            taken = {r for l, r in room_map.items() if l != room}
+            taken = {r for lr, r in room_map.items() if lr != room}
             rr = self._match(room, remote_taxonomy.get(rw, {}), taken)
             room_map[room] = rr
             created = True
@@ -105,5 +143,5 @@ class TaxonomyMap:
             for local_room, remote_room in self.rooms.get(local_wing, {}).items():
                 if remote_room == room:
                     return local_wing, local_room
-        local_wing = next((l for l, r in self.wings.items() if r == wing), wing)
+        local_wing = next((lw for lw, r in self.wings.items() if r == wing), wing)
         return local_wing, room
