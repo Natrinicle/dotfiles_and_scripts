@@ -17,4 +17,7 @@ description: >
 
 Lift **frame + CRC** only. Do not commit the blob.
 
+Strings / Ghidra / r2 walks are a **child** (`dump-harvest`, T2, effort
+**high** — skill `model-router`). Do not dump the image into the parent.
+
 Paths: `reverse-engineering-protocols` → `references/artifact-kinds.md`.

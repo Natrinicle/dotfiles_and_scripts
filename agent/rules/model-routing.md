@@ -16,16 +16,22 @@ child's compact is the child's rate (`$0` local). Search/answer backends
 
 ## Spawn local first (automatic)
 
-Before a discovery loop on the parent, spawn a pinned light child
-(`explore`, `code-explorer`, `local-search`, `local-extract`, and any other
-types the host config pins to Ollama). Omit an explicit `model` so the pin
-applies.
+Every spawn uses this rule plus skill `model-router` (task id → tier →
+model → effort). Pinned light types omit `model` so host T0 pins apply.
+Unpinned / dump-harvest / protocol-recover children load the skill and
+pass the table's `model`.
 
-Spawn `explore` or `code-explorer` when the next work is:
+Spawn `explore` or `code-explorer` when the next work is **source-tree**
+search (healthy T0 pin):
 
 - Code exploration, “how does X work”, architecture / call-graph mapping
 - File search over **multiple locations** or an unknown forest
 - Extract/summarize from a large file on disk
+
+A dump walk (jadx, unpacked app/firmware, many commands in one blob tree)
+is **`dump-harvest` (T2)**, not T0 explore. Protocol frames + encoder pack
+is **`protocol-recover` (T2)**. Spawn those before a parent discovery loop
+(rule `subagents-first`).
 
 A single `rg` / `grep` of one tree, or one command piped into grep, stays
 on the parent.
@@ -33,9 +39,14 @@ on the parent.
 Tool-free T0 text **already in context** → a short local generate (no explore
 child). See skill `skill-router`.
 
+**Ollama overloaded:** T0 may fall back to the **lowest upstream** tier
+(T1). Claude: Haiku. Grok: cheapest cloud slug in the spawn enum that is
+not the xhigh parent session id and not another local/Ollama id. Retry
+HTTP 503 once, then T1 is allowed. A slow VRAM load is not overload.
+
 **Escalate once** if the local result is empty, malformed, shallow, or misses
-files that exist: redo on the parent or `general-purpose`. Keep the local
-result when it is usable.
+files that exist: redo at the next model-router tier (dump-harvest stays T2,
+not Haiku). Keep the local result when it is usable.
 
 Skip the child when the user named 1–2 exact files, the next step is one
 `rg`/`grep` of one tree or a command piped into grep, or the work is a
@@ -43,8 +54,9 @@ single helper, MCP / browser / review / judgment call the parent is
 already doing.
 
 Offload: rule **subagents-first**. Spawn for software install that includes
-config and service files, multi-location search, decompile, large extract,
-multi-file implementation. Parent summarizes and verifies. Hook
+config and service files, multi-location search, **discovery loops**,
+decompile, large extract, multi-file implementation. Parent summarizes
+and verifies. Model + effort: this rule / skill `model-router`. Hook
 `prefer-spawn-search` **denies** forest and multi-location search; a single
 `rg` of one tree, or a command piped into grep, stays on the parent. One
 large unit → `spawn_subagent`.
@@ -55,12 +67,12 @@ Several units that do not share a window → skill **agent-graphs**.
 On Grok Build / Grok CLI:
 
 1. Do **not** re-read the full model-router skill or routing table before every
-   local spawn.
+   **pinned T0** spawn. The pin is the route when Ollama is healthy.
 2. Light subagent types are already pinned in the host config. Spawn them;
    the pin is the route.
-3. Load `{MEMORY_ROOT}/model-routing-table.md` only when adding/changing a
-   tier, auditing cost, or dispatching a Claude Agent-tool call that needs an
-   explicit `model`.
+3. Load skill `model-router` and `{MEMORY_ROOT}/model-routing-table.md` when
+   the task is unpinned: dump-harvest, protocol-recover, Claude Agent `model`,
+   adding/changing a tier, auditing cost, or Ollama overload fallback.
 4. Parent stays on a capable model for planning, MCP, implementation, and
    synthesis.
 
@@ -86,11 +98,12 @@ Before dispatching a subagent via the Agent tool, consult
   fail → next model tier.
 - Log dispatches when practical (task_id, model, validation).
 - When creating or editing skills, decompose so T0/T1 phases can stay local.
-- **T0 default:** local Ollama. Fall back to a small cloud model only if
-  Ollama is down (Claude/T0 curl path); Grok local pins fail closed if Ollama
-  is down. First load into VRAM can take minutes; use a 600s client timeout
-  and `keep_alive=-1`. Preload the T0 tag before a burst of local calls.
-  HTTP 503 is the queue, not a timeout — do not silent-fallback on 503.
+- **T0 default:** local Ollama. Fall back to the **lowest upstream** tier
+  (T1 / Haiku, or the cheapest cloud slug on Grok) if Ollama is down **or
+  overloaded**. Retry HTTP 503 once, then T1 is allowed. A slow VRAM load
+  is not overload. Do not fall back to Fable, Opus, or parent xhigh.
+  First load into VRAM can take minutes; use a 600s client timeout and
+  `keep_alive=-1`. Preload the T0 tag before a burst of local calls.
   Details: skill `model-router`.
 
 ## What stays remote (do not pin to 8B local)
@@ -98,6 +111,9 @@ Before dispatching a subagent via the Agent tool, consult
 - `plan`, `general-purpose`, code reviewers, architecture critics,
   adversarial/style judgment, PII risk judgment, multi-file implementation
   agents
+- Dump harvest / jadx / firmware strings / protocol recover
+  (`dump-harvest`, `protocol-recover`) — T2, effort **high**. Not Haiku,
+  not local 8B, not Fable, not parent **xhigh**.
 
 ## Decision models (System One) vs chat T0
 
