@@ -1,7 +1,6 @@
 [Unit]
 Description=MemPalace scope router (stdio/HTTP MCP fan-out)
 After=mempalace-mcp-http.service
-Wants=network-online.target
 
 [Service]
 Type=simple

@@ -19,14 +19,18 @@ def ensure_credential_file(path: Path) -> str:
     """Return the bearer credential at ``path``, minting it (mode 0600) if missing."""
     path = Path(path).expanduser()
     try:
-        return path.read_text().strip()
+        existing = path.read_text().strip()
     except FileNotFoundError:
-        pass
+        existing = ""
+    if existing:
+        return existing
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     value = secrets.token_urlsafe(32)
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.tmp")
+    fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w") as fh:
         fh.write(value + "\n")
+    os.replace(tmp, path)
     return value
 
 
@@ -72,7 +76,11 @@ def main(argv=None) -> int:
     if args.check_config:
         print("ok")
         return 0
-    use_http = args.http or (not args.stdio and sys.stdin.isatty())
+    try:
+        interactive = sys.stdin.isatty()
+    except (ValueError, AttributeError):
+        interactive = False
+    use_http = args.http or (not args.stdio and interactive)
     router = Router(targets, state_dir=args.state_dir)
     try:
         if use_http:
