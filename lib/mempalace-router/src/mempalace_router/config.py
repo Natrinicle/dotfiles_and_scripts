@@ -11,8 +11,6 @@ import yaml
 class ConfigError(ValueError):
     """Raised when configuration is invalid."""
 
-    pass
-
 
 @dataclass(frozen=True)
 class Target:
@@ -43,6 +41,29 @@ class Targets:
 DEFAULT_CONFIG_PATH = Path("~/.config/mempalace-router/targets.yaml").expanduser()
 
 
+def _validate_hints(hints_value, target_name: str) -> dict[str, list[str]]:
+    """Validate and normalize hints field.
+
+    Returns empty dict if absent or null.
+    Raises ConfigError if not a dict with list values.
+    """
+    if hints_value is None:
+        return {}
+    if not isinstance(hints_value, dict):
+        raise ConfigError(f"Target '{target_name}' hints must be a dict, got {type(hints_value).__name__}")
+    for key, value in hints_value.items():
+        if not isinstance(value, list):
+            raise ConfigError(
+                f"Target '{target_name}' hints['{key}'] must be a list, got {type(value).__name__}"
+            )
+        for item in value:
+            if not isinstance(item, str):
+                raise ConfigError(
+                    f"Target '{target_name}' hints['{key}'] contains non-string item: {type(item).__name__}"
+                )
+    return hints_value
+
+
 def load_targets(path: Path) -> Targets:
     """Load targets from a YAML file.
 
@@ -57,8 +78,13 @@ def load_targets(path: Path) -> Targets:
 
     Raises ConfigError if validation fails.
     """
-    with open(path) as f:
-        data = yaml.safe_load(f)
+    try:
+        with open(path) as f:
+            data = yaml.safe_load(f)
+    except FileNotFoundError as e:
+        raise ConfigError(f"Config file not found: {path}") from e
+    except yaml.YAMLError as e:
+        raise ConfigError(f"Invalid YAML in {path}: {e}") from e
 
     if not isinstance(data, dict) or "targets" not in data:
         raise ConfigError("YAML must have a 'targets' key at root")
@@ -83,7 +109,7 @@ def load_targets(path: Path) -> Targets:
         url = target_data.get("url")
         token_file_raw = target_data.get("token_file")
         palace_path_raw = target_data.get("palace_path")
-        hints = target_data.get("hints", {})
+        hints_raw = target_data.get("hints")
 
         # Expand ~ and $HOME in paths only
         if token_file_raw:
@@ -99,6 +125,10 @@ def load_targets(path: Path) -> Targets:
             palace_path = None
 
         if kind == "local":
+            # Local target must not have company field
+            if target_data.get("company") is not None:
+                raise ConfigError(f"Local target '{name}' cannot have 'company' field")
+
             # Local target: must have (url + token_file) or palace_path
             if (url and token_file) or palace_path:
                 if url and token_file and palace_path:
@@ -110,6 +140,7 @@ def load_targets(path: Path) -> Targets:
                     f"Local target '{name}' must have (url + token_file) or palace_path"
                 )
 
+            hints = _validate_hints(hints_raw, name)
             target = Target(
                 name=name,
                 kind="local",
@@ -123,6 +154,10 @@ def load_targets(path: Path) -> Targets:
             by_name[name] = target
 
         elif kind == "company":
+            # Company target must not have palace_path field
+            if palace_path_raw is not None:
+                raise ConfigError(f"Company target '{name}' cannot have 'palace_path' field")
+
             # Company target: must have company, url, and token_file
             company = target_data.get("company")
             if not company:
@@ -132,6 +167,7 @@ def load_targets(path: Path) -> Targets:
             if not token_file:
                 raise ConfigError(f"Company target '{name}' must have 'token_file' field")
 
+            hints = _validate_hints(hints_raw, name)
             target = Target(
                 name=name,
                 kind="company",
