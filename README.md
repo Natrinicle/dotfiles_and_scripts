@@ -36,7 +36,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 43 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 134 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 135 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
@@ -182,7 +182,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (134) include packaging (`package-toolkit` classifies generic pack
+**Skills** (135) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -215,6 +215,8 @@ Grok workflow `agent-graph`),
 `session-tunes` (quiet evolving RTTTL flock plus 70s computer-room analog beeps while the agent works; compositor/portal video-in is not a call; flock resumes after a sting if another session is still busy),
 `update-contacts-from-sources` (address-book create/patch from dumps; some
 cards are businesses; `Me to` / `Voicemail from` are cruft),
+`contact-notes-from-sources` (append-only biographies and postal addresses
+from Voice dumps; never replace existing notes),
 `rperks-activate-coupons` (own-account Ridley's RPerks digital coupons),
 `n8n-workflow` (generate/import a clickable DAG at `n8n.localhost`; example
 compose in `examples/n8n/`),
