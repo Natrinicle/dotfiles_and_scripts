@@ -1,0 +1,6 @@
+# Fragment for ~/.grok/config.toml (scope router, README section 9)
+# Restart the Grok CLI after changing this file.
+
+[mcp_servers.mempalace]
+url = "http://127.0.0.1:8770/mcp"
+bearer_token_file = "~/.config/mempalace-router/token"

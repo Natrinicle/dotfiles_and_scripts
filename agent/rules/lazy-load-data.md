@@ -56,6 +56,7 @@ names it. Do not `mempalace sync` in a way that prunes those drawers.
 | Looking up an API, CLI, device, MCP, library, or protocol | rules `prefer-mempalace` + `mempalace-file-interfaces`; search palace first, then file methods the same turn. A chat recap is not filing. Palace `add_drawer` is the commit. |
 | Compaction-time session continuity | rules `prefer-mempalace` + `mempalace-compact-filing`; file necessary pieces to palace before compact; lookup drawers later; the compact summary is not filing |
 | Durable facts vs local memory files | rule `prefer-mempalace`; palace KG / newest `filed_at` wins |
+| Scope-routed MemPalace / company palaces / mempalace-router | rule `mempalace-scope`; `kg_query` `mempalace-router` + search `mempalace-router scope local always one company filed tag retract outbox 2026-11-09` (wing personal / tools) |
 | Preference / fact replacements over time | rule `mempalace-timeline-supersede`; `{MEMORY_ROOT}/mempalace-recency-and-preferences.md` |
 | Browser automation | palace first (`browser control Chromium CDP`); disk fallback only if still listed |
 | LinkedIn DM / Voyager thread archive | palace `LinkedIn Voyager messaging events csrf JSESSIONID`; skill `linkedin-thread-archive` |
