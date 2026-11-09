@@ -1,6 +1,10 @@
 """Pure merge logic for fan-out search and kg_query results."""
 
+from collections.abc import Collection
+from datetime import datetime, timezone
 from typing import Callable
+
+_OLDEST = datetime.min.replace(tzinfo=timezone.utc)
 
 
 def merge_search(
@@ -75,11 +79,33 @@ def _is_current(fact: dict) -> bool:
     return fact.get("valid_to") is None
 
 
+def valid_from_key(value: object) -> datetime:
+    """Comparable UTC instant for a fact's ``valid_from``.
+
+    ``None``, empty or unparseable values sort oldest. A date-only value is
+    midnight UTC; a datetime without an offset is taken as UTC; ``Z`` and
+    explicit offsets are honoured.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return _OLDEST
+    text = value.strip()
+    if text.endswith(("Z", "z")):
+        text = text[:-1] + "+00:00"
+    try:
+        stamp = datetime.fromisoformat(text)
+    except ValueError:
+        return _OLDEST
+    if stamp.tzinfo is None:
+        stamp = stamp.replace(tzinfo=timezone.utc)
+    return stamp.astimezone(timezone.utc)
+
+
 def merge_kg_query(
     by_target: dict[str, dict],
     *,
     company: str | None,
     local: str,
+    single_valued: Collection[str] = frozenset(),
 ) -> tuple[dict, list[dict]]:
     """Merge decoded ``mempalace_kg_query`` results and detect conflicts.
 
@@ -87,10 +113,14 @@ def merge_kg_query(
         by_target: Decoded kg_query results keyed by target name.
         company: Name of the company target, or None for no conflict check.
         local: Name of the local target.
+        single_valued: Predicates eligible for a correction action. A
+            conflict on any other predicate gets ``action: "none"``.
 
     Returns:
         ``(merged, conflicts)``. Each conflict is ``{subject, predicate, local,
-        company, winner, action}``.
+        company, winner, action}``. The newer ``valid_from`` (see
+        :func:`valid_from_key`) wins; an exact tie goes to the company,
+        because hub facts carry no ``filed_at`` to break it.
     """
     merged: dict = {
         "entity": None,
@@ -117,7 +147,9 @@ def merge_kg_query(
 
     conflicts: list[dict] = []
     if company is not None:
-        conflicts = _detect_conflicts(by_target.get(local), by_target.get(company))
+        conflicts = _detect_conflicts(
+            by_target.get(local), by_target.get(company), frozenset(single_valued)
+        )
     return merged, conflicts
 
 
@@ -132,7 +164,9 @@ def _current_by_key(result: object) -> dict[tuple, list[dict]]:
     return groups
 
 
-def _detect_conflicts(local_result: object, company_result: object) -> list[dict]:
+def _detect_conflicts(
+    local_result: object, company_result: object, single_valued: frozenset[str]
+) -> list[dict]:
     """Find differing current objects between local and company facts."""
     local_groups = _current_by_key(local_result)
     company_groups = _current_by_key(company_result)
@@ -146,12 +180,12 @@ def _detect_conflicts(local_result: object, company_result: object) -> list[dict
         if local_objects == company_objects:
             continue
         multi = len(local_facts) > 1 or len(company_facts) > 1
-        local_fact = max(local_facts, key=lambda f: f.get("valid_from") or "")
-        company_fact = max(company_facts, key=lambda f: f.get("valid_from") or "")
-        local_from = local_fact.get("valid_from") or ""
-        company_from = company_fact.get("valid_from") or ""
+        local_fact = max(local_facts, key=lambda f: valid_from_key(f.get("valid_from")))
+        company_fact = max(company_facts, key=lambda f: valid_from_key(f.get("valid_from")))
+        local_from = valid_from_key(local_fact.get("valid_from"))
+        company_from = valid_from_key(company_fact.get("valid_from"))
         winner = "local" if local_from > company_from else "company"
-        if multi:
+        if multi or key[1] not in single_valued:
             action = "none"
         else:
             action = "supersede_local" if winner == "company" else "supersede_company"

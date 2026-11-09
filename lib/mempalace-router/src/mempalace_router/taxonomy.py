@@ -10,6 +10,7 @@ from pathlib import Path
 
 import os
 import tempfile
+import threading
 
 import yaml
 
@@ -52,6 +53,10 @@ class TaxonomyMap:
     ``to_remote`` auto-saves: whenever it records a new alias row it calls
     ``save()`` so the mapping survives a crash between the call and the
     write it guides. Callers need not save manually.
+
+    All methods hold an internal lock, so one map may be shared by the
+    router's worker threads. Read through :meth:`known` / :meth:`alias_count`
+    rather than iterating ``wings`` / ``rooms`` from another thread.
     """
 
     def __init__(self, target_name: str, state_dir: Path):
@@ -59,8 +64,24 @@ class TaxonomyMap:
         self.path = Path(state_dir) / "taxonomy" / f"{target_name}.yaml"
         self.wings: dict[str, str] = {}
         self.rooms: dict[str, dict[str, str]] = {}
+        self._lock = threading.RLock()
+
+    def known(self, wing: str, room: str | None = None) -> tuple[str | None, str | None]:
+        """Recorded ``(remote wing, remote room)`` aliases; ``None`` when unknown."""
+        with self._lock:
+            remote_room = self.rooms.get(wing, {}).get(room) if room is not None else None
+            return self.wings.get(wing), remote_room
+
+    def alias_count(self) -> int:
+        """Number of recorded wing plus room aliases."""
+        with self._lock:
+            return len(self.wings) + sum(len(r) for r in self.rooms.values())
 
     def load(self) -> None:
+        with self._lock:
+            self._load()
+
+    def _load(self) -> None:
         if not self.path.exists():
             self.wings, self.rooms = {}, {}
             return
@@ -90,6 +111,10 @@ class TaxonomyMap:
 
     def save(self) -> None:
         """Atomically write the YAML (temp file, fsync, rename)."""
+        with self._lock:
+            self._save()
+
+    def _save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         text = yaml.safe_dump({"wings": self.wings, "rooms": self.rooms}, sort_keys=True)
         with tempfile.NamedTemporaryFile(
@@ -117,6 +142,12 @@ class TaxonomyMap:
     def to_remote(
         self, wing: str, room: str, remote_taxonomy: dict[str, dict[str, int]]
     ) -> tuple[str, str, bool]:
+        with self._lock:
+            return self._to_remote(wing, room, remote_taxonomy)
+
+    def _to_remote(
+        self, wing: str, room: str, remote_taxonomy: dict[str, dict[str, int]]
+    ) -> tuple[str, str, bool]:
         created = False
         rw = self.wings.get(wing)
         if rw is None:
@@ -132,11 +163,15 @@ class TaxonomyMap:
             room_map[room] = rr
             created = True
         if created:
-            self.save()
+            self._save()
         return rw, rr, created
 
     def to_local(self, wing: str, room: str) -> tuple[str, str]:
         """Reverse lookup of remote names; identity when unknown."""
+        with self._lock:
+            return self._to_local(wing, room)
+
+    def _to_local(self, wing: str, room: str) -> tuple[str, str]:
         for local_wing, remote_wing in self.wings.items():
             if remote_wing != wing:
                 continue

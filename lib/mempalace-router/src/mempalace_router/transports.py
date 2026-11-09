@@ -10,6 +10,7 @@ import hmac
 import json
 import logging
 import sys
+import threading
 from collections.abc import Callable
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -18,13 +19,27 @@ from mempalace_router.router import Router
 log = logging.getLogger(__name__)
 
 MAX_BODY_BYTES = 8 * 1024 * 1024
+# How long shutdown waits for a still-running startup flush before closing.
+FLUSH_JOIN_S = 30.0
 
 
-def _startup_flush(router: Router) -> None:
+def _flush(router: Router) -> None:
     try:
         router.flush_all()
     except Exception:
         log.exception("startup flush failed")
+
+
+def _startup_flush(router: Router) -> threading.Thread:
+    """Drain every outbox in a daemon thread so requests are served at once.
+
+    A hanging company hub must not delay the first reply past the MCP
+    client's startup timeout; drains are serialised by the router's drain
+    guard, so a request that races the flush stays ordered.
+    """
+    thread = threading.Thread(target=_flush, args=(router,), name="startup-flush", daemon=True)
+    thread.start()
+    return thread
 
 
 def _parse_error(detail: str) -> dict:
@@ -42,7 +57,14 @@ def run_stdio(router: Router, stdin=None, stdout=None) -> None:
     reconfigure = getattr(stdin, "reconfigure", None)
     if reconfigure is not None:
         reconfigure(errors="replace")  # invalid UTF-8 becomes a -32700, not a dead loop
-    _startup_flush(router)
+    flusher = _startup_flush(router)
+    try:
+        _serve_lines(router, stdin, stdout)
+    finally:
+        flusher.join(FLUSH_JOIN_S)
+
+
+def _serve_lines(router: Router, stdin, stdout) -> None:
     for line in stdin:
         line = line.strip()
         if not line:
@@ -149,11 +171,12 @@ def run_http(
     ready: Callable[[ThreadingHTTPServer], None] | None = None,
 ) -> None:
     """Serve HTTP until ``shutdown()``; ``ready(server)`` fires once bound."""
-    _startup_flush(router)
     server = make_http_server(router, host=host, port=port, token=token)
+    flusher = _startup_flush(router)
     try:
         if ready is not None:
             ready(server)
         server.serve_forever()
     finally:
         server.server_close()
+        flusher.join(FLUSH_JOIN_S)

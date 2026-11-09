@@ -58,7 +58,10 @@ class FakeHub(threading.Thread):
                 self.send_header("Content-Type", ctype)
                 self.send_header("Content-Length", str(len(data)))
                 self.end_headers()
-                self.wfile.write(data)
+                try:
+                    self.wfile.write(data)
+                except (BrokenPipeError, ConnectionResetError):
+                    pass  # client gave up (timeout tests hang up by design)
 
             def do_GET(self):
                 if self.path == "/healthz":

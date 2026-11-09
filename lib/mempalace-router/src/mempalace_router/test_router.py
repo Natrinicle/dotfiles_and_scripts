@@ -1,15 +1,20 @@
 import dataclasses
 import json
+import os
 import tempfile
+import threading
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from mempalace_router.client import HubClient
-from mempalace_router.config import Target, Targets
+from mempalace_router.config import DEFAULT_SINGLE_VALUED_PREDICATES, Target, Targets
 from mempalace_router.router import Router
 from mempalace_router.testing.fakehub import FakeHub
 
 AWS_KEY = "AKIA" + "ABCDEFGHIJKLMNOP"
+# Stand-in for the ``mempalace`` CLI so no test ever runs the real one.
+STUB_CLI = '#!/bin/sh\nprintf "%s\\n" "$*" >> "$MPR_STUB_LOG"\nexit "${MPR_STUB_RC:-0}"\n'
 
 
 class DrawerHub(FakeHub):
@@ -33,9 +38,26 @@ class RouterTestBase(unittest.TestCase):
         self.addCleanup(self._tmp.cleanup)
         self.tmp = Path(self._tmp.name)
         self._stopped = set()
+        self.install_cli_stub()
         self.local = self.start_hub(DrawerHub(token="lt"))
         self.acme = self.start_hub(DrawerHub(token="at"))
         self.targets = self.make_targets(self.local, self.acme)
+
+    def install_cli_stub(self):
+        bindir = self.tmp / "bin"
+        bindir.mkdir()
+        stub = bindir / "mempalace"
+        stub.write_text(STUB_CLI)
+        stub.chmod(0o755)
+        self.mine_log = self.tmp / "mine.log"
+        env = {"PATH": f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}",
+               "MPR_STUB_LOG": str(self.mine_log), "MPR_STUB_RC": "0"}
+        patcher = mock.patch.dict(os.environ, env)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def mine_calls(self):
+        return self.mine_log.read_text().splitlines() if self.mine_log.exists() else []
 
     def start_hub(self, hub):
         hub.start()
@@ -58,7 +80,8 @@ class RouterTestBase(unittest.TestCase):
         acme_t = Target("acme", "company", "Acme", acme.url, self.cred("acme", acme.token), None, {})
         beta_t = Target("beta", "company", "Beta", "http://127.0.0.1:9", self.cred("beta", "x"), None, {})
         by_name = {"local": local_t, "acme": acme_t, "beta": beta_t}
-        return Targets(by_name=by_name, local=local_t, companies={"acme": acme_t, "beta": beta_t})
+        return Targets(by_name=by_name, local=local_t, companies={"acme": acme_t, "beta": beta_t},
+                       single_valued_predicates=frozenset(DEFAULT_SINGLE_VALUED_PREDICATES) | {"p"})
 
     def make_router(self, **kw):
         kw.setdefault("per_target_timeout_s", 5.0)
@@ -308,8 +331,9 @@ class RouterTests(RouterTestBase):
         self.assertEqual((out["files"], out["chunks"]), (2, 4))
         self.assertEqual(out["by_target"]["acme"]["filed"], 4)
         self.assertEqual(len(self.acme.drawers), 4)
-        self.assertIn("mempalace_mine", self.names(self.local))
-        self.assertEqual(self.local.calls[0][1], {"path": str(src)})
+        self.assertNotIn("mempalace_mine", self.names(self.local))
+        self.assertEqual(self.mine_calls(), [f"mine {src} --daemon --background --wing w --room r"])
+        self.assertEqual(out["by_target"]["local"]["returncode"], 0)
         rows = router.ledger.lookup(out["job_id"])
         self.assertEqual(len(rows), 4)
         self.assertEqual({r["mine_job_id"] for r in rows}, {out["job_id"]})
@@ -406,23 +430,32 @@ class RouterProtocolTests(RouterTestBase):
         self.assertEqual(before, after)
         self.assertEqual(self.call(router, "router_status", {})["ledger_rows"], 1)
 
-    def test_write_queues_behind_pending_outbox(self):
+    def test_write_drains_pending_outbox_before_sending(self):
         router = self.make_router()
         router.outbox.enqueue(target="acme", tool="mempalace_kg_add",
                               arguments={"subject": "S", "predicate": "p", "object": "first"},
                               local_ref=None, call_id="c0")
         out = self.call(router, "mempalace_kg_add",
                         {"subject": "S", "predicate": "p", "object": "second", "scope": ["acme"]})
+        self.assertEqual(out["filed_to"], ["local", "acme"])
+        self.assertEqual(router.outbox.pending("acme"), [])
+        self.assertEqual([f["object"] for f in self.acme.facts], ["first", "second"])
+        self.assertEqual(len(router.ledger.lookup("c0")), 1)
+
+    def test_write_queues_behind_outbox_that_will_not_drain(self):
+        router = self.make_router()
+        self.stop_hub(self.acme)
+        router.outbox.enqueue(target="acme", tool="mempalace_kg_add",
+                              arguments={"subject": "S", "predicate": "p", "object": "first"},
+                              local_ref=None, call_id="c0")
+        out = self.call(router, "mempalace_kg_add",
+                        {"subject": "S", "predicate": "p", "object": "second", "scope": ["acme"]})
         self.assertEqual(out["queued_for"], ["acme"])
-        self.assertEqual(self.acme.calls, [])
         self.assertEqual([r["arguments"]["object"] for r in router.outbox.pending("acme")],
                          ["first", "second"])
-        flushed = self.call(router, "router_flush", {"target": "acme"})
-        self.assertEqual(flushed["pushed"], 2)
-        self.assertEqual([f["object"] for f in self.acme.facts], ["first", "second"])
 
     def test_local_write_failure_skips_company(self):
-        bad = self.start_hub(DrawerHub(token="lt", fail_tools={"mempalace_add_drawer", "mempalace_mine"}))
+        bad = self.start_hub(DrawerHub(token="lt", fail_tools={"mempalace_add_drawer"}))
         self.targets = self.make_targets(bad, self.acme)
         router = self.make_router()
         out = self.call(router, "mempalace_add_drawer",
@@ -433,6 +466,7 @@ class RouterProtocolTests(RouterTestBase):
         src = self.tmp / "m"
         src.mkdir()
         (src / "a.md").write_text("hello")
+        os.environ["MPR_STUB_RC"] = "3"
         out = self.call(router, "router_mine",
                         {"dir": str(src), "scope": ["acme"], "wing": "w", "room": "r"})
         self.assertEqual(out["company_skipped"], "local write failed")
@@ -517,6 +551,229 @@ class RouterProtocolTests(RouterTestBase):
         router.flush_all()
         self.assertEqual(len(router.outbox.pending("acme")), 1)
 
+
+class FixWaveTests(RouterTestBase):
+    """Final-review fix wave: outbox, corrections, guards and router tools."""
+
+    def down_router(self):
+        client = HubClient(self.targets.by_name["acme"], timeout_s=2.0)
+        router = self.make_router(clients={"acme": client})
+        self.stop_hub(self.acme)
+        return router, client
+
+    def revive(self, client):
+        revived = self.start_hub(DrawerHub(token="at"))
+        client.target = dataclasses.replace(client.target, url=revived.url)
+        return revived
+
+    def test_retract_dequeues_queued_write(self):
+        router, client = self.down_router()
+        out = self.call(router, "mempalace_add_drawer",
+                        {"wing": "w", "room": "r", "content": "queued", "scope": ["acme"]})
+        self.assertEqual(out["queued_for"], ["acme"])
+        done = self.call(router, "router_retract", {"ref": out["call_id"]})
+        self.assertEqual((done["retracted"], done["dequeued"]), (0, 1))
+        revived = self.revive(client)
+        flushed = self.call(router, "router_flush", {"target": "acme"})
+        self.assertEqual(flushed["pushed"], 0)
+        self.assertEqual(revived.drawers, {})
+        self.assertEqual(len(self.local.drawers), 1)
+
+    def test_retract_dequeues_by_local_ref(self):
+        router, _ = self.down_router()
+        out = self.call(router, "mempalace_add_drawer",
+                        {"wing": "w", "room": "r", "content": "queued", "scope": ["acme"]})
+        done = self.call(router, "router_retract", {"ref": out["drawer_id"], "target": "acme"})
+        self.assertEqual(done["dequeued"], 1)
+        self.assertEqual(router.outbox.count("acme"), 0)
+
+    def kg_pair(self, predicate, local_obj, company_obj, local_from="2026-01-01", company_from="2026-06-01"):
+        self.local.facts.append({"subject": "S", "predicate": predicate, "object": local_obj,
+                                 "valid_from": local_from, "valid_to": None, "current": True})
+        self.acme.facts.append({"subject": "S", "predicate": predicate, "object": company_obj,
+                                "valid_from": company_from, "valid_to": None, "current": True})
+
+    def test_multivalued_predicate_conflict_is_not_corrected(self):
+        self.kg_pair("has_method", "GET /a", "GET /b")
+        router = self.make_router()
+        out = self.call(router, "mempalace_kg_query", {"entity": "S", "scope": ["acme"]})
+        self.assertEqual([c["action"] for c in out["conflicts"]], ["none"])
+        self.assertEqual(out["corrections"], [])
+        self.assertNotIn("mempalace_kg_supersede", self.names(self.local))
+        self.assertNotIn("mempalace_kg_supersede", self.names(self.acme))
+        self.assertTrue(all(f["current"] for f in self.local.facts + self.acme.facts))
+
+    def test_allowlisted_version_conflict_supersedes_older_side(self):
+        self.kg_pair("version", "1.0", "2.0")
+        router = self.make_router()
+        out = self.call(router, "mempalace_kg_query", {"entity": "S", "scope": ["acme"]})
+        (corr,) = out["corrections"]
+        self.assertEqual((corr["target"], corr["applied"]), ("local", True))
+        self.assertEqual([f["object"] for f in self.local.facts if f["current"]], ["2.0"])
+
+    def test_default_allowlist_excludes_arbitrary_predicate(self):
+        self.targets.single_valued_predicates = frozenset(DEFAULT_SINGLE_VALUED_PREDICATES)
+        self.kg_pair("p", "A", "B")
+        router = self.make_router()
+        out = self.call(router, "mempalace_kg_query", {"entity": "S", "scope": ["acme"]})
+        self.assertEqual(out["conflicts"][0]["action"], "none")
+        self.assertNotIn("mempalace_kg_supersede", self.names(self.local))
+
+    def test_local_correction_exception_recorded(self):
+        self.kg_pair("version", "1.0", "2.0")
+        router = self.make_router()
+        local = router.client("local")
+        original = local.call_tool
+
+        def boom(name, arguments):
+            if name == "mempalace_kg_supersede":
+                raise RuntimeError("disk on fire")
+            return original(name, arguments)
+
+        with mock.patch.object(local, "call_tool", side_effect=boom):
+            out = self.call(router, "mempalace_kg_query", {"entity": "S", "scope": ["acme"]})
+        (corr,) = out["corrections"]
+        self.assertFalse(corr["applied"])
+        self.assertEqual(corr["error"], "disk on fire")
+
+    def test_write_after_recovery_drains_queue_then_files_directly(self):
+        router, client = self.down_router()
+        first = self.call(router, "mempalace_kg_add",
+                          {"subject": "S", "predicate": "p", "object": "one", "scope": ["acme"]})
+        self.assertEqual(first["queued_for"], ["acme"])
+        revived = self.revive(client)
+        second = self.call(router, "mempalace_kg_add",
+                           {"subject": "S", "predicate": "p", "object": "two", "scope": ["acme"]})
+        self.assertEqual(second["filed_to"], ["local", "acme"])
+        self.assertNotIn("queued_for", second)
+        self.assertEqual([f["object"] for f in revived.facts], ["one", "two"])
+        self.assertEqual(router.outbox.count("acme"), 0)
+        self.assertEqual(len(router.ledger.lookup(first["call_id"])), 1)
+
+    def test_two_routers_flush_concurrently_without_duplicates(self):
+        slow = self.start_hub(FakeHub(token="at", latency_s=0.05))
+        self.targets = self.make_targets(self.local, slow)
+        first, second = self.make_router(), self.make_router()
+        for i in range(5):
+            first.outbox.enqueue(target="acme", tool="mempalace_kg_add",
+                                 arguments={"subject": "S", "predicate": "p", "object": f"o{i}"},
+                                 local_ref=None, call_id=f"c{i}")
+        results = {}
+        barrier = threading.Barrier(2)
+
+        def flush(name, router):
+            barrier.wait()
+            results[name] = router.flush("acme")
+
+        threads = [threading.Thread(target=flush, args=(n, r)) for n, r in (("a", first), ("b", second))]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(results["a"]["pushed"] + results["b"]["pushed"], 5)
+        self.assertEqual([f["object"] for f in slow.facts], [f"o{i}" for i in range(5)])
+        self.assertTrue(first.lock_path("acme").exists())
+
+    def test_drain_guard_times_out_when_held_elsewhere(self):
+        first = self.make_router(per_target_timeout_s=0.2)
+        second = self.make_router(per_target_timeout_s=0.2)
+        second.outbox.enqueue(target="acme", tool="mempalace_kg_add",
+                              arguments={"subject": "S", "predicate": "p", "object": "o"},
+                              local_ref=None, call_id="c1")
+        with first.drain_guard("acme") as held:
+            self.assertTrue(held)
+            busy = second.flush("acme")
+            out = self.call(second, "mempalace_kg_add",
+                            {"subject": "S", "predicate": "p", "object": "x", "scope": ["acme"]})
+        self.assertEqual(busy["errors"], ["drain lock busy"])
+        self.assertEqual(out["queued_for"], ["acme"])
+        self.assertEqual(self.acme.facts, [])
+
+    def test_supersede_without_prior_company_fact_falls_back_to_add(self):
+        self.local.facts.append({"subject": "S", "predicate": "version", "object": "1",
+                                 "valid_from": "2026-01-01", "valid_to": None, "current": True})
+        router = self.make_router()
+        out = self.call(router, "mempalace_kg_supersede",
+                        {"subject": "S", "predicate": "version", "old_object": "1", "new_object": "2",
+                         "scope": ["acme"]})
+        self.assertEqual(out["filed_to"], ["local", "acme"])
+        self.assertEqual(out["fallback"], {"acme": "added (no prior fact)"})
+        self.assertIn("acme: added (no prior fact)", out["notes"])
+        self.assertEqual([(f["object"], f["current"]) for f in self.acme.facts], [("2", True)])
+        (row,) = router.ledger.lookup(out["call_id"])
+        self.assertEqual((row["tool"], row["payload"]["object"]), ("mempalace_kg_add", "2"))
+
+    def test_queued_supersede_without_prior_fact_drains_as_add(self):
+        router = self.make_router()
+        router.outbox.enqueue(target="acme", tool="mempalace_kg_supersede",
+                              arguments={"subject": "S", "predicate": "version",
+                                         "old_object": "1", "new_object": "2"},
+                              local_ref=None, call_id="c9")
+        flushed = self.call(router, "router_flush", {"target": "acme"})
+        self.assertEqual((flushed["pushed"], flushed["fallback_add"], flushed["skipped_stale"]), (1, 1, 0))
+        self.assertEqual([f["object"] for f in self.acme.facts], ["2"])
+        (row,) = router.ledger.lookup("c9")
+        self.assertEqual(row["tool"], "mempalace_kg_add")
+
+    def test_company_read_with_secret_argument_is_not_sent(self):
+        self.local.drawers["d1"] = {"text": f"has {AWS_KEY}", "wing": "w", "room": "r"}
+        router = self.make_router()
+        out = self.call(router, "mempalace_search", {"query": AWS_KEY, "scope": ["acme"]})
+        self.assertEqual(out["refused"], {"acme": "secret_pattern:aws_access_key"})
+        self.assertEqual(self.acme.calls, [])
+        self.assertEqual([h["target"] for h in out["results"]], ["local"])
+        self.assertIn("acme not queried: an argument matched secret_pattern:aws_access_key", out["notes"])
+        self.assertNotIn("degraded", out)
+        dup = self.call(router, "mempalace_check_duplicate",
+                        {"content": f"x {AWS_KEY}", "scope": ["acme"]})
+        self.assertEqual(dup["refused"], {"acme": "secret_pattern:aws_access_key"})
+        self.assertEqual(self.acme.calls, [])
+
+    def test_status_has_todo_and_targets_have_hints(self):
+        self.targets.by_name["acme"] = dataclasses.replace(
+            self.targets.by_name["acme"], hints={"keywords": ["cluster"]})
+        self.targets.companies["acme"] = self.targets.by_name["acme"]
+        router = self.make_router()
+        router.outbox.enqueue(target="beta", tool="mempalace_kg_add",
+                              arguments={"subject": "S", "predicate": "p", "object": "o"},
+                              local_ref=None, call_id="c1")
+        status = self.call(router, "router_status", {})
+        self.assertEqual(status["todo"], ["push 1 queued writes to beta (router_flush)"])
+        rows = {r["name"]: r for r in self.call(router, "router_targets", {})["targets"]}
+        self.assertEqual(rows["acme"]["hints"], {"keywords": ["cluster"]})
+        self.assertEqual(rows["local"]["hints"], {})
+
+    def test_cross_company_replicate_logs_override(self):
+        router = self.make_router()
+        fact = {"subject": "S", "predicate": "p", "object": "o"}
+        with self.assertLogs("mempalace_router.router_tools", level="WARNING") as logs:
+            out = self.call(router, "router_replicate", {"ref_or_fact": fact, "to": ["acme", "beta"]})
+        self.assertEqual(logs.output, [
+            "WARNING:mempalace_router.router_tools:cross-company replicate: fact:S/p → ['acme', 'beta']"])
+        self.assertEqual(out["by_target"]["acme"]["status"], "filed")
+        self.assertEqual(out["by_target"]["beta"]["status"], "queued")
+
+    def test_mine_local_only_uses_cli_and_reports_tails(self):
+        src = self.tmp / "only"
+        src.mkdir()
+        router = self.make_router()
+        out = self.call(router, "router_mine", {"dir": str(src)})
+        self.assertEqual(self.mine_calls(), [f"mine {src} --daemon --background"])
+        self.assertEqual(set(out["by_target"]["local"]), {"returncode", "stdout_tail", "stderr_tail"})
+        self.assertEqual(self.local.calls, [])
+
+    def test_mine_missing_cli_skips_company(self):
+        src = self.tmp / "nocli"
+        src.mkdir()
+        (src / "a.md").write_text("body")
+        empty = self.tmp / "emptybin"
+        empty.mkdir()
+        os.environ["PATH"] = str(empty)
+        router = self.make_router()
+        out = self.call(router, "router_mine", {"dir": str(src), "scope": ["acme"], "wing": "w", "room": "r"})
+        self.assertIsNone(out["by_target"]["local"]["returncode"])
+        self.assertEqual(out["company_skipped"], "local write failed")
+        self.assertEqual(self.acme.drawers, {})
 
 if __name__ == "__main__":
     unittest.main()

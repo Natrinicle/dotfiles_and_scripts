@@ -40,10 +40,11 @@ the classification. They do not decide it.
 ## Router tools
 
 - `router_targets`: configured targets and `todo` (pending outbox pushes).
-- `router_status`: router health.
+- `router_status`: router health, ledger size and the same `todo`.
 - `router_mine(dir, scope, wing?, room?)`: mine a directory into the scope.
 - `router_flush(target)`: push that target's queued outbox now.
-- `router_retract(ref, target=None)`: remove a filed item from a company palace.
+- `router_retract(ref, target=None)`: remove a filed item from a company palace,
+  and drop it from the outbox if it is still queued (`dequeued`). The local copy stays.
 - `router_replicate(ref_or_fact, to=[...])`: copy to company palaces; the only multi-company path.
 
 ## Response fields
@@ -54,8 +55,9 @@ the classification. They do not decide it.
 | `tag: "filed → <company> + local"` | Router's own summary | Echo verbatim |
 | `queued_for` | Company unreachable; item in outbox | "Saved locally, queued for <company>" |
 | `partial` | Some targets accepted, some did not | List which; offer `router_flush` |
-| `refused` | Router blocked it, e.g. `secret_pattern:<name>` | Say why; remove the secret; do not retry blindly |
-| `corrections` (on company `kg_query`) | Company-side corrections to local facts | Surface them; prefer the corrected value |
+| `refused` | Router blocked it, e.g. `secret_pattern:<name>` (writes, and reads whose query looks like a secret) | Say why; remove the secret; do not retry blindly |
+| `corrections` (on company `kg_query`) | Corrections in both directions: the older side's fact was superseded with the newer, for allowlisted single-valued predicates only (`version`, `interface_kind`, `reach`, `status` by default) | Surface them; prefer the corrected value |
+| `fallback: "added (no prior fact)"` | Company lacked the old triple, so the supersede became a `kg_add` there | Say so |
 
 Unknown tools route local-only and return a note; relay it.
 
@@ -64,6 +66,9 @@ Unknown tools route local-only and return a note; relay it.
 1. User says "that shouldn't be in <company>".
 2. `router_retract(ref, target="<company>")` (omit `target` only when unambiguous).
 3. Search-verify the company scope no longer returns it.
+
+Retracting a ledgered `kg_supersede` invalidates the new object on the
+company palace. It does not restore the old object; re-add it if needed.
 4. Id-bound tools (`get_drawer`, `delete_drawer`, `update_drawer`, ...) refuse
    company scope. Use `router_retract`, not `delete_drawer`.
 

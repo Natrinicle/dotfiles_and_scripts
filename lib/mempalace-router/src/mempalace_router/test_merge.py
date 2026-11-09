@@ -3,7 +3,7 @@
 import copy
 import unittest
 
-from mempalace_router.merge import merge_kg_query, merge_search
+from mempalace_router.merge import merge_kg_query, merge_search, valid_from_key
 
 
 def _hit(text, wing, room, eff, drawer_id="d"):
@@ -125,7 +125,7 @@ class MergeKgQueryTest(unittest.TestCase):
 
     def _merge(self, local_facts, company_facts):
         by_target = {"local": _kg(*local_facts), "acme": _kg(*company_facts)}
-        return merge_kg_query(by_target, company="acme", local="local")
+        return merge_kg_query(by_target, company="acme", local="local", single_valued={"p"})
 
     def test_kg_conflict_newer_company_wins(self):
         lf = _fact("s", "p", "old", "2026-01-01")
@@ -198,6 +198,49 @@ class MergeKgQueryTest(unittest.TestCase):
         merge_kg_query(by_target, company="acme", local="local")
         self.assertEqual(by_target, before)
 
+
+class SingleValuedAndTimestampTest(unittest.TestCase):
+    """Corrections only on allowlisted predicates; normalised valid_from."""
+
+    def _merge(self, lf, cf, single_valued=frozenset({"version"})):
+        by_target = {"local": _kg(lf), "acme": _kg(cf)}
+        return merge_kg_query(by_target, company="acme", local="local", single_valued=single_valued)
+
+    def test_multivalued_predicate_one_value_per_side_has_no_action(self):
+        _, conflicts = self._merge(_fact("s", "has_method", "a", "2026-01-01"),
+                                   _fact("s", "has_method", "b", "2026-02-01"))
+        self.assertEqual((conflicts[0]["action"], conflicts[0]["winner"]), ("none", "company"))
+
+    def test_allowlisted_predicate_supersedes(self):
+        _, conflicts = self._merge(_fact("s", "version", "1", "2026-01-01"),
+                                   _fact("s", "version", "2", "2026-02-01"))
+        self.assertEqual(conflicts[0]["action"], "supersede_local")
+
+    def test_default_allowlist_is_empty(self):
+        by_target = {"local": _kg(_fact("s", "version", "1", "2026-01-01")),
+                     "acme": _kg(_fact("s", "version", "2", "2026-02-01"))}
+        _, conflicts = merge_kg_query(by_target, company="acme", local="local")
+        self.assertEqual(conflicts[0]["action"], "none")
+
+    def test_date_only_vs_midnight_datetime_ties_to_company(self):
+        for local_from in ("2026-03-01T00:00:00", "2026-03-01T00:00:00Z", "2026-03-01T00:00:00+00:00"):
+            _, conflicts = self._merge(_fact("s", "version", "1", local_from),
+                                       _fact("s", "version", "2", "2026-03-01"))
+            self.assertEqual(conflicts[0]["winner"], "company", local_from)
+            self.assertEqual(conflicts[0]["action"], "supersede_local", local_from)
+
+    def test_offsets_compared_as_instants(self):
+        # 2026-03-01T01:00+02:00 is 2026-02-28T23:00Z, older than company midnight
+        _, conflicts = self._merge(_fact("s", "version", "1", "2026-03-01T01:00:00+02:00"),
+                                   _fact("s", "version", "2", "2026-03-01"))
+        self.assertEqual(conflicts[0]["winner"], "company")
+        _, conflicts = self._merge(_fact("s", "version", "1", "2026-03-01T00:00:01Z"),
+                                   _fact("s", "version", "2", "2026-03-01"))
+        self.assertEqual(conflicts[0]["winner"], "local")
+
+    def test_valid_from_key_none_and_garbage_oldest(self):
+        self.assertEqual(valid_from_key(None), valid_from_key("not a date"))
+        self.assertLess(valid_from_key(""), valid_from_key("1970-01-01"))
 
 if __name__ == "__main__":
     unittest.main()

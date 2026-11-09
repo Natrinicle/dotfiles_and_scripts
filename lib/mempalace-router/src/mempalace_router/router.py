@@ -6,12 +6,17 @@ one company, and the ``router_*`` tools live in :mod:`router_tools`.
 """
 
 import copy
+import fcntl
 import json
 import logging
+import os
+import re
 import threading
+import time
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor, wait
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -19,7 +24,8 @@ from mempalace_router import merge, router_tools
 from mempalace_router.client import HubClient, HubError
 from mempalace_router.config import Targets
 from mempalace_router.content_guard import find_secret
-from mempalace_router.ledger import Ledger, Outbox
+from mempalace_router.ledger import KG_ADD, SUPERSEDE, Ledger, Outbox, supersede_fallback_args
+from mempalace_router.results import is_stale_error, result_error, result_failed
 from mempalace_router.router_tools import RpcError
 from mempalace_router.scope import ScopeError, normalize_scope
 from mempalace_router.taxonomy import TaxonomyMap, canonical
@@ -80,7 +86,20 @@ def _ref(tool: str, result: dict):
     return result.get("drawer_id") if tool == "mempalace_add_drawer" else result.get("triple_id")
 
 
-_failed = router_tools.result_failed
+_failed = result_failed
+FALLBACK_NOTE = "added (no prior fact)"
+
+
+def _strings(value) -> Iterator[str]:
+    """Every string inside a JSON-like value (dict values, list items)."""
+    if isinstance(value, str):
+        yield value
+    elif isinstance(value, dict):
+        for item in value.values():
+            yield from _strings(item)
+    elif isinstance(value, (list, tuple)):
+        for item in value:
+            yield from _strings(item)
 
 
 class Router:
@@ -109,6 +128,7 @@ class Router:
         self._remote_tax: dict[str, dict] = {}
         self._drain_locks: dict[str, threading.Lock] = {}
         self._guard = threading.Lock()
+        self.single_valued = frozenset(targets.single_valued_predicates)
 
     def close(self) -> None:
         """Close the ledger and outbox connections."""
@@ -125,9 +145,53 @@ class Router:
             return self._clients[name]
 
     def drain_lock(self, name: str) -> threading.Lock:
-        """Per-target lock serialising outbox drains."""
+        """Per-target in-process lock serialising outbox drains."""
         with self._guard:
             return self._drain_locks.setdefault(name, threading.Lock())
+
+    def lock_path(self, name: str) -> Path:
+        """Cross-process drain lock file for a target."""
+        safe = re.sub(r"[^A-Za-z0-9_.-]", "_", name)
+        return self.state_dir / "locks" / f"drain-{safe}.lock"
+
+    @contextmanager
+    def drain_guard(self, name: str) -> Iterator[bool]:
+        """Hold the target's drain lock (thread lock plus ``flock``); yield whether it was taken.
+
+        Several router processes (each stdio session plus the HTTP unit)
+        share one state dir, so the outbox for a target is drained, dequeued
+        or bypassed only under an exclusive ``flock`` on
+        ``state_dir/locks/drain-<target>.lock``. Waits at most
+        ``per_target_timeout_s``; on timeout yields ``False`` and the caller
+        must not touch the target's outbox or send around it.
+        """
+        deadline = time.monotonic() + self.timeout_s
+        tlock = self.drain_lock(name)
+        if not tlock.acquire(timeout=self.timeout_s):
+            yield False
+            return
+        try:
+            path = self.lock_path(name)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o600)
+            try:
+                while True:
+                    try:
+                        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                        break
+                    except BlockingIOError:
+                        if time.monotonic() >= deadline:
+                            yield False
+                            return
+                        time.sleep(0.02)
+                try:
+                    yield True
+                finally:
+                    fcntl.flock(fd, fcntl.LOCK_UN)
+            finally:
+                os.close(fd)
+        finally:
+            tlock.release()
 
     def taxmap(self, name: str) -> TaxonomyMap:
         """Return the (lazily loaded) taxonomy map for a company target."""
@@ -166,7 +230,7 @@ class Router:
 
     def pending_counts(self) -> dict[str, int]:
         """Queued outbox rows per company target."""
-        return {n: len(self.outbox.pending(n)) for n in self.targets.companies}
+        return {n: self.outbox.count(n) for n in self.targets.companies}
 
     # -- taxonomy mapping ----------------------------------------------
 
@@ -192,7 +256,7 @@ class Router:
         the names pass through unmapped (a note says so).
         """
         tmap = self.taxmap(name)
-        known_wing, known_room = tmap.wings.get(wing), tmap.rooms.get(wing, {}).get(room)
+        known_wing, known_room = tmap.known(wing, room)
         if known_wing and known_room:
             return known_wing, known_room
         try:
@@ -207,7 +271,7 @@ class Router:
         return rw, rr
 
     def _map_wing(self, name: str, wing: str, notes: list | None) -> str:
-        known = self.taxmap(name).wings.get(wing)
+        known, _ = self.taxmap(name).known(wing)
         if known:
             return known
         try:
@@ -241,8 +305,13 @@ class Router:
     ) -> dict:
         """Write to one company target; outcome ``{"status": filed|queued|partial|refused, ...}``.
 
-        Sent directly with the client's own timeout (never retried here). A
-        write behind queued rows is queued too so order is kept.
+        Sent directly with the client's own timeout (never retried here).
+        When rows are already queued for the target, the outbox is drained
+        first under the drain guard; the write is sent directly only if the
+        queue is then empty, otherwise it is queued behind the rest so order
+        is kept. A ``kg_supersede`` the company refuses because it lacks the
+        old fact falls back to ``kg_add`` of the new object (outcome
+        ``fallback: "added (no prior fact)"``).
         """
         for field in GUARDED_FIELDS:
             value = args.get(field)
@@ -267,33 +336,60 @@ class Router:
             )
             return done({"status": "queued"})
 
-        if skip_send or self.outbox.pending(name):
+        def send() -> dict:
+            return done(self._send_company(name, tool, mapped, local_ref, call_id, mine_job_id, queue))
+
+        if skip_send:
             return queue()
+        if not self.outbox.count(name):
+            return send()
+        with self.drain_guard(name) as held:
+            if not held:
+                return queue()
+            try:
+                self._drain_locked(name)
+            except Exception:
+                log.exception("auto-drain of %s failed", name)
+            if self.outbox.count(name):
+                return queue()
+            return send()
+
+    def _send_company(self, name, tool, mapped, local_ref, call_id, mine_job_id, queue) -> dict:
+        """Send one write directly; queue on transport failure; ledger on success."""
+        client = self.client(name)
+        fallback = False
         try:
-            value = self.client(name).call_tool(tool, mapped)
+            value = client.call_tool(tool, mapped)
+            if _failed(value) and tool == SUPERSEDE and is_stale_error(result_error(value)):
+                add_args = supersede_fallback_args(mapped)
+                value = client.call_tool(KG_ADD, add_args)
+                tool, mapped, fallback = KG_ADD, add_args, True
         except HubError as exc:
             if exc.kind in ("transport", "timeout"):
                 return queue()
-            return done({"status": "partial", "error": str(exc)})
+            return {"status": "partial", "error": str(exc)}
         except Exception as exc:
-            return done({"status": "partial", "error": str(exc)})
+            return {"status": "partial", "error": str(exc)}
         if _failed(value):
-            error = str(value.get("error", "unknown error")) if isinstance(value, dict) else "bad reply"
+            error = result_error(value)
             if "wing" in error.lower() or "room" in error.lower():
                 self._remote_tax.pop(name, None)
-            return done({"status": "partial", "error": error})
+            return {"status": "partial", "error": error}
         remote_ref = _ref(tool, value)
         if tool in LEDGERED_TOOLS:
             if not remote_ref:
-                return done({"status": "partial", "error": "no remote id"})
+                return {"status": "partial", "error": "no remote id"}
             self.ledger.record(
                 call_id=call_id, target=name, tool=tool, local_ref=local_ref,
                 remote_ref=remote_ref, payload=mapped, mine_job_id=mine_job_id,
             )
-        return done({"status": "filed", "remote_ref": remote_ref})
+        outcome = {"status": "filed", "remote_ref": remote_ref}
+        if fallback:
+            outcome["fallback"] = FALLBACK_NOTE
+        return outcome
 
-    def flush(self, name: str) -> dict:
-        """Drain a company target's outbox (serialised per target)."""
+    def _drain_locked(self, name: str) -> dict:
+        """Drain a target's outbox; the caller holds :meth:`drain_guard`."""
         client = self.client(name)
 
         def on_pushed(row: dict, reply: dict) -> None:
@@ -303,8 +399,15 @@ class Router:
                     remote_ref=_ref(row["tool"], reply), payload=row["arguments"],
                 )
 
-        with self.drain_lock(name):
-            return self.outbox.drain(name, lambda tool, a: client.call_tool(tool, a), on_pushed=on_pushed)
+        return self.outbox.drain(name, lambda tool, a: client.call_tool(tool, a), on_pushed=on_pushed)
+
+    def flush(self, name: str) -> dict:
+        """Drain a company target's outbox under the cross-process drain guard."""
+        with self.drain_guard(name) as held:
+            if not held:
+                return {"pushed": 0, "skipped_stale": 0, "fallback_add": 0, "failed": 0,
+                        "errors": ["drain lock busy"]}
+            return self._drain_locked(name)
 
     def flush_all(self) -> None:
         """Drain every company outbox, logging (not raising) failures. For startup."""
@@ -414,6 +517,14 @@ class Router:
     # -- reads ------------------------------------------------------------
 
     def _read(self, name: str, args: dict, names: list[str], notes: list[str]) -> dict:
+        refused: dict[str, str] = {}
+        hit = next((h for h in map(find_secret, _strings(args)) if h), None)
+        if hit:  # never send a secret-looking query or payload off the machine
+            for target in names:
+                if target != self.local_name:
+                    refused[target] = f"secret_pattern:{hit}"
+                    notes.append(f"{target} not queried: an argument matched secret_pattern:{hit}")
+            names = [n for n in names if n not in refused]
         raw = self.fan_out(names, lambda n: self.client(n).call_tool(name, self.map_args(n, args, notes)))
         local_ok, local_value = raw[self.local_name]
         if not local_ok:
@@ -425,7 +536,7 @@ class Router:
             result = merge.merge_search(good, self._to_local)
         elif name == "mempalace_kg_query":
             result, conflicts = merge.merge_kg_query(good, company=company if company in good else None,
-                                                     local=self.local_name)
+                                                     local=self.local_name, single_valued=self.single_valued)
             result["conflicts"] = conflicts
             if conflicts and "as_of" not in args:
                 result["corrections"] = self._correct(conflicts, company)
@@ -434,10 +545,16 @@ class Router:
             result["by_target"] = good
         if degraded:
             result["degraded"] = degraded
+        if refused:
+            result["refused"] = refused
         return result
 
     def _correct(self, conflicts: list[dict], company: str) -> list[dict]:
-        """Supersede the losing side of each actionable kg_query conflict."""
+        """Supersede the older side of each actionable kg_query conflict.
+
+        Only conflicts on ``single_valued_predicates`` carry an action (see
+        :func:`merge.merge_kg_query`); the rest are reported, not corrected.
+        """
         corrections = []
         for conflict in conflicts:
             if conflict["action"] == "none":
@@ -459,6 +576,8 @@ class Router:
                         entry["applied"] = True
                 except HubError as exc:
                     entry["error"] = str(exc)
+                except Exception as exc:  # e.g. corrupt state; record, never raise from a read
+                    entry["error"] = str(exc)
             else:  # company side: guard, ledger and outbox semantics apply
                 outcome = self.write_company(
                     loser, "mempalace_kg_supersede", call, local_ref=None, call_id=uuid.uuid4().hex
@@ -466,6 +585,8 @@ class Router:
                 entry["status"] = outcome["status"]
                 if outcome["status"] == "filed":
                     entry["applied"] = True
+                    if outcome.get("fallback"):
+                        entry["fallback"] = outcome["fallback"]
                 else:
                     entry["error"] = outcome.get("error") or outcome.get("reason") or outcome["status"]
             corrections.append(entry)
@@ -496,4 +617,7 @@ class Router:
         else:
             result["filed_to"] = [self.local_name, company]
             result["tag"] = f"filed → {company} + local"
+            if outcome.get("fallback"):
+                result["fallback"] = {company: outcome["fallback"]}
+                self._add_notes(result, [f"{company}: {outcome['fallback']}"])
         return result

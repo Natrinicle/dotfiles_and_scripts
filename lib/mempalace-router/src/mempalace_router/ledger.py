@@ -12,7 +12,19 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
-_STALE_MARKERS = ("not current", "no current fact")
+from mempalace_router.results import is_stale_error, result_error, result_failed
+
+SUPERSEDE = "mempalace_kg_supersede"
+KG_ADD = "mempalace_kg_add"
+
+
+def supersede_fallback_args(arguments: dict) -> dict:
+    """``kg_add`` arguments that file a supersede's new object on its own."""
+    return {
+        "subject": arguments.get("subject"),
+        "predicate": arguments.get("predicate"),
+        "object": arguments.get("new_object"),
+    }
 
 
 def _now() -> str:
@@ -141,6 +153,21 @@ class Outbox:
             out.append(item)
         return out
 
+    def count(self, target: str) -> int:
+        """Number of queued rows for target (no decoding)."""
+        with self._lock:
+            return int(
+                self._conn.execute("SELECT COUNT(*) FROM outbox WHERE target=?", (target,)).fetchone()[0]
+            )
+
+    def delete_matching(self, target: str, ref: str) -> int:
+        """Delete queued rows for target whose call_id or local_ref equals ref; return the count."""
+        with self._lock:
+            cur = self._conn.execute(
+                "DELETE FROM outbox WHERE target=? AND (call_id=? OR local_ref=?)", (target, ref, ref)
+            )
+            return int(cur.rowcount)
+
     def _delete(self, row_id: int) -> None:
         with self._lock:
             self._conn.execute("DELETE FROM outbox WHERE id=?", (row_id,))
@@ -160,29 +187,40 @@ class Outbox:
     ) -> dict:
         """Replay pending rows for target in order through send(tool, arguments).
 
-        A successful result deletes the row and calls ``on_pushed(row, result)``.
-        A result dict with ``success`` false whose ``error`` contains "not
-        current" or "no current fact" (case-insensitive) is stale: the row is
-        deleted and counted ``skipped_stale``. A transport exception, or any
-        other ``success`` false result (logical rejection), increments
-        ``attempts``, stores ``last_error``, counts ``failed``, appends the
-        error and STOPS the drain so order is preserved; later rows stay
-        pending.
+        Failure is judged by :func:`~mempalace_router.results.result_failed`
+        (non-dict reply, ``success`` false, or an ``error`` key). A successful
+        result deletes the row and calls ``on_pushed(row, result)``.
 
-        Returns ``{"pushed", "skipped_stale", "failed", "errors"}``.
+        A failed result whose error says the old fact is not current is stale.
+        For a ``mempalace_kg_supersede`` row the new object is then filed with
+        ``mempalace_kg_add`` (counted ``pushed`` and ``fallback_add``; the row
+        passed to ``on_pushed`` carries the ``kg_add`` tool and arguments).
+        Any other stale row is deleted and counted ``skipped_stale``.
+
+        A transport exception, or any other failed result (logical rejection),
+        increments ``attempts``, stores ``last_error``, counts ``failed``,
+        appends the error and STOPS the drain so order is preserved; later
+        rows stay pending.
+
+        Returns ``{"pushed", "skipped_stale", "fallback_add", "failed", "errors"}``.
         """
-        result = {"pushed": 0, "skipped_stale": 0, "failed": 0, "errors": []}
+        result = {"pushed": 0, "skipped_stale": 0, "fallback_add": 0, "failed": 0, "errors": []}
         for row in self.pending(target):
+            tool, arguments = row["tool"], row["arguments"]
+            fallback = False
             try:
-                reply = send(row["tool"], row["arguments"])
+                reply = send(tool, arguments)
+                if result_failed(reply) and tool == SUPERSEDE and is_stale_error(result_error(reply)):
+                    tool, arguments, fallback = KG_ADD, supersede_fallback_args(arguments), True
+                    reply = send(tool, arguments)
             except Exception as exc:  # transport failure: keep row, stop
                 self._fail(row["id"], str(exc))
                 result["failed"] += 1
                 result["errors"].append(str(exc))
                 break
-            if isinstance(reply, dict) and reply.get("success") is False:
-                error = str(reply.get("error", ""))
-                if any(marker in error.lower() for marker in _STALE_MARKERS):
+            if result_failed(reply):
+                error = result_error(reply)
+                if not fallback and is_stale_error(error):
                     self._delete(row["id"])
                     result["skipped_stale"] += 1
                     continue
@@ -192,6 +230,8 @@ class Outbox:
                 break
             self._delete(row["id"])
             result["pushed"] += 1
+            if fallback:
+                result["fallback_add"] += 1
             if on_pushed is not None:
-                on_pushed(row, reply)
+                on_pushed({**row, "tool": tool, "arguments": arguments}, reply)
         return result
