@@ -6,7 +6,12 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-from mempalace_router.config import ConfigError, load_targets
+from mempalace_router.config import (
+    DEFAULT_SINGLE_VALUED_PREDICATES,
+    ConfigError,
+    load_targets,
+    normalize_hub_url,
+)
 
 
 class ConfigTest(unittest.TestCase):
@@ -418,6 +423,52 @@ targets:
             expected_palace = Path(tmpdir) / "palace"
             self.assertEqual(targets.local.palace_path, expected_palace)
 
+
+class ConfigFixWaveTest(unittest.TestCase):
+    def _load(self, content):
+        fd, path = tempfile.mkstemp(suffix=".yaml")
+        os.close(fd)
+        self.addCleanup(lambda: os.unlink(path))
+        Path(path).write_text(content)
+        return load_targets(Path(path))
+
+    BASE = """
+targets:
+  local:
+    kind: local
+    url: http://127.0.0.1:9999/mcp/
+    token_file: /tmp/local.cred
+  acme:
+    kind: company
+    company: acme
+    url: https://hub.example.com/mcp
+    token_file: /tmp/acme.cred
+"""
+
+    def test_url_trailing_mcp_and_slash_stripped(self):
+        targets = self._load(self.BASE)
+        self.assertEqual(targets.local.url, "http://127.0.0.1:9999")
+        self.assertEqual(targets.by_name["acme"].url, "https://hub.example.com")
+
+    def test_normalize_hub_url(self):
+        self.assertEqual(normalize_hub_url("https://h.example.com"), "https://h.example.com")
+        self.assertEqual(normalize_hub_url("https://h.example.com/"), "https://h.example.com")
+        self.assertEqual(normalize_hub_url("https://h.example.com/mcp"), "https://h.example.com")
+        self.assertEqual(normalize_hub_url("https://h.example.com/x/mcp/"), "https://h.example.com/x")
+        self.assertEqual(normalize_hub_url("https://h.example.com/mcpx"), "https://h.example.com/mcpx")
+
+    def test_single_valued_predicates_default_and_override(self):
+        self.assertEqual(self._load(self.BASE).single_valued_predicates,
+                         frozenset(DEFAULT_SINGLE_VALUED_PREDICATES))
+        targets = self._load(self.BASE + "single_valued_predicates: [version, owner]\n")
+        self.assertEqual(targets.single_valued_predicates, frozenset({"version", "owner"}))
+        self.assertEqual(self._load(self.BASE + "single_valued_predicates: []\n").single_valued_predicates,
+                         frozenset())
+
+    def test_single_valued_predicates_must_be_string_list(self):
+        for bad in ("single_valued_predicates: version\n", "single_valued_predicates: [1]\n"):
+            with self.assertRaises(ConfigError):
+                self._load(self.BASE + bad)
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,7 +1,7 @@
 """Configuration loading for mempalace-router targets."""
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
 
@@ -25,13 +25,25 @@ class Target:
     hints: dict[str, list[str]]
 
 
+DEFAULT_SINGLE_VALUED_PREDICATES = ("version", "interface_kind", "reach", "status")
+
+
 @dataclass
 class Targets:
-    """All loaded targets."""
+    """All loaded targets.
+
+    ``single_valued_predicates`` is the allowlist of KG predicates for which
+    a read-time conflict between local and company may be corrected (the
+    older side superseded). Conflicts on any other predicate are reported
+    only.
+    """
 
     by_name: dict[str, Target]
     local: Target
     companies: dict[str, Target]
+    single_valued_predicates: frozenset[str] = field(
+        default_factory=lambda: frozenset(DEFAULT_SINGLE_VALUED_PREDICATES)
+    )
 
     def get(self, name: str) -> Target:
         """Get a target by name, raising KeyError if not found."""
@@ -39,6 +51,26 @@ class Targets:
 
 
 DEFAULT_CONFIG_PATH = Path("~/.config/mempalace-router/targets.yaml").expanduser()
+
+
+def normalize_hub_url(url: str) -> str:
+    """Return a hub base URL: strip trailing ``/`` and one trailing ``/mcp``.
+
+    Clients append ``/mcp`` and ``/healthz`` themselves, while users usually
+    copy the full ``.../mcp`` endpoint from an MCP client config.
+    """
+    base = url.rstrip("/")
+    if base.endswith("/mcp"):
+        base = base[: -len("/mcp")].rstrip("/")
+    return base
+
+
+def _single_valued(value) -> frozenset[str]:
+    if value is None:
+        return frozenset(DEFAULT_SINGLE_VALUED_PREDICATES)
+    if not isinstance(value, list) or not all(isinstance(p, str) and p for p in value):
+        raise ConfigError("'single_valued_predicates' must be a list of non-empty strings")
+    return frozenset(value)
 
 
 def _validate_hints(hints_value, target_name: str) -> dict[str, list[str]]:
@@ -74,7 +106,12 @@ def load_targets(path: Path) -> Targets:
     A company target must have company, url, and token_file.
     Exactly one local target is required.
 
-    ~ and $HOME are expanded in token_file and palace_path.
+    ~ and $HOME are expanded in token_file and palace_path. ``url`` is
+    normalised to the hub base (a trailing ``/mcp`` is dropped).
+
+    An optional top-level ``single_valued_predicates`` list sets the KG
+    predicates eligible for read-time correction (default
+    ``DEFAULT_SINGLE_VALUED_PREDICATES``).
 
     Raises ConfigError if validation fails.
     """
@@ -107,6 +144,8 @@ def load_targets(path: Path) -> Targets:
 
         # Handle common fields
         url = target_data.get("url")
+        if isinstance(url, str) and url:
+            url = normalize_hub_url(url)
         token_file_raw = target_data.get("token_file")
         palace_path_raw = target_data.get("palace_path")
         hints_raw = target_data.get("hints")
@@ -188,4 +227,5 @@ def load_targets(path: Path) -> Targets:
         by_name=by_name,
         local=local_targets[0],
         companies=company_targets,
+        single_valued_predicates=_single_valued(data.get("single_valued_predicates")),
     )

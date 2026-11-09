@@ -6,11 +6,12 @@ import os
 import stat
 import tempfile
 import threading
+import time
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from mempalace_router import cli
+from mempalace_router import cli, transports
 from mempalace_router.test_router import RouterTestBase
 from mempalace_router.transports import MAX_BODY_BYTES, make_http_server, run_http, run_stdio
 
@@ -184,6 +185,41 @@ class CliTests(unittest.TestCase):
         self.assertEqual(rc, 2)
         self.assertIn("not found", err.getvalue())
 
+
+class StartupFlushTests(RouterTestBase):
+    def test_stdio_answers_initialize_while_startup_flush_hangs(self):
+        router = self.make_router()
+        started = threading.Event()
+
+        def slow_flush():
+            started.set()
+            time.sleep(2)
+
+        class Clock(io.StringIO):
+            first = None
+
+            def write(self, text):
+                if self.first is None:
+                    self.first = time.monotonic()
+                return super().write(text)
+
+        stdout = Clock()
+        line = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}})
+        with patch.object(router, "flush_all", side_effect=slow_flush):
+            begin = time.monotonic()
+            run_stdio(router, io.StringIO(line + "\n"), stdout)
+        self.assertTrue(started.is_set())
+        self.assertLess(stdout.first - begin, 1.0)
+        self.assertEqual(json.loads(stdout.getvalue())["result"]["serverInfo"]["name"], "mempalace-router")
+
+    def test_startup_flush_runs_in_daemon_thread(self):
+        router = self.make_router()
+        seen = []
+        with patch.object(router, "flush_all", side_effect=lambda: seen.append(threading.current_thread())):
+            transports._startup_flush(router).join(5)
+        self.assertEqual(len(seen), 1)
+        self.assertIsNot(seen[0], threading.main_thread())
+        self.assertTrue(seen[0].daemon)
 
 if __name__ == "__main__":
     unittest.main()

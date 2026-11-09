@@ -1,4 +1,5 @@
 import tempfile
+import threading
 import unittest
 from pathlib import Path
 
@@ -130,6 +131,41 @@ class TaxonomyMapTests(unittest.TestCase):
         m2.load()
         self.assertEqual(m2.wings, {"solar": "solar"})
 
+
+class TaxonomyLockTests(unittest.TestCase):
+    def test_known_alias_count_and_concurrent_use(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        tmap = TaxonomyMap("acme", Path(tmp.name))
+        self.assertEqual(tmap.known("w", "r"), (None, None))
+        tmap.to_remote("k8s", "notes", {"kubernetes": {"notes": 1}})
+        self.assertEqual(tmap.known("k8s", "notes"), ("kubernetes", "notes"))
+        self.assertEqual(tmap.known("k8s"), ("kubernetes", None))
+        self.assertEqual(tmap.alias_count(), 2)
+        errors = []
+
+        def writer():
+            try:
+                for i in range(200):
+                    tmap.to_remote(f"w{i}", f"r{i}", {})
+            except Exception as exc:  # pragma: no cover - the failure being guarded against
+                errors.append(exc)
+
+        def reader():
+            try:
+                for _ in range(400):
+                    tmap.to_local("kubernetes", "notes")
+                    tmap.alias_count()
+            except Exception as exc:  # pragma: no cover
+                errors.append(exc)
+
+        threads = [threading.Thread(target=f) for f in (writer, reader, reader)]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        self.assertEqual(errors, [])
+        self.assertEqual(tmap.alias_count(), 402)
 
 if __name__ == "__main__":
     unittest.main()

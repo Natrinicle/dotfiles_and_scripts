@@ -196,12 +196,32 @@ Invariants:
 
 - The local target is always present.
 - At most one company target is active.
-- A write to a company palace reports `filed → {company} + local`, tagged so
-  the copy in each palace is traceable.
-- `router_retract` removes a filed item from both palaces.
-- If the company hub is unreachable, writes queue in an offline outbox;
-  `router_flush` replays them.
+- A write to a company palace returns `filed_to` and the tag
+  `filed → {company} + local` in the response. The tag is not stored in
+  either palace; the router's ledger records which company id came from
+  which call.
+- `router_retract` removes a filed item from the company palace only (and
+  drops it from the outbox if it is still queued). The local copy is kept.
+- If the company hub is unreachable, writes queue in an offline outbox. The
+  outbox drains on router start, before the next write to that company, and
+  on `router_flush`.
 - Wing/room taxonomy is mapped between local and company palaces.
+- Company-scope reads correct only KG predicates listed in
+  `single_valued_predicates` (default `version`, `interface_kind`, `reach`,
+  `status`): the older side is superseded. Other conflicts are reported.
+
+Router tools:
+
+- `router_targets`: targets, reachability, hints, outbox depth and `todo`.
+- `router_status`: targets, outbox depth, ledger size and `todo`.
+- `router_flush(target)`: push one company's queued writes now.
+- `router_retract(ref, target?)`: undo company writes by call id, mine job
+  id, local id or company id; local copies are kept.
+- `router_replicate(ref_or_fact, to)`: copy a local drawer or fact to one or
+  more companies (the only cross-company path; logged).
+- `router_mine(dir, scope, wing?, room?)`: local leg runs
+  `mempalace mine DIR --daemon --background`; a company in scope gets the
+  `.md`/`.txt` files chunked into `add_drawer` calls.
 
 ### Install
 
@@ -220,13 +240,19 @@ Plain `pipx inject` does not expose the `mempalace-router` entry point on
 ```yaml
 targets:
   local:
+    kind: local
     palace_path: {PALACE}
   {company}:
     kind: company
     company: {company}
     url: https://{hub-host}/mcp
     token_file: ~/.config/mempalace-router/tokens/{company}
+# optional; predicates whose read-time conflicts may be corrected
+single_valued_predicates: [version, interface_kind, reach, status]
 ```
+
+`url` may be the hub base or the full `.../mcp` endpoint; the router strips a
+trailing `/mcp`.
 
 The HTTP listener reads its bearer token from
 `~/.config/mempalace-router/token` (mode 0600). Do not print or commit it.
@@ -256,9 +282,8 @@ Restart both clients after changing their config.
 curl http://127.0.0.1:8770/healthz     # ok
 ```
 
-`tools/list` through the router returns the hub's tools plus 6 router tools
-(`router_targets`, `router_retract`, `router_flush`, and the rest of the
-router set). `mempalace_status` includes a top-level `by_target` with a
+`tools/list` through the router returns the hub's tools plus the 6 router
+tools listed above. `mempalace_status` includes a top-level `by_target` with a
 `local` key.
 
 ## Do not

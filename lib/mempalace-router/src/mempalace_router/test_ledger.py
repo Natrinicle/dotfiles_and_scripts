@@ -90,7 +90,7 @@ class OutboxTests(LedgerBase):
 
         result = self.outbox.drain("company", send)
         self.assertEqual(
-            result, {"pushed": 3, "skipped_stale": 0, "failed": 0, "errors": []}
+            result, {"pushed": 3, "skipped_stale": 0, "fallback_add": 0, "failed": 0, "errors": []}
         )
         self.assertEqual(seen, [("add_drawer", 0), ("add_drawer", 1), ("add_drawer", 2)])
         self.assertEqual(self.outbox.pending("company"), [])
@@ -146,7 +146,7 @@ class OutboxTests(LedgerBase):
         }
         result = self.outbox.drain("company", lambda t, a: replies[a["n"]])
         self.assertEqual(
-            result, {"pushed": 1, "skipped_stale": 2, "failed": 0, "errors": []}
+            result, {"pushed": 1, "skipped_stale": 2, "fallback_add": 0, "failed": 0, "errors": []}
         )
         self.assertEqual(self.outbox.pending("company"), [])
 
@@ -164,6 +164,61 @@ class OutboxTests(LedgerBase):
         self.assertEqual(rows[0]["attempts"], 1)
         self.assertEqual(rows[0]["last_error"], "bad wing")
 
+
+class OutboxFixWaveTests(LedgerBase):
+    def _enqueue(self, n, target="company", tool="mempalace_kg_add", **extra):
+        return self.outbox.enqueue(target=target, tool=tool, arguments={"n": n, **extra},
+                                   local_ref=f"L{n}", call_id=f"c{n}")
+
+    def test_bare_error_and_non_dict_replies_are_failures(self):
+        for reply in ({"error": "nope"}, None, "text"):
+            self._enqueue(0)
+            pushed = []
+            result = self.outbox.drain("company", lambda t, a, r=reply: r,
+                                       on_pushed=lambda row, res: pushed.append(row))
+            self.assertEqual((result["pushed"], result["failed"]), (0, 1), reply)
+            self.assertEqual(pushed, [])
+            self.assertEqual(self.outbox.count("company"), 1)
+            self.outbox.delete_matching("company", "c0")
+
+    def test_count_and_delete_matching(self):
+        self._enqueue(1)
+        self._enqueue(2)
+        self._enqueue(3, target="other")
+        self.assertEqual((self.outbox.count("company"), self.outbox.count("other")), (2, 1))
+        self.assertEqual(self.outbox.delete_matching("company", "c1"), 1)
+        self.assertEqual(self.outbox.delete_matching("company", "L2"), 1)
+        self.assertEqual(self.outbox.delete_matching("company", "c3"), 0)
+        self.assertEqual((self.outbox.count("company"), self.outbox.count("other")), (0, 1))
+
+    def test_stale_supersede_retried_as_kg_add(self):
+        self.outbox.enqueue(target="company", tool="mempalace_kg_supersede",
+                            arguments={"subject": "S", "predicate": "version",
+                                       "old_object": "1", "new_object": "2"},
+                            local_ref=None, call_id="c1")
+        sent, pushed = [], []
+
+        def send(tool, args):
+            sent.append((tool, args))
+            if tool == "mempalace_kg_supersede":
+                return {"success": False, "error": "old_object is not a current fact"}
+            return {"success": True, "triple_id": "t_1"}
+
+        result = self.outbox.drain("company", send, on_pushed=lambda row, res: pushed.append(row))
+        self.assertEqual(result, {"pushed": 1, "skipped_stale": 0, "fallback_add": 1, "failed": 0, "errors": []})
+        self.assertEqual(sent[1], ("mempalace_kg_add", {"subject": "S", "predicate": "version", "object": "2"}))
+        self.assertEqual((pushed[0]["tool"], pushed[0]["call_id"]), ("mempalace_kg_add", "c1"))
+        self.assertEqual(self.outbox.count("company"), 0)
+
+    def test_failed_fallback_add_keeps_row(self):
+        self.outbox.enqueue(target="company", tool="mempalace_kg_supersede",
+                            arguments={"subject": "S", "predicate": "v", "old_object": "1", "new_object": "2"},
+                            local_ref=None, call_id="c1")
+        replies = {"mempalace_kg_supersede": {"success": False, "error": "No current fact"},
+                   "mempalace_kg_add": {"success": False, "error": "bad predicate"}}
+        result = self.outbox.drain("company", lambda t, a: replies[t])
+        self.assertEqual((result["pushed"], result["failed"], result["errors"]), (0, 1, ["bad predicate"]))
+        self.assertEqual(self.outbox.count("company"), 1)
 
 if __name__ == "__main__":
     unittest.main()

@@ -4,6 +4,7 @@ Wraps ``mempalace.hub_client.forward_json_rpc`` (stateless JSON-RPC POST to
 ``/mcp``) and maps every failure onto :class:`HubError` with a ``kind``.
 """
 
+import http.client
 import itertools
 import json
 import socket
@@ -11,7 +12,7 @@ import urllib.error
 import urllib.request
 from typing import Literal
 
-from mempalace_router.config import Target
+from mempalace_router.config import Target, normalize_hub_url
 
 try:
     from mempalace.hub_client import forward_json_rpc as _forward
@@ -72,7 +73,7 @@ class HubClient:
         else:
             if not target.url:
                 raise HubError("transport", f"target {target.name} has no url or palace_path")
-            url = target.url.rstrip("/")
+            url = normalize_hub_url(target.url)
             token = None
             if target.token_file is not None:
                 try:
@@ -100,6 +101,8 @@ class HubClient:
         except (urllib.error.URLError, OSError) as exc:
             kind = "timeout" if _is_timeout(exc) else "transport"
             raise HubError(kind, str(exc)) from exc
+        except http.client.HTTPException as exc:  # BadStatusLine, IncompleteRead, ...
+            raise HubError("transport", f"{type(exc).__name__}: {exc}") from exc
         except ValueError as exc:
             raise HubError("rpc", f"invalid JSON response: {exc}") from exc
         if not isinstance(response, dict):
@@ -135,5 +138,5 @@ class HubClient:
             url, _ = self.resolve()
             with urllib.request.urlopen(f"{url}/healthz", timeout=self.timeout_s) as response:
                 return response.read().decode("utf-8", "replace").strip() == "ok"
-        except (HubError, OSError, ValueError):
+        except (HubError, OSError, ValueError, http.client.HTTPException):
             return False
