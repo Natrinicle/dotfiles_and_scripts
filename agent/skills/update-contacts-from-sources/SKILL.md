@@ -14,6 +14,8 @@ Create or patch **address-book cards** from dumps and live sources. Some cards
 are **businesses**. Call-log titles are **cruft**, not names.
 
 Use **contact-syncer** for IM/profile notes, friction, and commitments.
+Append-only biographies and postal addresses from dumps:
+**REQUIRED** `contact-notes-from-sources`.
 
 ## When to run
 

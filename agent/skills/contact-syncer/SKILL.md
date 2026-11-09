@@ -47,6 +47,8 @@ For people with enough signal in the window:
 Do **not** write to desktop address books or platform-specific contact UIs from
 this skill. Use `update-contacts-from-sources` for address-book cards from
 dumps (people **or** businesses; `Me to` / `Voicemail from` are cruft).
+Append-only biographies and postal addresses from those dumps:
+`contact-notes-from-sources`.
 
 ## Friction → other skills
 
