@@ -78,6 +78,12 @@ class FakeHub(threading.Thread):
                 req = json.loads(raw)
                 if hub.latency_s:
                     time.sleep(hub.latency_s)
+                if "id" not in req:
+                    hub._rpc(req)
+                    self.send_response(202)
+                    self.send_header("Content-Length", "0")
+                    self.end_headers()
+                    return
                 self._send(200, json.dumps(hub._rpc(req)))
 
         self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
@@ -114,6 +120,8 @@ class FakeHub(threading.Thread):
                 self.calls.append((name, args))
                 out = self._tool(name, args)
             result = {"content": [{"type": "text", "text": json.dumps(out)}]}
+        elif method and method.startswith("notifications/"):
+            return None
         else:
             return {"jsonrpc": "2.0", "id": rid,
                     "error": {"code": -32601, "message": f"method not found: {method}"}}
@@ -134,19 +142,30 @@ class FakeHub(threading.Thread):
                 if q in d["text"].lower()
                 and a.get("wing") in (None, d["wing"])
                 and a.get("room") in (None, d["room"])]
-        results = [{"drawer_id": i, "text": d["text"], "wing": d["wing"], "room": d["room"],
-                    "effective_distance": round(0.1 * rank, 6)}
-                   for rank, (i, d) in enumerate(hits)]
-        return {"query": a.get("query", ""), "results": results[: a.get("limit", 5)]}
+        results = []
+        for rank, (i, d) in enumerate(hits):
+            dist = round(0.1 * rank, 6)
+            results.append({
+                "drawer_id": i, "text": d["text"], "wing": d["wing"], "room": d["room"],
+                "source_file": None, "source_path": None,
+                "similarity": round(1 - dist, 6), "distance": dist,
+                "effective_distance": dist, "closet_boost": 0.0, "matched_via": "drawer"})
+        return {"query": a.get("query", ""),
+                "filters": {"wing": a.get("wing"), "room": a.get("room"),
+                            "source_file": a.get("source_file"),
+                            "since": a.get("since"), "before": a.get("before")},
+                "total_before_filter": len(self.drawers),
+                "results": results[: a.get("limit", 5)]}
 
     def _t_add_drawer(self, a):
         did = "drawer_" + hashlib.sha256(a["content"].encode()).hexdigest()[:16]
         if did in self.drawers:
-            return {"success": True, "drawer_id": did, "already_exists": True}
+            return {"success": True, "reason": "already_exists", "drawer_id": did}
         self.drawers[did] = {"text": a["content"], "wing": a["wing"], "room": a["room"]}
         rooms = self.taxonomy.setdefault(a["wing"], {})
         rooms[a["room"]] = rooms.get(a["room"], 0) + 1
-        return {"success": True, "drawer_id": did, "wing": a["wing"], "room": a["room"]}
+        return {"success": True, "drawer_id": did, "wing": a["wing"], "room": a["room"],
+                "chunks": 1}
 
     def _t_delete_drawer(self, a):
         d = self.drawers.pop(a.get("drawer_id"), None)
@@ -158,37 +177,54 @@ class FakeHub(threading.Thread):
             del rooms[d["room"]]
         if not rooms:
             del self.taxonomy[d["wing"]]
-        return {"success": True, "drawer_id": a["drawer_id"]}
+        return {"success": True, "drawer_id": a["drawer_id"],
+                "deleted_ids": [a["drawer_id"]]}
 
     def _current(self, s, p, o):
         return next((f for f in self.facts if f["subject"] == s and f["predicate"] == p
                      and f["object"] == o and f["current"]), None)
 
+    def _new_fact(self, s, p, o):
+        fact = {"subject": s, "predicate": p, "object": o,
+                "valid_from": time.strftime("%Y-%m-%d"), "valid_to": None, "current": True}
+        self.facts.append(fact)
+        return fact
+
+    def _expire(self, fact):
+        fact["current"] = False
+        fact["valid_to"] = time.strftime("%Y-%m-%d")
+
+    def _triple_id(self, fact):
+        key = "|".join(fact[k] for k in ("subject", "predicate", "object"))
+        return "t_" + hashlib.sha256(key.encode()).hexdigest()[:12]
+
     def _t_kg_add(self, a):
-        self.facts.append({"subject": a["subject"], "predicate": a["predicate"],
-                           "object": a["object"], "current": True})
-        return {"success": True}
+        fact = self._new_fact(a["subject"], a["predicate"], a["object"])
+        return {"success": True, "triple_id": self._triple_id(fact), "fact": dict(fact)}
 
     def _t_kg_supersede(self, a):
         old = self._current(a["subject"], a["predicate"], a["old_object"])
         if old is None:
             return {"success": False, "error": "old_object is not a current fact"}
-        old["current"] = False
-        self.facts.append({"subject": a["subject"], "predicate": a["predicate"],
-                           "object": a["new_object"], "current": True})
-        return {"success": True}
+        self._expire(old)
+        fact = self._new_fact(a["subject"], a["predicate"], a["new_object"])
+        return {"success": True, "triple_id": self._triple_id(fact),
+                "fact": dict(fact), "superseded": dict(old)}
 
     def _t_kg_invalidate(self, a):
         fact = self._current(a["subject"], a["predicate"], a["object"])
         if fact is None:
             return {"success": False, "error": "fact is not current"}
-        fact["current"] = False
+        self._expire(fact)
         return {"success": True}
 
     def _t_kg_query(self, a):
         e = a.get("entity")
-        facts = [f for f in self.facts if f["current"] and e in (f["subject"], f["object"])]
-        return {"entity": e, "facts": facts, "count": len(facts)}
+        facts = [dict(f) for f in self.facts if e in (f["subject"], f["object"])]
+        return {"entity": e, "as_of": a.get("as_of"),
+                "active_facts": [f for f in facts if f["current"]],
+                "historical_facts": [f for f in facts if f["valid_to"]],
+                "future_facts": [], "facts": facts, "count": len(facts)}
 
     def _t_list_wings(self, a):
         return {"wings": {w: sum(r.values()) for w, r in self.taxonomy.items()}}
