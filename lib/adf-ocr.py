@@ -69,9 +69,23 @@ AMOUNT_CUE = re.compile(
 )
 LETTERHEAD = re.compile(
     r"\b(?:bank|credit union|insurance|department of|county of|"
-    r"llc|inc\.?|hospital|university|financial|holdings)\b",
+    r"llc|inc\.?|hospital|university|financial|holdings|"
+    r"subrogation|health plan|blue cross|blue shield)\b",
     re.IGNORECASE,
 )
+TITLECASE_ORG = re.compile(r"^[A-Z][A-Za-z'&.-]*(?:\s+[A-Z][A-Za-z'&.-]*){1,5}$")
+ORG_NAME_TOKEN = re.compile(
+    r"\b(?:dmv|department|bank|union|credit|insurance|county|hospital|"
+    r"llc|inc|university|holdings|financial|subrogation|health)\b",
+    re.IGNORECASE,
+)
+SERVICE_DATE_CUE = re.compile(
+    r"(?:date\s+of\s+service|service\s+date|got\s+medical\s+care|"
+    r"medical\s+care\s+on)",
+    re.IGNORECASE,
+)
+ISSUER_HEADER_CHARS = 900
+DATE_HEADER_CHARS = 800
 PAGE_OF = re.compile(r"\bpage\s+(\d+)\s+of\s+(\d+)\b", re.IGNORECASE)
 SAFE_NAME = re.compile(r"[^A-Za-z0-9 ._()-]+")
 CONTINUATION = re.compile(
@@ -148,7 +162,18 @@ DOC_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ),
     (
         "insurance",
-        ("policy number", "declaration page", "coverage", "premium"),
+        (
+            "policy number",
+            "declaration page",
+            "coverage",
+            "premium",
+            "subrogation",
+            "health plan",
+            "medical plan",
+            "auto insurance",
+            "workers' compensation",
+            "workers compensation",
+        ),
     ),
     (
         "medical",
@@ -164,6 +189,9 @@ DOC_TYPE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
         "correspondence",
         ("dear ", "sincerely", "to whom it may concern"),
     ),
+)
+TITLE_HINTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("Subrogation Questionnaire", ("subrogation",)),
 )
 WORD = re.compile(r"[A-Za-z][A-Za-z']{3,}")
 IMB_HUMAN = re.compile(r"\b[A-Z0-9]{6,12}[ \-]\d{3,5}[ \-]\d{5,7}\b")
@@ -830,24 +858,63 @@ def extract_due_date(text: str) -> str | None:
     return None
 
 
+def collapsed_ws(text: str) -> str:
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def yaml_str_list(value: Any) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return [str(item).strip() for item in value if str(item).strip()]
+    text = str(value).strip()
+    return [text] if text else []
+
+
+def match_is_org_name(needle: str) -> bool:
+    parts = needle.split()
+    if len(parts) >= 3:
+        return True
+    return ORG_NAME_TOKEN.search(needle) is not None
+
+
+def span_is_service_date(text: str, start: int, end: int) -> bool:
+    lo = max(0, start - 100)
+    hi = min(len(text), end + 24)
+    return SERVICE_DATE_CUE.search(text[lo:hi]) is not None
+
+
 def extract_doc_date(text: str, due: str | None) -> str | None:
-    """Prefer statement-cue and header dates over later transaction/footnote dates."""
+    """Prefer statement-cue and header dates over later transaction/footnote dates.
+
+    Skip date-of-service / medical-care dates so a letter date later in the
+    body still wins.
+    """
+
+    def usable(iso: str, start: int, end: int) -> bool:
+        if iso == due:
+            return False
+        if not plausible_iso(iso, allow_future_days=14):
+            return False
+        return not span_is_service_date(text, start, end)
+
     for match in STATEMENT_CUE.finditer(text):
-        window = text[match.end() : match.end() + 80]
-        for iso, _, _ in extract_date_spans(window):
-            if iso != due and plausible_iso(iso, allow_future_days=14):
+        base = match.end()
+        window = text[base : base + 80]
+        for iso, rel_s, rel_e in extract_date_spans(window):
+            if usable(iso, base + rel_s, base + rel_e):
                 return iso
     today = date.today().isoformat()
 
-    def newest_past(chunk: str) -> str | None:
+    def newest_past(chunk: str, offset: int = 0) -> str | None:
         past = [
             iso
-            for iso, _, _ in extract_date_spans(chunk)
-            if iso != due and iso <= today and plausible_iso(iso, allow_future_days=14)
+            for iso, start, end in extract_date_spans(chunk)
+            if iso <= today and usable(iso, offset + start, offset + end)
         ]
         return max(past) if past else None
 
-    header = newest_past(text[:800])
+    header = newest_past(text[:DATE_HEADER_CHARS])
     if header:
         return header
     return newest_past(text)
@@ -869,8 +936,33 @@ def guess_doc_type(text: str) -> str:
     return best
 
 
+def guess_title(text: str, dtype: str) -> str:
+    hay = text.lower()
+    for title, hints in TITLE_HINTS:
+        if any(hint in hay for hint in hints):
+            return title
+    if dtype != "other":
+        return dtype.title()
+    return "Scanned Document"
+
+
+def title_without_issuer(title: str, issuer: str) -> str:
+    cleaned = title.strip()
+    name = issuer.strip()
+    if not cleaned or not name:
+        return cleaned
+    low_title = cleaned.lower()
+    low_name = name.lower()
+    if low_title == low_name:
+        return ""
+    if low_title.startswith(low_name):
+        rest = cleaned[len(name) :].lstrip(" -–:")
+        return rest
+    return cleaned
+
+
 def letterhead_issuer(text: str) -> str | None:
-    skip = ("identity keys", "page ", "http", "www.")
+    skip = ("identity keys", "page ", "http", "www.", "dear ", "the ", "this ")
     for raw in text.splitlines()[:20]:
         line = raw.strip()
         if len(line) < 5 or len(line) > 80:
@@ -878,7 +970,12 @@ def letterhead_issuer(text: str) -> str | None:
         low = line.lower()
         if low.startswith(skip):
             continue
+        if re.search(r"\d", line) and not LETTERHEAD.search(line):
+            continue
         if LETTERHEAD.search(line):
+            cleaned = sanitize_filename_part(line, fallback="")
+            return cleaned or None
+        if TITLECASE_ORG.match(line) and not re.search(r"\d", line):
             cleaned = sanitize_filename_part(line, fallback="")
             return cleaned or None
         letters = re.sub(r"[^A-Za-z]", "", line)
@@ -905,20 +1002,43 @@ def hay_has_phrase(hay: str, needle: str) -> bool:
 def issuer_map_hit(
     text: str, taxonomy: dict[str, Any]
 ) -> tuple[str | None, str | None]:
+    """Map text to (folder, issuer label).
+
+    Prefer letterhead-zone hits over a later form-section phrase. Skip a
+    generic 1–2 word body match (``motor vehicle`` on a health packet).
+    ``unless:`` drops the whole issuer entry when those phrases appear.
+    ``name:`` is the filename issuer when present.
+    """
     hay = text.lower()
-    best: tuple[int, str, str] | None = None
+    header = collapsed_ws(text).lower()[:ISSUER_HEADER_CHARS]
+    best: tuple[int, int, int, str, str] | None = None
     for issuer in taxonomy.get("issuers") or []:
-        folder = str(issuer.get("folder") or "").strip() or None
-        for match in issuer.get("match") or []:
-            needle = str(match).strip()
-            if not needle or not hay_has_phrase(hay, needle):
+        if any(
+            hay_has_phrase(hay, skip) for skip in yaml_str_list(issuer.get("unless"))
+        ):
+            continue
+        folder = str(issuer.get("folder") or "").strip()
+        yaml_name = str(issuer.get("name") or "").strip()
+        for match in yaml_str_list(issuer.get("match")):
+            needle = match
+            if not hay_has_phrase(hay, needle):
                 continue
-            cand = (len(needle), folder or "", needle)
-            if best is None or cand[0] > best[0]:
+            header_hit = hay_has_phrase(header, needle)
+            if not header_hit and not match_is_org_name(needle):
+                continue
+            pos = hay.find(needle.lower())
+            if yaml_name:
+                label = yaml_name
+            elif match_is_org_name(needle) or header_hit:
+                label = needle.title() if needle.islower() else needle
+            else:
+                label = needle
+            cand = (1 if header_hit else 0, -pos, len(needle), folder, label)
+            if best is None or cand[:3] > best[:3]:
                 best = cand
     if best is None:
         return None, None
-    folder, label = best[1] or None, best[2]
+    folder, label = best[3] or None, best[4]
     if label.islower():
         label = label.title()
     return folder, label
@@ -1392,7 +1512,18 @@ def heuristic_classify(
     due = extract_due_date(text)
     doc_date = extract_doc_date(text, due)
     amount = extract_amount(text)
-    issuer = label or letterhead_issuer(text) or "Unknown"
+    letterhead = letterhead_issuer(text)
+    yaml_names = {
+        str(row.get("name") or "").strip()
+        for row in (taxonomy.get("issuers") or [])
+        if str(row.get("name") or "").strip()
+    }
+    if label and label in yaml_names:
+        issuer = label
+    elif letterhead and label and not match_is_org_name(label):
+        issuer = letterhead
+    else:
+        issuer = label or letterhead or "Unknown"
     if mapped:
         confidence = 0.9 if dtype != "other" or doc_date else 0.85
     elif issuer != "Unknown" and dtype != "other":
@@ -1404,12 +1535,9 @@ def heuristic_classify(
     if folder and folder not in folders:
         folder = ""
         confidence = min(confidence, 0.5)
-    if issuer != "Unknown" and dtype != "other":
-        title = f"{issuer} {dtype.title()}"
-    elif issuer != "Unknown":
-        title = f"{issuer} Document"
-    else:
-        title = "Scanned Document"
+    title = title_without_issuer(guess_title(text, dtype), issuer) or guess_title(
+        text, dtype
+    )
     slug = sanitize_filename_part(title.lower().replace(" ", "-"), fallback="document")
     return {
         "doc_type": dtype,
@@ -1543,6 +1671,10 @@ def classify_text(
         )
         prompt = f"""You are a document archivist. Analyze the text and return only valid JSON.
 Prefer the CLI heuristic when it looks correct. Do not add glosses like "(implied ...)".
+Issuer is the letterhead organization, never a form-section title such as "Motor vehicle".
+doc_date is the letter or statement date, not a date of service or medical-care date.
+title must not repeat the issuer (filename is already Date - Issuer - Title).
+A health-plan subrogation packet is insurance correspondence, not DMV, even if it has a Motor vehicle section.
 
 Heuristic:
 {hint}
@@ -1587,6 +1719,10 @@ confidence is 0 to 1.
         conf = 0.4 if parsed else float(result.get("confidence") or 0.35)
     result["confidence"] = max(0.0, min(1.0, conf))
     result["issuer"] = clean_issuer_name(str(result.get("issuer") or "Unknown"))
+    title = title_without_issuer(
+        str(result.get("title") or "Document"), str(result["issuer"])
+    )
+    result["title"] = title or guess_title(text, str(result.get("doc_type") or "other"))
     if not result.get("issuer_map") and result.get("folder") == ".":
         result["confidence"] = min(result["confidence"], 0.7)
     if result.get("folder") not in folders:
@@ -1621,6 +1757,9 @@ def build_filename(meta: dict[str, Any], scan_day: str) -> str:
     title = sanitize_filename_part(
         str(meta.get("title") or meta.get("base_name") or "Document"),
         fallback="Document",
+    )
+    title = sanitize_filename_part(
+        title_without_issuer(title, issuer) or "Document", fallback="Document"
     )
     return f"{day} - {issuer} - {title}.pdf"
 
@@ -2652,6 +2791,111 @@ def self_test() -> int:
     check(
         issuer_folder("STATE OF NEVADA DEPARTMENT OF MOTOR VEHICLES", tax) == "DMV",
         "issuer map",
+    )
+    dmv_motor = {
+        "issuers": [
+            {
+                "match": [
+                    "department of motor vehicles",
+                    "nevada dmv",
+                    "motor vehicle",
+                ],
+                "name": "Nevada DMV",
+                "folder": "DMV",
+                "unless": [
+                    "subrogation",
+                    "health plan",
+                    "workers' compensation",
+                ],
+            }
+        ],
+        "folders": ["DMV", "."],
+        "doc_types": list(DOC_TYPES),
+    }
+    health_mail = (
+        "Example Health Subrogation\n"
+        "PO Box 10000\n"
+        "October 21, 2026\n"
+        "Dear valued member, please help us figure this out.\n"
+        "You, or someone close to you, got medical care on July 29, 2026.\n"
+        "Your medical plan covered it, so no worries there.\n"
+        "Maybe another company should have paid instead like auto insurance "
+        "or workers' compensation.\n"
+        "Date of Service July 29, 2026\n"
+        "Patient Name Sampleton Resident\n"
+        "HIPAA Protected Health Information\n"
+        "Section B: Motor vehicle\n"
+        "Was the other person at fault?\n"
+        "On Behalf of Example Health Plan\n"
+    )
+    check(
+        issuer_folder(health_mail, dmv_motor) is None,
+        "health subrogation does not map to DMV",
+    )
+    health = classify_text(
+        health_mail,
+        dmv_motor,
+        ["DMV", "."],
+        llm_url="http://127.0.0.1:9/v1/chat/completions",
+        models=["offline"],
+        temperature=0,
+        max_tokens=8,
+        use_llm=False,
+    )
+    check(health["folder"] != "DMV", "subrogation folder is not DMV")
+    check(
+        "motor vehicle" not in health["issuer"].lower(), "issuer is not Motor Vehicle"
+    )
+    check("subrogation" in health["issuer"].lower(), "letterhead issuer is Subrogation")
+    check(health["doc_date"] == "2026-10-21", "letter date beats date of service")
+    check(
+        health["title"] == "Subrogation Questionnaire",
+        "subrogation title",
+    )
+    check(
+        "motor vehicle" not in health["title"].lower(),
+        "title does not repeat motor vehicle",
+    )
+    taut = build_filename(
+        {
+            "doc_date": "2026-10-21",
+            "issuer": "Motor Vehicle",
+            "title": "Motor Vehicle Medical",
+        },
+        "2026-10-29",
+    )
+    check(
+        taut == "2026-10-21 - Motor Vehicle - Medical.pdf",
+        "filename strips repeated issuer",
+    )
+    check(
+        guess_doc_type(health_mail) == "insurance",
+        "subrogation is insurance not medical",
+    )
+    long_health = (
+        "Example Health Subrogation\nOctober 21, 2026\nDear valued member,\n"
+        + ("lorem notes filler line\n" * 80)
+        + "Section B: Motor vehicle was the other person at fault\n"
+    )
+    body_only_dmv = {
+        "issuers": [
+            {
+                "match": ["department of motor vehicles", "motor vehicle"],
+                "folder": "DMV",
+            }
+        ],
+        "folders": ["DMV"],
+    }
+    check(
+        issuer_folder(long_health, body_only_dmv) is None,
+        "body-only motor vehicle is not DMV",
+    )
+    check(
+        issuer_folder(
+            "STATE OF NEVADA DEPARTMENT OF MOTOR VEHICLES title fee", dmv_motor
+        )
+        == "DMV",
+        "DMV letterhead still maps with unless",
     )
     with tempfile.TemporaryDirectory() as tmp:
         ics = Path(tmp) / "due.ics"
