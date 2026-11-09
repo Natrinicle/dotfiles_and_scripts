@@ -16,6 +16,8 @@ class DrawerHub(FakeHub):
     """FakeHub plus ``mempalace_get_drawer`` (the stock fake lacks it)."""
 
     def _tool(self, name, args):
+        if name == "mempalace_mine" and name not in self.fail_tools:
+            return {"success": True, "files": 0}
         if name == "mempalace_get_drawer":
             drawer = self.drawers.get(args.get("drawer_id"))
             if drawer is None:
@@ -118,6 +120,7 @@ class RouterTests(RouterTestBase):
 
     def test_search_degrades_on_target_timeout(self):
         slow = self.start_hub(FakeHub(token="at", latency_s=2))
+        slow._server.handle_error = lambda request, client_address: None  # client hangs up by design
         self.targets = self.make_targets(self.local, slow)
         self.local.drawers["d1"] = {"text": "note one", "wing": "w", "room": "r"}
         router = self.make_router(per_target_timeout_s=1.0)
@@ -346,17 +349,157 @@ class RouterProtocolTests(RouterTestBase):
         self.assertIsNone(router.handle({"jsonrpc": "2.0", "method": "notifications/initialized"}))
         self.assertEqual(self.rpc(router, "bogus/method")["error"]["code"], -32601)
 
-    def test_get_drawer_tries_targets_in_order(self):
-        self.acme.drawers["x"] = {"text": "t", "wing": "w", "room": "r"}
-        router = self.make_router()
-        out = self.call(router, "mempalace_get_drawer", {"drawer_id": "x", "scope": ["acme"]})
-        self.assertEqual(out["target"], "acme")
-        self.assertEqual(out["content"], "t")
-        self.assertEqual(out["degraded"], ["local"])
+    def test_id_bound_tools_rejected_with_company_scope(self):
         self.local.drawers["y"] = {"text": "u", "wing": "w", "room": "r"}
-        out = self.call(router, "mempalace_get_drawer", {"drawer_id": "y", "scope": ["acme"]})
-        self.assertEqual(out["target"], "local")
-        self.assertNotIn("degraded", out)
+        self.local.taxonomy = {"w": {"r": 1}}
+        router = self.make_router()
+        for tool in ("mempalace_get_drawer", "mempalace_delete_drawer", "mempalace_update_drawer"):
+            err = self.call(router, tool, {"drawer_id": "y", "scope": ["acme"]})
+            self.assertEqual(err["code"], -32602)
+            self.assertEqual(err["message"], "ids are per-palace; use router_retract / local scope")
+        self.assertEqual(self.local.calls, [])
+        self.assertEqual(self.acme.calls, [])
+        out = self.call(router, "mempalace_get_drawer", {"drawer_id": "y"})
+        self.assertEqual(out["content"], "u")
+        self.assertEqual(self.call(router, "mempalace_delete_drawer", {"drawer_id": "y"})["success"], True)
+
+    def test_mutating_tools_are_local_only_with_company_scope(self):
+        router = self.make_router()
+        for tool in ("artifact_put", "event_append", "task_create", "create_tunnel", "diary_read"):
+            out = self.call(router, f"mempalace_{tool}", {"scope": ["acme"]})
+            self.assertEqual(out["notes"], ["scope ignored for local-only tool"])
+        self.assertEqual(self.acme.calls, [])
+        self.assertEqual(len(self.local.calls), 5)
+
+    def test_unknown_tool_routed_local_only_with_note(self):
+        router = self.make_router()
+        out = self.call(router, "mempalace_brand_new", {"scope": ["acme"]})
+        self.assertEqual(out["notes"], ["unknown tool routed local-only"])
+        self.assertEqual(self.acme.calls, [])
+        self.assertEqual(self.names(self.local), ["mempalace_brand_new"])
+
+    def test_kg_correction_supersede_company_is_guarded_and_ledgered(self):
+        def fact(s, o, frm):
+            return {"subject": s, "predicate": "p", "object": o, "valid_from": frm,
+                    "valid_to": None, "current": True}
+
+        # company side loses: local is newer
+        self.local.facts.append(fact("S1", "NEW", "2026-06-01"))
+        self.acme.facts.append(fact("S1", "OLD", "2026-01-01"))
+        self.local.facts.append(fact("S2", AWS_KEY, "2026-06-01"))
+        self.acme.facts.append(fact("S2", "OLD", "2026-01-01"))
+        router = self.make_router()
+        out = self.call(router, "mempalace_kg_query", {"entity": "S1", "scope": ["acme"]})
+        (corr,) = out["corrections"]
+        self.assertEqual((corr["target"], corr["applied"], corr["status"]), ("acme", True, "filed"))
+        self.assertEqual(self.call(router, "router_status", {})["ledger_rows"], 1)
+        rows = router.ledger.lookup(self.acme._triple_id(self.acme.facts[-1]))
+        self.assertEqual((rows[0]["target"], rows[0]["tool"]), ("acme", "mempalace_kg_supersede"))
+        self.assertEqual(rows[0]["payload"]["new_object"], "NEW")
+        # guarded: the winning object looks like a secret, so it must not reach the company
+        before = len([c for c in self.acme.calls if c[0] == "mempalace_kg_supersede"])
+        out = self.call(router, "mempalace_kg_query", {"entity": "S2", "scope": ["acme"]})
+        (corr,) = out["corrections"]
+        self.assertFalse(corr["applied"])
+        self.assertEqual(corr["error"], "secret_pattern:aws_access_key")
+        after = len([c for c in self.acme.calls if c[0] == "mempalace_kg_supersede"])
+        self.assertEqual(before, after)
+        self.assertEqual(self.call(router, "router_status", {})["ledger_rows"], 1)
+
+    def test_write_queues_behind_pending_outbox(self):
+        router = self.make_router()
+        router.outbox.enqueue(target="acme", tool="mempalace_kg_add",
+                              arguments={"subject": "S", "predicate": "p", "object": "first"},
+                              local_ref=None, call_id="c0")
+        out = self.call(router, "mempalace_kg_add",
+                        {"subject": "S", "predicate": "p", "object": "second", "scope": ["acme"]})
+        self.assertEqual(out["queued_for"], ["acme"])
+        self.assertEqual(self.acme.calls, [])
+        self.assertEqual([r["arguments"]["object"] for r in router.outbox.pending("acme")],
+                         ["first", "second"])
+        flushed = self.call(router, "router_flush", {"target": "acme"})
+        self.assertEqual(flushed["pushed"], 2)
+        self.assertEqual([f["object"] for f in self.acme.facts], ["first", "second"])
+
+    def test_local_write_failure_skips_company(self):
+        bad = self.start_hub(DrawerHub(token="lt", fail_tools={"mempalace_add_drawer", "mempalace_mine"}))
+        self.targets = self.make_targets(bad, self.acme)
+        router = self.make_router()
+        out = self.call(router, "mempalace_add_drawer",
+                        {"wing": "w", "room": "r", "content": "x", "scope": ["acme"]})
+        self.assertEqual(out["company_skipped"], "local write failed")
+        self.assertFalse(out["success"])
+        self.assertEqual(self.acme.calls, [])
+        src = self.tmp / "m"
+        src.mkdir()
+        (src / "a.md").write_text("hello")
+        out = self.call(router, "router_mine",
+                        {"dir": str(src), "scope": ["acme"], "wing": "w", "room": "r"})
+        self.assertEqual(out["company_skipped"], "local write failed")
+        self.assertEqual(self.acme.calls, [])
+
+    def test_taxonomy_unavailable_is_not_cached_or_aliased(self):
+        down = self.start_hub(DrawerHub(token="at", fail_tools={"mempalace_get_taxonomy"}))
+        self.targets = self.make_targets(self.local, down)
+        router = self.make_router()
+        out = self.call(router, "mempalace_add_drawer",
+                        {"wing": "k8s", "room": "notes", "content": "x", "scope": ["acme"]})
+        self.assertIn("taxonomy unavailable for acme; names unmapped", out["notes"])
+        (drawer,) = down.drawers.values()
+        self.assertEqual((drawer["wing"], drawer["room"]), ("k8s", "notes"))
+        self.assertEqual(router.taxmap("acme").wings, {})
+        self.assertEqual(router._remote_tax, {})
+
+    def test_two_targets_of_same_company_rejected(self):
+        extra = Target("acme2", "company", "Acme", self.acme.url, self.cred("acme2", "at"), None, {})
+        self.targets.by_name["acme2"] = extra
+        self.targets.companies["acme2"] = extra
+        router = self.make_router()
+        err = self.call(router, "mempalace_add_drawer",
+                        {"wing": "w", "room": "r", "content": "x", "scope": ["acme", "acme2"]})
+        self.assertEqual((err["code"], err["message"]), (-32602, "one target per company in scope"))
+        self.assertEqual(self.local.calls, [])
+
+    def test_mine_frontmatter_wing_room_with_argument_override(self):
+        src = self.tmp / "fm"
+        src.mkdir()
+        (src / "a.md").write_text("---\nwing: fw\nroom: fr\n---\nbody text\n")
+        router = self.make_router()
+        out = self.call(router, "router_mine", {"dir": str(src), "scope": ["acme"]})
+        self.assertEqual(out["by_target"]["acme"]["filed"], 1)
+        (drawer,) = self.acme.drawers.values()
+        self.assertEqual((drawer["wing"], drawer["room"], drawer["text"]), ("fw", "fr", "body text"))
+        (src / "a.md").write_text("---\nwing: fw\nroom: fr\n---\nother body\n")
+        out = self.call(router, "router_mine", {"dir": str(src), "scope": ["acme"], "wing": "aw"})
+        self.assertEqual(out["by_target"]["acme"]["filed"], 1)
+        self.assertEqual(sorted(d["wing"] for d in self.acme.drawers.values()), ["aw", "fw"])
+        (src / "b.txt").write_text("no frontmatter")
+        err = self.call(router, "router_mine", {"dir": str(src), "scope": ["acme"]})
+        self.assertEqual(err["code"], -32602)
+
+    def test_non_dict_params_rejected(self):
+        router = self.make_router()
+        out = router.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": ["x"]})
+        self.assertEqual(out["error"]["code"], -32602)
+
+    def test_no_remote_id_is_partial_and_not_ledgered(self):
+        class NoIdHub(FakeHub):
+            def _t_add_drawer(self, a):
+                return {"success": True}
+
+        bare = self.start_hub(NoIdHub(token="at"))
+        self.targets = self.make_targets(self.local, bare)
+        router = self.make_router()
+        out = self.call(router, "mempalace_add_drawer",
+                        {"wing": "w", "room": "r", "content": "x", "scope": ["acme"]})
+        self.assertEqual(out["partial"], {"acme": "no remote id"})
+        self.assertEqual(self.call(router, "router_status", {})["ledger_rows"], 0)
+
+    def test_tool_schemas_omit_empty_required(self):
+        router = self.make_router()
+        tools = {t["name"]: t for t in self.rpc(router, "tools/list")["result"]["tools"]}
+        self.assertNotIn("required", tools["router_targets"]["inputSchema"])
+        self.assertEqual(tools["router_flush"]["inputSchema"]["required"], ["target"])
 
     def test_list_wings_returns_by_target_and_local_top_level(self):
         self.acme.taxonomy = {"w": {"r": 2}}

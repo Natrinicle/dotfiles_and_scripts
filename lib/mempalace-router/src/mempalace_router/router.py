@@ -28,28 +28,34 @@ log = logging.getLogger(__name__)
 
 READ_TOOLS = frozenset(
     {
-        "mempalace_search", "mempalace_kg_query", "mempalace_get_drawer", "mempalace_get_drawers",
-        "mempalace_list_wings", "mempalace_list_rooms", "mempalace_get_taxonomy", "mempalace_status",
-        "mempalace_list_drawers", "mempalace_kg_timeline", "mempalace_kg_stats", "mempalace_graph_stats",
-        "mempalace_check_duplicate", "mempalace_diary_read", "mempalace_traverse",
+        "mempalace_status", "mempalace_list_wings", "mempalace_list_rooms", "mempalace_get_taxonomy",
+        "mempalace_kg_query", "mempalace_kg_timeline", "mempalace_kg_stats", "mempalace_graph_stats",
+        "mempalace_search", "mempalace_check_duplicate", "mempalace_list_drawers",
     }
 )
 WRITE_TOOLS = frozenset(
     {
         "mempalace_add_drawer", "mempalace_kg_add", "mempalace_kg_supersede", "mempalace_kg_invalidate",
-        "mempalace_diary_write", "mempalace_update_drawer", "mempalace_delete_drawer",
+        "mempalace_diary_write",
     }
 )
 LOCAL_ONLY_TOOLS = frozenset(
+    "mempalace_" + n
+    for n in (
+        "mine sync reconnect hook_settings mesh_peers get_aaak_spec checkpoint patch_submit "
+        "artifact_put artifact_get event_append event_ack event_list event_wait task_create "
+        "create_tunnel delete_tunnel delete_hallway list_tunnels list_hallways find_tunnels "
+        "follow_tunnels traverse memories_filed_away diary_read"
+    ).split()
+)
+# Drawer ids are per palace: usable on local only, never with a company in scope.
+ID_BOUND_TOOLS = frozenset(
     {
-        "mempalace_mine", "mempalace_sync", "mempalace_reconnect", "mempalace_hook_settings",
-        "mempalace_mesh_peers", "mempalace_get_aaak_spec", "mempalace_checkpoint", "mempalace_patch_submit",
+        "mempalace_delete_drawer", "mempalace_delete_drawers", "mempalace_update_drawer",
+        "mempalace_delete_by_source", "mempalace_get_drawer", "mempalace_get_drawers",
     }
 )
 LEDGERED_TOOLS = frozenset({"mempalace_add_drawer", "mempalace_kg_add", "mempalace_kg_supersede"})
-MAP_BY_TARGET = frozenset(
-    {"mempalace_list_wings", "mempalace_list_rooms", "mempalace_get_taxonomy", "mempalace_status"}
-)
 GUARDED_FIELDS = ("content", "object", "new_object", "entry")
 SCOPE_SCHEMA = {
     "type": "array",
@@ -74,8 +80,7 @@ def _ref(tool: str, result: dict):
     return result.get("drawer_id") if tool == "mempalace_add_drawer" else result.get("triple_id")
 
 
-def _failed(result: object) -> bool:
-    return not isinstance(result, dict) or result.get("success") is False or "error" in result
+_failed = router_tools.result_failed
 
 
 class Router:
@@ -166,15 +171,26 @@ class Router:
     # -- taxonomy mapping ----------------------------------------------
 
     def _remote_taxonomy(self, name: str) -> dict:
+        """Company taxonomy; cached only when the reply is a real taxonomy."""
         cached = self._remote_tax.get(name)
         if cached is None:
             reply = self.client(name).call_tool("mempalace_get_taxonomy", {})
-            cached = reply.get("taxonomy") or {}
-            self._remote_tax[name] = cached
+            taxonomy = reply.get("taxonomy")
+            if reply.get("success") is False or not isinstance(taxonomy, dict):
+                raise HubError("rpc", "taxonomy unavailable")
+            cached = self._remote_tax[name] = taxonomy
         return cached
 
-    def map_wing_room(self, name: str, wing: str, room: str) -> tuple[str, str]:
-        """Map a local wing/room to a company target's names."""
+    @staticmethod
+    def _unmapped_note(name: str) -> str:
+        return f"taxonomy unavailable for {name}; names unmapped"
+
+    def map_wing_room(self, name: str, wing: str, room: str, notes: list | None = None) -> tuple[str, str]:
+        """Map a local wing/room to a company target's names.
+
+        When the company taxonomy cannot be fetched, no alias is recorded and
+        the names pass through unmapped (a note says so).
+        """
         tmap = self.taxmap(name)
         known_wing, known_room = tmap.wings.get(wing), tmap.rooms.get(wing, {}).get(room)
         if known_wing and known_room:
@@ -182,31 +198,35 @@ class Router:
         try:
             taxonomy = self._remote_taxonomy(name)
         except HubError:
-            return known_wing or wing, known_room or room  # unmapped: nothing recorded
+            if notes is not None:
+                notes.append(self._unmapped_note(name))
+            return known_wing or wing, known_room or room
         rw, rr, created = tmap.to_remote(wing, room, taxonomy)
         if created:
             self._remote_tax.pop(name, None)
         return rw, rr
 
-    def _map_wing(self, name: str, wing: str) -> str:
+    def _map_wing(self, name: str, wing: str, notes: list | None) -> str:
         known = self.taxmap(name).wings.get(wing)
         if known:
             return known
         try:
             taxonomy = self._remote_taxonomy(name)
         except HubError:
+            if notes is not None:
+                notes.append(self._unmapped_note(name))
             return wing
         return next((w for w in sorted(taxonomy) if canonical(w) == canonical(wing)), wing)
 
-    def map_args(self, name: str, args: dict) -> dict:
+    def map_args(self, name: str, args: dict, notes: list | None = None) -> dict:
         """Return a copy of ``args`` with wing/room mapped for a company target."""
         mapped = dict(args)
         if name == self.local_name or not isinstance(args.get("wing"), str):
             return mapped
         if isinstance(args.get("room"), str):
-            mapped["wing"], mapped["room"] = self.map_wing_room(name, args["wing"], args["room"])
+            mapped["wing"], mapped["room"] = self.map_wing_room(name, args["wing"], args["room"], notes)
         else:
-            mapped["wing"] = self._map_wing(name, args["wing"])
+            mapped["wing"] = self._map_wing(name, args["wing"], notes)
         return mapped
 
     def _to_local(self, target: str, wing, room):
@@ -219,49 +239,65 @@ class Router:
     def write_company(
         self, name, tool, args, *, local_ref, call_id, mine_job_id=None, skip_send=False
     ) -> dict:
-        """Write to one company target; outcome ``{"status": filed|queued|partial|refused, ...}``."""
+        """Write to one company target; outcome ``{"status": filed|queued|partial|refused, ...}``.
+
+        Sent directly with the client's own timeout (never retried here). A
+        write behind queued rows is queued too so order is kept.
+        """
         for field in GUARDED_FIELDS:
             value = args.get(field)
             if isinstance(value, str):
                 hit = find_secret(value)
                 if hit:
                     return {"status": "refused", "reason": f"secret_pattern:{hit}"}
+        notes: list[str] = []
         try:
-            mapped = self.map_args(name, args)
+            mapped = self.map_args(name, args, notes)
         except Exception as exc:  # corrupt taxonomy file etc.
             return {"status": "partial", "error": str(exc)}
+
+        def done(outcome: dict) -> dict:
+            if notes:
+                outcome["notes"] = notes
+            return outcome
 
         def queue():
             self.outbox.enqueue(
                 target=name, tool=tool, arguments=mapped, local_ref=local_ref, call_id=call_id
             )
-            return {"status": "queued"}
+            return done({"status": "queued"})
 
-        if skip_send:
+        if skip_send or self.outbox.pending(name):
             return queue()
-        ok, value = self.fan_out([name], lambda n: self.client(n).call_tool(tool, mapped))[name]
-        if not ok:
-            if isinstance(value, HubError) and value.kind in ("transport", "timeout"):
+        try:
+            value = self.client(name).call_tool(tool, mapped)
+        except HubError as exc:
+            if exc.kind in ("transport", "timeout"):
                 return queue()
-            return {"status": "partial", "error": str(value)}
+            return done({"status": "partial", "error": str(exc)})
+        except Exception as exc:
+            return done({"status": "partial", "error": str(exc)})
         if _failed(value):
             error = str(value.get("error", "unknown error")) if isinstance(value, dict) else "bad reply"
             if "wing" in error.lower() or "room" in error.lower():
                 self._remote_tax.pop(name, None)
-            return {"status": "partial", "error": error}
+            return done({"status": "partial", "error": error})
+        remote_ref = _ref(tool, value)
         if tool in LEDGERED_TOOLS:
+            if not remote_ref:
+                return done({"status": "partial", "error": "no remote id"})
             self.ledger.record(
                 call_id=call_id, target=name, tool=tool, local_ref=local_ref,
-                remote_ref=_ref(tool, value), payload=mapped, mine_job_id=mine_job_id,
+                remote_ref=remote_ref, payload=mapped, mine_job_id=mine_job_id,
             )
-        return {"status": "filed", "remote_ref": _ref(tool, value)}
+        return done({"status": "filed", "remote_ref": remote_ref})
 
     def flush(self, name: str) -> dict:
         """Drain a company target's outbox (serialised per target)."""
         client = self.client(name)
 
         def on_pushed(row: dict, reply: dict) -> None:
-            if row["tool"] in LEDGERED_TOOLS:
+            if row["tool"] in LEDGERED_TOOLS and _ref(row["tool"], reply):
                 self.ledger.record(
                     call_id=row["call_id"], target=name, tool=row["tool"], local_ref=row["local_ref"],
                     remote_ref=_ref(row["tool"], reply), payload=row["arguments"],
@@ -286,7 +322,12 @@ class Router:
             return None
         rid = request["id"]
         try:
-            result = self._dispatch(request.get("method"), request.get("params") or {})
+            params = request.get("params")
+            if params is None:
+                params = {}
+            if not isinstance(params, dict):
+                raise RpcError(-32602, "params must be an object")
+            result = self._dispatch(request.get("method"), params)
         except RpcError as exc:
             error = {"code": exc.code, "message": exc.message}
             if exc.data is not None:
@@ -327,9 +368,12 @@ class Router:
         if scope is not None and not (isinstance(scope, list) and all(isinstance(s, str) for s in scope)):
             raise RpcError(-32602, "scope must be a list of target names")
         try:
-            return normalize_scope(scope, self.targets)
+            names, notes = normalize_scope(scope, self.targets)
         except ScopeError as exc:
             raise RpcError(-32602, str(exc), {"code": exc.code}) from exc
+        if len(names) > 2:  # distinct companies are already rejected, so these share one
+            raise RpcError(-32602, "one target per company in scope")
+        return names, notes
 
     def _call_tool(self, name: str, args: dict) -> dict:
         if name == "router_mine":
@@ -340,17 +384,24 @@ class Router:
         if not name.startswith("mempalace_"):
             raise RpcError(-32602, f"unknown tool: {name}")
         had_scope = "scope" in args
-        if name in LOCAL_ONLY_TOOLS:
+        known = name in READ_TOOLS or name in WRITE_TOOLS or name in ID_BOUND_TOOLS
+        if name in LOCAL_ONLY_TOOLS or not known:
             args.pop("scope", None)
             result = dict(self._local(lambda c: c.call_tool(name, args)))
-            if had_scope:
+            if name not in LOCAL_ONLY_TOOLS:
+                self._add_notes(result, ["unknown tool routed local-only"])
+            elif had_scope:
                 self._add_notes(result, ["scope ignored for local-only tool"])
             return result
         names, notes = self._scope(args)
-        if name in WRITE_TOOLS:
+        if name in ID_BOUND_TOOLS:
+            if len(names) > 1:
+                raise RpcError(-32602, "ids are per-palace; use router_retract / local scope")
+            result = dict(self._local(lambda c: c.call_tool(name, args)))
+        elif name in WRITE_TOOLS:
             result = self._write(name, args, names)
         else:
-            result = self._read(name, args, names)
+            result = self._read(name, args, names, notes)
         self._add_notes(result, notes)
         return result
 
@@ -362,10 +413,8 @@ class Router:
 
     # -- reads ------------------------------------------------------------
 
-    def _read(self, name: str, args: dict, names: list[str]) -> dict:
-        if name in ("mempalace_get_drawer", "mempalace_get_drawers"):
-            return self._read_first(name, args, names)
-        raw = self.fan_out(names, lambda n: self.client(n).call_tool(name, self.map_args(n, args)))
+    def _read(self, name: str, args: dict, names: list[str], notes: list[str]) -> dict:
+        raw = self.fan_out(names, lambda n: self.client(n).call_tool(name, self.map_args(n, args, notes)))
         local_ok, local_value = raw[self.local_name]
         if not local_ok:
             raise RpcError(-32000, "local_unreachable", {"detail": str(local_value)})
@@ -387,26 +436,6 @@ class Router:
             result["degraded"] = degraded
         return result
 
-    def _read_first(self, name: str, args: dict, names: list[str]) -> dict:
-        degraded: list[str] = []
-        for target in names:
-            try:
-                value = self.client(target).call_tool(name, args)
-            except HubError as exc:
-                if target == self.local_name:
-                    raise RpcError(-32000, "local_unreachable", {"detail": str(exc)}) from exc
-                degraded.append(target)
-                continue
-            if _failed(value):
-                degraded.append(target)
-                continue
-            result = dict(value)
-            result["target"] = target
-            if degraded:
-                result["degraded"] = degraded
-            return result
-        return {"success": False, "error": "not found in any target", "degraded": degraded}
-
     def _correct(self, conflicts: list[dict], company: str) -> list[dict]:
         """Supersede the losing side of each actionable kg_query conflict."""
         corrections = []
@@ -421,14 +450,24 @@ class Router:
                      "old_object": old, "new_object": new, "applied": False}
             call = {"subject": conflict["subject"], "predicate": conflict["predicate"],
                     "old_object": old, "new_object": new}
-            try:
-                reply = self.client(loser).call_tool("mempalace_kg_supersede", call)
-                if _failed(reply):
-                    entry["error"] = str(reply.get("error", "failed"))
-                else:
+            if loser_local:
+                try:
+                    reply = self.client(loser).call_tool("mempalace_kg_supersede", call)
+                    if _failed(reply):
+                        entry["error"] = str(reply.get("error", "failed"))
+                    else:
+                        entry["applied"] = True
+                except HubError as exc:
+                    entry["error"] = str(exc)
+            else:  # company side: guard, ledger and outbox semantics apply
+                outcome = self.write_company(
+                    loser, "mempalace_kg_supersede", call, local_ref=None, call_id=uuid.uuid4().hex
+                )
+                entry["status"] = outcome["status"]
+                if outcome["status"] == "filed":
                     entry["applied"] = True
-            except HubError as exc:
-                entry["error"] = str(exc)
+                else:
+                    entry["error"] = outcome.get("error") or outcome.get("reason") or outcome["status"]
             corrections.append(entry)
         return corrections
 
@@ -440,9 +479,13 @@ class Router:
         company = next((n for n in names if n != self.local_name), None)
         if company is None:
             return result
+        if _failed(result):
+            result["company_skipped"] = "local write failed"
+            return result
         local_ref = _ref(name, result)
         outcome = self.write_company(company, name, args, local_ref=local_ref, call_id=call_id)
         result["call_id"] = call_id
+        self._add_notes(result, outcome.get("notes", []))
         status = outcome["status"]
         if status == "refused":
             result["refused"] = {company: outcome["reason"]}
