@@ -10,6 +10,8 @@ import uuid
 from contextlib import closing
 from pathlib import Path
 
+import yaml
+
 from mempalace_router.client import HubError
 
 CHUNK_CHARS = 1500
@@ -26,6 +28,11 @@ class RpcError(Exception):
         self.data = data
 
 
+def result_failed(result: object) -> bool:
+    """True for a non-dict reply or one carrying ``success: false`` / ``error``."""
+    return not isinstance(result, dict) or result.get("success") is False or "error" in result
+
+
 def _scope_prop(description: str = "Targets") -> dict:
     return {"type": "array", "items": {"type": "string"}, "description": description}
 
@@ -34,11 +41,10 @@ def router_tool_descriptors() -> list[dict]:
     """Return the ``tools/list`` entries for the router's own tools."""
 
     def tool(name, description, props, required=()):
-        return {
-            "name": name,
-            "description": description,
-            "inputSchema": {"type": "object", "properties": props, "required": list(required)},
-        }
+        schema = {"type": "object", "properties": props}
+        if required:
+            schema["required"] = list(required)
+        return {"name": name, "description": description, "inputSchema": schema}
 
     string = {"type": "string"}
     return [
@@ -256,6 +262,35 @@ def _mine_files(root: Path) -> list[Path]:
     )
 
 
+def split_frontmatter(text: str) -> tuple[dict, str]:
+    """Split a leading ``---`` YAML block off ``text``; ``({}, text)`` when absent or invalid."""
+    if not text.startswith("---\n"):
+        return {}, text
+    end = text.find("\n---", 4)
+    if end == -1:
+        return {}, text
+    try:
+        meta = yaml.safe_load(text[4:end])
+    except yaml.YAMLError:
+        return {}, text
+    rest = text[end + 4:].lstrip("\n")
+    return (meta if isinstance(meta, dict) else {}), rest
+
+
+def _plan_files(root: Path, wing, room) -> list[tuple[str, str, str, str]]:
+    """``(relative path, wing, room, body)`` per file; arguments override frontmatter."""
+    plan = []
+    for path in _mine_files(root):
+        rel = path.relative_to(root).as_posix()
+        meta, body = split_frontmatter(path.read_text(errors="replace"))
+        file_wing = wing or meta.get("wing")
+        file_room = room or meta.get("room")
+        if not (isinstance(file_wing, str) and file_wing and isinstance(file_room, str) and file_room):
+            raise RpcError(-32602, f"wing and room required (arguments or frontmatter): {rel}")
+        plan.append((rel, file_wing, file_room, body))
+    return plan
+
+
 def tool_mine(router, args: dict, scope: list[str]) -> dict:
     """``router_mine``: mine locally, and chunk files into a company target."""
     directory = _require_str(args, "dir")
@@ -264,33 +299,37 @@ def tool_mine(router, args: dict, scope: list[str]) -> dict:
         raise RpcError(-32602, f"dir is not a directory: {directory}")
     company = next((n for n in scope if n != router.local_name), None)
     wing, room = args.get("wing"), args.get("room")
-    if company and not (isinstance(wing, str) and wing and isinstance(room, str) and room):
-        raise RpcError(-32602, "wing and room are required for company scope")
+    wing = wing if isinstance(wing, str) and wing else None
+    room = room if isinstance(room, str) and room else None
+    plan = _plan_files(root, wing, room) if company else []
     try:
         local_result = router.client(router.local_name).call_tool("mempalace_mine", {"path": directory})
     except HubError as exc:
         raise RpcError(-32000, "local_unreachable", {"detail": str(exc)}) from exc
     job_id = uuid.uuid4().hex
     by_target: dict = {router.local_name: local_result}
-    files = chunks = 0
-    if company:
-        tally = {"filed": 0, "queued": 0, "partial": 0, "refused": 0}
-        down = False
-        for path in _mine_files(root):
-            files += 1
-            rel = path.relative_to(root).as_posix()
-            for chunk in chunk_text(path.read_text(errors="replace")):
-                chunks += 1
-                outcome = router.write_company(
-                    company,
-                    "mempalace_add_drawer",
-                    {"wing": wing, "room": room, "content": chunk, "source_file": rel},
-                    local_ref=None,
-                    call_id=job_id,
-                    mine_job_id=job_id,
-                    skip_send=down,
-                )
-                tally[outcome["status"]] += 1
-                down = down or outcome["status"] == "queued"
-        by_target[company] = tally
-    return {"job_id": job_id, "files": files, "chunks": chunks, "by_target": by_target}
+    out = {"job_id": job_id, "files": 0, "chunks": 0, "by_target": by_target}
+    if not company:
+        return out
+    if result_failed(local_result):
+        out["company_skipped"] = "local write failed"
+        return out
+    tally = {"filed": 0, "queued": 0, "partial": 0, "refused": 0}
+    down = False
+    for rel, file_wing, file_room, body in plan:
+        out["files"] += 1
+        for chunk in chunk_text(body):
+            out["chunks"] += 1
+            outcome = router.write_company(
+                company,
+                "mempalace_add_drawer",
+                {"wing": file_wing, "room": file_room, "content": chunk, "source_file": rel},
+                local_ref=None,
+                call_id=job_id,
+                mine_job_id=job_id,
+                skip_send=down,
+            )
+            tally[outcome["status"]] += 1
+            down = down or outcome["status"] == "queued"
+    by_target[company] = tally
+    return out
