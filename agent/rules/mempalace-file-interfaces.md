@@ -18,6 +18,8 @@ Palace `add_drawer` / `kg_add` is the filing step. **Commit** in this rule
 means that palace write. It is not a git commit. Local-first still asks
 before `git commit`, push, or server mutate.
 
+Scope: pick targets per rule `mempalace-scope`; the router adds `local` itself.
+
 ## Same-turn gate
 
 A scan, decompile, datasheet, or live probe that yields a new method is
