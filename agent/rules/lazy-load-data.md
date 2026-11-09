@@ -62,6 +62,7 @@ names it. Do not `mempalace sync` in a way that prunes those drawers.
 | Local tracing / OTEL demos | palace first; disk fallback only if still listed |
 | Decision models / System One (Jev Nimble Kev) | palace `Jev Nimble Kev System One gemma4` |
 | Model routing / cost audits | `{MEMORY_ROOT}/model-routing-table.md` |
+| Dump harvest spawn / Ollama overload T1 | palace `subagents-first dump-harvest T2 high model-router Ollama overload T1 2026-11-09`; rules `subagents-first` + `model-routing`; skill `model-router` |
 | Employer-tree parent model switch | PATH `employer-parent-model` (`--fetch-key` writes `secrets.env` mode 600) / `employer-grok` / `employer-claude` / POSIX `employer-anthropic-api-key`; `{MEMORY_ROOT}/model-routing-table.md`; examples `examples/employer-parent-model.env.example`, `examples/employer-claude-settings.json.example`, `examples/employer-claude-shim` |
 | Packaging a toolkit | `toolkit-homes.md`; classify first; rule `toolkit-residual-identity` (host denylist, never pack real names) |
 | Reverse Engineer Anything / `rea-agents` / REA MCP | `{MEMORY_ROOT}/reverse-engineer-anything-2026-10-16.md` |

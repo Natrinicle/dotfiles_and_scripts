@@ -21,7 +21,14 @@ Parent `scripts/unpack_artifact.py` already printed the kind. Follow that kind.
 
 HTTP: host/path/JSON keys in that tree, then a proxy. Do not commit tokens.
 
-Prove BLE/serial with a live tap. Copy the app’s unit conversion. One BLE
+Prove BLE/serial with a live tap. Copy the app's unit conversion. One BLE
 central: unbind the phone first.
+
+When the parent pack is a BLE/WiFi remote catalog (`remote_codes` or
+equivalent), also harvest **supported-device detection** and **preset
+catalogs** in the same unpack (see reverse-engineering-protocols).
+
+Unpack and jadx/strings walks are a **child** (`dump-harvest`, T2, effort
+**high** — skill `model-router`). Do not dump the APK tree into the parent.
 
 Paths: `reverse-engineering-protocols` → `references/artifact-kinds.md`.

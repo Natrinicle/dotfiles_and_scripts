@@ -70,9 +70,10 @@ Parent-window EV of a spawn (tokens):
 
 Parent-do grows the expensive window. That raises both **P(compact)** and
 `C_compact_parent`. A cheap or local child does the slice (and any child-window
-compact) off the parent. Which child model: `model-router` cheapest viable
-tier; local is the strongest compact hedge. Escalate once if the cheap child
-is empty or shallow.
+compact) off the parent. Which child model: skill `model-router` cheapest
+**viable** tier (dump harvest is T2, not gemma4/Haiku). Local is the
+strongest compact hedge when quality allows. Escalate once if the cheap
+child is empty or shallow. T0 may fall back to T1 if Ollama is overloaded.
 
 Low `C_rem` makes a scoped child high value (protects the bankroll).
 One `rg` of one tree, or one command piped into grep: `C_prompt +
@@ -116,8 +117,10 @@ Estimating EV must cost less than the action.
    `independent-checker`, `pre-commit-gate`, `employer-pr-findings-gate`,
    `system-security`. EV does not waive those.
 
-Which model: `model-router` / `skill-router`. Whether to spend at all: this
-skill.
+Which model: skill `model-router` (cheapest **viable** child; dump harvest
+is T2 high, not gemma4/Haiku; T0 may fall back to T1 if Ollama is
+overloaded). Whether to spawn: rule `subagents-first`. Whether to spend
+at all: this skill.
 
 ## Worked calls
 
@@ -125,6 +128,7 @@ skill.
 |-----------|---------|------|
 | Palace already has the GATT map | tokens + time | Skip re-decompile |
 | One-tree “where is X” | tokens | Parent `rg` of that tree |
+| jadx / `libapp.so` / firmware discovery loop | context-window + compact | Spawn `dump-harvest` T2 (skill `model-router`); not parent xhigh, not Haiku |
 | One-shot “did this open the port” | tokens | Parent `ss \| grep` |
 | Reusable router diagnostics (iptables, clients, stats) | tokens + time | Helper script |
 | Multi-location “where is X” | context-window | Local explore (`C_parent_do` ≫ `C_reingest`) |
@@ -146,14 +150,14 @@ skill.
 | “Compaction is automatic, keep it on the parent” | Compaction is a billed parent pass (`C_compact_parent`) |
 | “Spawn a cloud T3 child to save compact” | Child work is still billed; the hedge is cheap/local plus small `C_reingest` |
 | “One more child just in case” | Extra child needs its own edge |
-| “I'll read the whole routing table” | Cached pin; re-read is −EV |
+| “I'll read the whole routing table” | Cached pin for healthy T0; dump-harvest loads `model-router` |
 | “EV takes too long to compute” | Cheap actions skip the ledger |
 | “Positive EV, dump the window” | Size the stake; leave answer headroom |
 
 ## Related
 
-- `model-routing` / `model-router` / `skill-router` — which model (cheapest viable child; local is the compact hedge)
-- `subagents-first` — large child-capable work goes to a child; one `rg` of one tree or one piped grep stays on the parent; this skill scores that spawn's context-window and parent compaction
+- `model-routing` / `model-router` / `skill-router` — which model (cheapest viable child; dump harvest T2 high; T0→T1 if Ollama overloaded)
+- `subagents-first` — large child-capable work and dump discovery loops go to a child; one `rg` of one tree or one piped grep stays on the parent; this skill scores that spawn's context-window and parent compaction
 - `mempalace-compact-filing` — durability hedge: file necessary pieces to MemPalace before compact so later `C_reingest` is a palace lookup. This skill scores the compact **cost** (`C_compact_parent`); that rule owns filing.
 - `decision-judge` — user-facing A vs B court (skip when no tradeoff)
 - `agent-graphs` / `loop-until-green` — shape of multi-agent work and the inner programmable check; this skill still scores each spawn

@@ -40,7 +40,7 @@ single `rg` / `grep` of one tree stays on the parent.
 |------|------|
 | Direct Ollama `/api/generate` | Tool-free T0 text. Short prompt, cap `num_predict`. |
 | Ollama `/v1/systemone` (Nimble / Kev) | **Candidate only.** Closed yes/no, enum, or score. Needs Ollama ≥0.35 and a pulled DMM. Palace: `Jev Nimble Kev System One gemma4`. |
-| Spawn `explore` / `code-explorer` / `local-search` / `local-extract` | Host config pins these to local Ollama. Skip re-reading the routing table. Omit `model`. |
+| Spawn `explore` / `code-explorer` / `local-search` / `local-extract` | Host pin to local Ollama when **healthy**. Skip re-reading the routing table. Omit `model`. Down or overloaded → pass T1 (skill `model-router`). |
 | Persona `local-brief` | When the parent will re-ingest a long child reply |
 
 Direct generate pattern (same as `model-router`):
@@ -56,7 +56,8 @@ curl -sS --max-time 600 http://localhost:11434/api/generate \
 
 First generate after idle can take minutes while weights load into VRAM.
 Use a 600s client timeout and `keep_alive=-1`. HTTP 503 is the Ollama
-queue, not a timeout — see skill `model-router`.
+queue (overload): retry once, then T1 lowest-upstream fallback is
+**allowed** (skill `model-router`). A slow VRAM load is not overload.
 
 ## Mixed turns
 
@@ -65,8 +66,13 @@ Parent gathers with tools. Local synthesizes or extracts from that result.
 ## Escalation
 
 Empty, malformed, shallow, or missing-files local output → one redo on the
-parent (or `general-purpose`). Keep the local result when it is usable. Grok
-local pins have no automatic small-cloud fallback; Claude T0 curl does.
+parent (or `general-purpose`). Keep the local result when it is usable.
+
+**Ollama down or overloaded:** T1 lowest-upstream fallback is **allowed**
+(skill `model-router`). Retry HTTP 503 once. Then pass T1 (Claude: cheapest
+small-cloud; Grok: cheapest cloud slug that is not the xhigh parent).
+Omitting `model` still hits the local pin; the harness does not rewrite it.
+Dump-harvest stays T2.
 
 ## Anti-patterns
 

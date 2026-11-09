@@ -35,7 +35,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── lib/                           # Off-PATH helpers (adf-ocr.py → ~/.local/lib)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 42 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── rules/                     # 43 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 134 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
@@ -173,7 +173,7 @@ is the commit; later sessions query the palace first),
 (file necessary pieces to MemPalace before parent compact so later lookup
 has full drawers; the compact summary is not filing; PostCompact mines
 `compaction/INDEX.md` as a pointer only),
-`subagents-first` (spawn large work; parent runs one `rg`/`grep` of one tree or one command piped into grep; hook `prefer-spawn-search` denies forest/multi-location search; reusable multi-grep diagnostics → helper script; several independent units → `agent-graphs`),
+`subagents-first` (spawn large work and dump discovery loops; parent runs one `rg`/`grep` of one tree or one command piped into grep; every spawn uses `model-router`; dump-harvest is T2 effort high, not xhigh/Fable, not Haiku; Ollama overload may fall back to T1; hook `prefer-spawn-search` denies forest/multi-location search; reusable multi-grep diagnostics → helper script; several independent units → `agent-graphs`),
 `expected-value` (take an expensive action only with an edge; ledger is USD, tokens, wall-clock, context-window, and parent compaction; spawn value is parent context saved vs re-ingest),
 `agent-graphs` (shape of multi-agent work: splitter, isolated workers, code nodes, blast-radius gate; inner retry is `loop-until-green`),
 `cups-custom-backend` (KDE Printers list is configured dests; last-seen discovery; `retry-job` holds jobs while the printer is off), etc.
