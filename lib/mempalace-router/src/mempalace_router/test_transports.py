@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from mempalace_router import cli
 from mempalace_router.test_router import RouterTestBase
-from mempalace_router.transports import run_http, run_stdio
+from mempalace_router.transports import MAX_BODY_BYTES, make_http_server, run_http, run_stdio
 
 BEARER = "unit-test-bearer"
 
@@ -41,6 +41,49 @@ class TransportTests(RouterTestBase):
 
         self.addCleanup(stop)
         return server.server_address[1]
+
+    def start_http_with(self, bearer):
+        router = self.make_router()
+        server = make_http_server(router, host="127.0.0.1", port=0, token=bearer)
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+
+        def stop():
+            server.shutdown()
+            thread.join()
+            server.server_close()
+
+        self.addCleanup(stop)
+        return server.server_address[1]
+
+    def test_http_rejects_empty_bearer_when_expected_empty(self):
+        port = self.start_http_with("")
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        for header in ("Bearer ", "Bearer"):
+            conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+            self.addCleanup(conn.close)
+            conn.request("POST", "/mcp", body=body, headers={"Authorization": header})
+            resp = conn.getresponse()
+            resp.read()
+            self.assertEqual(resp.status, 401)
+
+    def test_http_oversize_body_413(self):
+        port = self.start_http()
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        self.addCleanup(conn.close)
+        conn.putrequest("POST", "/mcp")
+        conn.putheader("Authorization", f"Bearer {BEARER}")
+        conn.putheader("Content-Length", str(MAX_BODY_BYTES + 1))
+        conn.endheaders()
+        resp = conn.getresponse()
+        resp.read()
+        self.assertEqual(resp.status, 413)
+
+    def test_stdio_blank_lines_skipped(self):
+        stdout = io.StringIO()
+        line = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        run_stdio(self.make_router(), io.StringIO(f"\n  \n{line}\n\n"), stdout)
+        self.assertEqual(len(stdout.getvalue().splitlines()), 1)
 
     def request(self, port, method, path, body=None, auth=None):
         conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
@@ -118,6 +161,19 @@ class CliTests(unittest.TestCase):
         first = cred.read_text()
         self.assertGreaterEqual(len(first.strip()), 32)
         self.assertEqual(cli.ensure_credential_file(cred), first.strip())
+
+    def test_empty_credential_file_is_reminted(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        cred = Path(tmp.name) / "cred"
+        for blank in ("", "  \n"):
+            cred.write_text(blank)
+            cred.chmod(0o644)
+            value = cli.ensure_credential_file(cred)
+            self.assertGreaterEqual(len(value), 32)
+            self.assertEqual(cred.read_text().strip(), value)
+            self.assertEqual(stat.S_IMODE(cred.stat().st_mode), 0o600)
+        self.assertEqual([p.name for p in Path(tmp.name).iterdir()], ["cred"])
 
     def test_cli_bad_config_exits_2(self):
         tmp = tempfile.TemporaryDirectory()

@@ -39,6 +39,9 @@ def run_stdio(router: Router, stdin=None, stdout=None) -> None:
     """Serve newline-delimited JSON-RPC until ``stdin`` reaches EOF."""
     stdin = sys.stdin if stdin is None else stdin
     stdout = sys.stdout if stdout is None else stdout
+    reconfigure = getattr(stdin, "reconfigure", None)
+    if reconfigure is not None:
+        reconfigure(errors="replace")  # invalid UTF-8 becomes a -32700, not a dead loop
     _startup_flush(router)
     for line in stdin:
         line = line.strip()
@@ -51,8 +54,11 @@ def run_stdio(router: Router, stdin=None, stdout=None) -> None:
         else:
             reply = router.handle(request) if isinstance(request, dict) else _invalid_request()
         if reply is not None:
-            stdout.write(json.dumps(reply) + "\n")
-            stdout.flush()
+            try:
+                stdout.write(json.dumps(reply) + "\n")
+                stdout.flush()
+            except BrokenPipeError:
+                return
 
 
 def _make_handler(router: Router, bearer: str):
@@ -72,9 +78,10 @@ def _make_handler(router: Router, bearer: str):
         def _authorized(self) -> bool:
             header = self.headers.get("Authorization", "")
             scheme, _, given = header.partition(" ")
-            if scheme != "Bearer":
+            given = given.strip().encode()
+            if scheme != "Bearer" or not expected or not given:
                 return False
-            return hmac.compare_digest(given.strip().encode(), expected)
+            return hmac.compare_digest(given, expected)
 
         def do_GET(self):
             if self.path == "/healthz":
