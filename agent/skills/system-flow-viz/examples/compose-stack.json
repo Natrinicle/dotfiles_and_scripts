@@ -1,0 +1,182 @@
+{
+  "title": "Sample compose stack",
+  "mode": "combo",
+  "chrome": "tui",
+  "width": 1200,
+  "height": 1500,
+  "header": {
+    "host": "sample",
+    "system": "compose stack",
+    "kernel": "Linux"
+  },
+  "stages": [
+    {
+      "id": "edge",
+      "label": "Edge",
+      "status": "done",
+      "elapsed_s": 0.8,
+      "units": 1,
+      "failed": 0
+    },
+    {
+      "id": "app",
+      "label": "App",
+      "status": "running",
+      "elapsed_s": 2.4,
+      "units": 3,
+      "failed": 0
+    }
+  ],
+  "nodes": [
+    {
+      "id": "ingress",
+      "label": "proxy",
+      "kind": "edge",
+      "state": "done",
+      "parent": null,
+      "description": "TLS terminator",
+      "role": "lead"
+    },
+    {
+      "id": "api",
+      "label": "app",
+      "kind": "service",
+      "state": "running",
+      "parent": "ingress",
+      "description": "API workers",
+      "running_s": 1.4,
+      "role": "swarm"
+    },
+    {
+      "id": "store",
+      "label": "db",
+      "kind": "service",
+      "state": "waiting",
+      "parent": "api",
+      "description": "Primary store"
+    },
+    {
+      "id": "jobs",
+      "label": "worker",
+      "kind": "service",
+      "state": "waiting",
+      "parent": "api",
+      "description": "Background jobs",
+      "role": "local"
+    }
+  ],
+  "edges": [
+    {
+      "from": "ingress",
+      "to": "api",
+      "kind": "talks",
+      "label": "HTTPS",
+      "packets": true,
+      "tone": "o",
+      "volume": "high"
+    },
+    {
+      "from": "api",
+      "to": "store",
+      "kind": "talks",
+      "label": "SQL",
+      "packets": true,
+      "tone": "b",
+      "volume": "medium"
+    },
+    {
+      "from": "api",
+      "to": "jobs",
+      "kind": "talks",
+      "label": "queue",
+      "packets": true,
+      "tone": "g",
+      "volume": "low"
+    }
+  ],
+  "gates": [
+    {"id": "g1", "label": "before start", "active": true},
+    {"id": "g2", "label": "same error twice", "active": false},
+    {"id": "g3", "label": "before done", "active": false}
+  ],
+  "log": [
+    {"t": "00:00:01", "tag": "proxy", "tone": "o", "text": "listen :443"},
+    {"t": "00:00:02", "tag": "app", "tone": "b", "text": "migrate start"}
+  ],
+  "failures": [],
+  "timeline": [
+    {"id": "edge", "label": "Edge (1 unit)", "start_s": 0.0, "end_s": 0.8, "state": "done"},
+    {"id": "api", "label": "app", "start_s": 0.8, "end_s": 3.2, "state": "running"},
+    {"id": "store", "label": "db", "start_s": 1.6, "end_s": 3.2, "state": "waiting"}
+  ],
+  "footer": {"done": 1, "running": 1, "waiting": 2, "failed": 0},
+  "cli": "render-flow --graph compose-stack.json",
+  "keyframes": [
+    {
+      "t": 0.0,
+      "nodes": {
+        "ingress": {"state": "running"},
+        "api": {"state": "waiting"},
+        "store": {"state": "waiting"},
+        "jobs": {"state": "waiting"}
+      },
+      "stages": [
+        {"id": "edge", "status": "running", "elapsed_s": 0.2},
+        {"id": "app", "status": "waiting", "elapsed_s": 0.0}
+      ],
+      "footer": {"done": 0, "running": 1, "waiting": 3, "failed": 0},
+      "gates": ["g1"],
+      "log": [
+        {"t": "00:00:00", "tag": "proxy", "tone": "o", "text": "bind :443"}
+      ]
+    },
+    {
+      "t": 0.25,
+      "nodes": {
+        "ingress": {"state": "done"},
+        "api": {"state": "running"}
+      },
+      "stages": [
+        {"id": "edge", "status": "done", "elapsed_s": 0.8},
+        {"id": "app", "status": "running", "elapsed_s": 0.4}
+      ],
+      "footer": {"done": 1, "running": 1, "waiting": 2, "failed": 0},
+      "log": [
+        {"t": "00:00:01", "tag": "proxy", "tone": "o", "text": "listen :443"},
+        {"t": "00:00:02", "tag": "app", "tone": "b", "text": "migrate start"}
+      ]
+    },
+    {
+      "t": 0.55,
+      "nodes": {
+        "store": {"state": "running"},
+        "jobs": {"state": "running"}
+      },
+      "footer": {"done": 1, "running": 3, "waiting": 0, "failed": 0},
+      "gates": ["g2"],
+      "log": [
+        {"t": "00:00:02", "tag": "app", "tone": "b", "text": "migrate start"},
+        {"t": "00:00:03", "tag": "db", "tone": "b", "text": "accept 5432"},
+        {"t": "00:00:03", "tag": "worker", "tone": "g", "text": "consume jobs"}
+      ]
+    },
+    {
+      "t": 0.85,
+      "nodes": {
+        "api": {"state": "done"},
+        "store": {"state": "done"},
+        "jobs": {"state": "done"}
+      },
+      "stages": [
+        {"id": "edge", "status": "done", "elapsed_s": 0.8},
+        {"id": "app", "status": "done", "elapsed_s": 2.4}
+      ],
+      "footer": {"done": 4, "running": 0, "waiting": 0, "failed": 0},
+      "gates": ["g3"],
+      "log": [
+        {"t": "00:00:04", "tag": "app", "tone": "b", "text": "ready"},
+        {"t": "00:00:04", "tag": "check", "tone": "p", "text": "before done · VERDICT PASS"}
+      ]
+    }
+  ]
+}
