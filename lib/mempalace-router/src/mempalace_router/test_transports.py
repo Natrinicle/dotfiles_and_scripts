@@ -1,0 +1,133 @@
+import contextlib
+import http.client
+import io
+import json
+import os
+import stat
+import tempfile
+import threading
+import unittest
+from pathlib import Path
+from unittest.mock import patch
+
+from mempalace_router import cli
+from mempalace_router.test_router import RouterTestBase
+from mempalace_router.transports import run_http, run_stdio
+
+BEARER = "unit-test-bearer"
+
+
+class TransportTests(RouterTestBase):
+    def start_http(self):
+        router = self.make_router()
+        ready = threading.Event()
+        box = {}
+
+        def on_ready(server):
+            box["server"] = server
+            ready.set()
+
+        thread = threading.Thread(
+            target=run_http, args=(router,),
+            kwargs={"host": "127.0.0.1", "port": 0, "token": BEARER, "ready": on_ready},
+        )
+        thread.start()
+        self.assertTrue(ready.wait(10))
+        server = box["server"]
+
+        def stop():
+            server.shutdown()
+            thread.join()
+
+        self.addCleanup(stop)
+        return server.server_address[1]
+
+    def request(self, port, method, path, body=None, auth=None):
+        conn = http.client.HTTPConnection("127.0.0.1", port, timeout=10)
+        self.addCleanup(conn.close)
+        headers = {"Authorization": f"Bearer {auth}"} if auth else {}
+        conn.request(method, path, body=body, headers=headers)
+        resp = conn.getresponse()
+        return resp.status, resp.read()
+
+    def test_stdio_roundtrip_tools_list(self):
+        router = self.make_router()
+        lines = [
+            {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
+            {"jsonrpc": "2.0", "method": "notifications/initialized"},
+            {"jsonrpc": "2.0", "id": 2, "method": "tools/list"},
+        ]
+        stdin = io.StringIO("".join(json.dumps(x) + "\n" for x in lines))
+        stdout = io.StringIO()
+        run_stdio(router, stdin, stdout)
+        replies = [json.loads(x) for x in stdout.getvalue().splitlines()]
+        self.assertEqual(len(replies), 2)
+        self.assertEqual(replies[0]["result"]["serverInfo"]["name"], "mempalace-router")
+        names = {t["name"] for t in replies[1]["result"]["tools"]}
+        self.assertIn("router_targets", names)
+
+    def test_stdio_bad_json_gets_parse_error(self):
+        stdout = io.StringIO()
+        run_stdio(self.make_router(), io.StringIO("{nope\n"), stdout)
+        self.assertEqual(json.loads(stdout.getvalue())["error"]["code"], -32700)
+
+    def test_http_requires_bearer(self):
+        port = self.start_http()
+        body = json.dumps({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})
+        self.assertEqual(self.request(port, "POST", "/mcp", body)[0], 401)
+        self.assertEqual(self.request(port, "POST", "/mcp", body, auth="wrong")[0], 401)
+        status, raw = self.request(port, "POST", "/mcp", body, auth=BEARER)
+        self.assertEqual(status, 200)
+        names = {t["name"] for t in json.loads(raw)["result"]["tools"]}
+        self.assertIn("router_status", names)
+
+    def test_http_notification_gets_202(self):
+        port = self.start_http()
+        body = json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"})
+        status, raw = self.request(port, "POST", "/mcp", body, auth=BEARER)
+        self.assertEqual((status, raw), (202, b""))
+
+    def test_http_healthz_ok(self):
+        port = self.start_http()
+        self.assertEqual(self.request(port, "GET", "/healthz"), (200, b"ok\n"))
+
+    def test_http_statusz_and_404(self):
+        port = self.start_http()
+        self.assertEqual(self.request(port, "GET", "/statusz")[0], 401)
+        status, raw = self.request(port, "GET", "/statusz", auth=BEARER)
+        self.assertEqual(status, 200)
+        self.assertIsInstance(json.loads(raw), dict)
+        self.assertEqual(self.request(port, "GET", "/nope")[0], 404)
+
+
+class CliTests(unittest.TestCase):
+    def test_cli_mints_token_file_0600(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        home = Path(tmp.name)
+        config = home / "targets.yaml"
+        config.write_text("targets:\n  local:\n    kind: local\n    palace_path: ~/palace\n")
+        cred = home / ".config" / "mempalace-router" / "cred"
+        out = io.StringIO()
+        with patch.dict(os.environ, {"HOME": str(home)}), contextlib.redirect_stdout(out):
+            rc = cli.main(["--check-config", "--config", str(config), "--token-file", str(cred)])
+        self.assertEqual(rc, 0)
+        self.assertEqual(out.getvalue().strip(), "ok")
+        self.assertEqual(stat.S_IMODE(cred.stat().st_mode), 0o600)
+        self.assertEqual(stat.S_IMODE(cred.parent.stat().st_mode), 0o700)
+        first = cred.read_text()
+        self.assertGreaterEqual(len(first.strip()), 32)
+        self.assertEqual(cli.ensure_credential_file(cred), first.strip())
+
+    def test_cli_bad_config_exits_2(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = cli.main(["--check-config", "--config", str(Path(tmp.name) / "missing.yaml")])
+        self.assertEqual(rc, 2)
+        self.assertIn("not found", err.getvalue())
+
+
+if __name__ == "__main__":
+    unittest.main()
