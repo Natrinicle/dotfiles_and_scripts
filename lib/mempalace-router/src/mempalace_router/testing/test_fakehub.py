@@ -42,6 +42,17 @@ class FakeHubTest(unittest.TestCase):
         hits = _call(hub, "mempalace_search", {"query": "palace"})["results"]
         self.assertEqual(hits[0]["drawer_id"], body["drawer_id"])
         self.assertEqual(hits[0]["effective_distance"], 0.0)
+        self.assertEqual(body["chunks"], 1)
+        full = _call(hub, "mempalace_search", {"query": "palace", "wing": "w"})
+        self.assertEqual(full["filters"]["wing"], "w")
+        self.assertEqual(full["total_before_filter"], 1)
+        hit = full["results"][0]
+        self.assertEqual(hit["similarity"], 1.0)
+        self.assertEqual(hit["distance"], 0.0)
+        self.assertEqual(hit["closet_boost"], 0.0)
+        self.assertEqual(hit["matched_via"], "drawer")
+        self.assertIn("source_file", hit)
+        self.assertIn("source_path", hit)
         self.assertEqual(hub.calls[0][0], "mempalace_add_drawer")
         self.assertEqual(hub.taxonomy, {"w": {"r": 1}})
 
@@ -51,7 +62,7 @@ class FakeHubTest(unittest.TestCase):
         first = _call(hub, "mempalace_add_drawer", args)
         second = _call(hub, "mempalace_add_drawer", args)
         self.assertTrue(second["success"])
-        self.assertTrue(second["already_exists"])
+        self.assertEqual(second["reason"], "already_exists")
         self.assertEqual(second["drawer_id"], first["drawer_id"])
 
     def test_fakehub_rejects_bad_token(self):
@@ -81,6 +92,9 @@ class FakeHubTest(unittest.TestCase):
         added = _call(hub, "mempalace_kg_add",
                       {"subject": "s", "predicate": "p", "object": "old"})
         self.assertTrue(added["success"])
+        self.assertIn("triple_id", added)
+        self.assertEqual(added["fact"]["object"], "old")
+        self.assertIsNone(added["fact"]["valid_to"])
         bad = _call(hub, "mempalace_kg_supersede",
                     {"subject": "s", "predicate": "p",
                      "old_object": "nope", "new_object": "new"})
@@ -89,8 +103,29 @@ class FakeHubTest(unittest.TestCase):
                      {"subject": "s", "predicate": "p",
                       "old_object": "old", "new_object": "new"})
         self.assertTrue(good["success"])
-        current = _call(hub, "mempalace_kg_query", {"entity": "s"})
-        self.assertEqual([f["object"] for f in current["facts"]], ["new"])
+        self.assertIn("triple_id", good)
+        self.assertEqual(good["fact"]["object"], "new")
+        self.assertEqual(good["superseded"]["object"], "old")
+        self.assertFalse(good["superseded"]["current"])
+        self.assertIsNotNone(good["superseded"]["valid_to"])
+        q = _call(hub, "mempalace_kg_query", {"entity": "s"})
+        self.assertEqual([f["object"] for f in q["active_facts"]], ["new"])
+        self.assertEqual([f["object"] for f in q["historical_facts"]], ["old"])
+        self.assertEqual(q["future_facts"], [])
+        self.assertEqual(q["count"], 2)
+        self.assertEqual(len(q["facts"]), 2)
+        self.assertIn("as_of", q)
+
+    def test_fakehub_notification_gets_202_empty(self):
+        hub = self._hub()
+        req = urllib.request.Request(
+            hub.url + "/mcp",
+            data=json.dumps({"jsonrpc": "2.0", "method": "notifications/initialized"}).encode(),
+            headers={"Content-Type": "application/json", "Authorization": "Bearer abc"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            self.assertEqual(resp.status, 202)
+            self.assertEqual(resp.read(), b"")
 
     def test_fakehub_fail_tools(self):
         hub = self._hub(fail_tools={"mempalace_status"})
@@ -104,7 +139,9 @@ class FakeHubTest(unittest.TestCase):
         self.assertEqual(_call(hub, "mempalace_list_wings", {})["wings"], {"w": 1})
         self.assertEqual(_call(hub, "mempalace_list_rooms", {"wing": "w"})["rooms"], {"r": 1})
         self.assertEqual(_call(hub, "mempalace_get_taxonomy", {})["taxonomy"], {"w": {"r": 1}})
-        self.assertTrue(_call(hub, "mempalace_delete_drawer", {"drawer_id": d["drawer_id"]})["success"])
+        deleted = _call(hub, "mempalace_delete_drawer", {"drawer_id": d["drawer_id"]})
+        self.assertTrue(deleted["success"])
+        self.assertEqual(deleted["deleted_ids"], [d["drawer_id"]])
         self.assertEqual(hub.drawers, {})
 
 
