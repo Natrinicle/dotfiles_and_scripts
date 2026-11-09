@@ -1,0 +1,296 @@
+"""``router_*`` tool handlers and their schemas.
+
+Each handler takes the owning :class:`~mempalace_router.router.Router` and the
+decoded tool arguments and returns a JSON-able dict, or raises
+:class:`RpcError` for a JSON-RPC level failure.
+"""
+
+import sqlite3
+import uuid
+from contextlib import closing
+from pathlib import Path
+
+from mempalace_router.client import HubError
+
+CHUNK_CHARS = 1500
+MINE_SUFFIXES = (".md", ".txt")
+
+
+class RpcError(Exception):
+    """A JSON-RPC error to return to the caller."""
+
+    def __init__(self, code: int, message: str, data: dict | None = None):
+        super().__init__(message)
+        self.code = code
+        self.message = message
+        self.data = data
+
+
+def _scope_prop(description: str = "Targets") -> dict:
+    return {"type": "array", "items": {"type": "string"}, "description": description}
+
+
+def router_tool_descriptors() -> list[dict]:
+    """Return the ``tools/list`` entries for the router's own tools."""
+
+    def tool(name, description, props, required=()):
+        return {
+            "name": name,
+            "description": description,
+            "inputSchema": {"type": "object", "properties": props, "required": list(required)},
+        }
+
+    string = {"type": "string"}
+    return [
+        tool("router_targets", "List routing targets, reachability and queued writes.", {}),
+        tool(
+            "router_retract",
+            "Undo company writes recorded in the ledger (local copies are kept).",
+            {"ref": string, "target": string},
+            ["ref"],
+        ),
+        tool(
+            "router_replicate",
+            "Copy a local drawer or a fact to one or more company targets.",
+            {
+                "ref_or_fact": {"description": "Drawer id (string) or {subject, predicate, object}"},
+                "to": _scope_prop("Company targets to copy to"),
+            },
+            ["ref_or_fact", "to"],
+        ),
+        tool(
+            "router_mine",
+            "Mine a directory of .md/.txt files into local and, by scope, a company target.",
+            {"dir": string, "scope": _scope_prop(), "wing": string, "room": string},
+            ["dir"],
+        ),
+        tool("router_flush", "Push queued writes to a company target.", {"target": string}, ["target"]),
+        tool("router_status", "Targets, queued writes and ledger size.", {}),
+    ]
+
+
+def _require_str(args: dict, key: str) -> str:
+    value = args.get(key)
+    if not isinstance(value, str) or not value:
+        raise RpcError(-32602, f"{key} must be a non-empty string")
+    return value
+
+
+def _company_name(router, name, what: str = "target") -> str:
+    if not isinstance(name, str) or name not in router.targets.by_name:
+        raise RpcError(-32602, f"unknown {what}: {name}", {"code": "unknown_target"})
+    if name == router.local_name:
+        raise RpcError(-32602, f"{what} must be a company target, not local: {name}")
+    return name
+
+
+# -- router_targets / router_status / router_flush --------------------------
+
+
+def _target_rows(router) -> list[dict]:
+    names = list(router.targets.by_name)
+    pings = router.fan_out(names, lambda n: router.client(n).ping())
+    pending = router.pending_counts()
+    rows = []
+    for name in names:
+        target = router.targets.by_name[name]
+        ok, value = pings[name]
+        aliases = 0
+        if target.kind == "company":
+            try:
+                tmap = router.taxmap(name)
+                aliases = len(tmap.wings) + sum(len(r) for r in tmap.rooms.values())
+            except ValueError:
+                aliases = 0
+        rows.append(
+            {
+                "name": name,
+                "kind": target.kind,
+                "company": target.company,
+                "reachable": bool(ok and value),
+                "outbox_pending": pending.get(name, 0),
+                "taxonomy_aliases": aliases,
+            }
+        )
+    return rows
+
+
+def tool_targets(router, args: dict) -> dict:
+    """``router_targets``: target table plus ``todo`` lines for queued writes."""
+    rows = _target_rows(router)
+    todo = [
+        f"push {row['outbox_pending']} queued writes to {row['name']} (router_flush)"
+        for row in rows
+        if row["outbox_pending"] > 0
+    ]
+    return {"targets": rows, "todo": todo}
+
+
+def tool_status(router, args: dict) -> dict:
+    """``router_status``: targets, outbox depth and ledger size."""
+    rows = _target_rows(router)
+    with closing(sqlite3.connect(str(router.db_path), timeout=30)) as conn:
+        count = conn.execute("SELECT COUNT(*) FROM ledger").fetchone()[0]
+    return {
+        "targets": rows,
+        "outbox_pending": router.pending_counts(),
+        "ledger_rows": count,
+        "as_of": router.now(),
+    }
+
+
+def tool_flush(router, args: dict) -> dict:
+    """``router_flush``: drain one company target's outbox."""
+    name = _company_name(router, args.get("target"))
+    result = router.flush(name)
+    return {"target": name, **result}
+
+
+# -- router_retract ----------------------------------------------------------
+
+
+def tool_retract(router, args: dict) -> dict:
+    """``router_retract``: undo ledgered company writes; local copies stay."""
+    ref = _require_str(args, "ref")
+    target = args.get("target")
+    if target is not None:
+        _company_name(router, target)
+    rows = [r for r in router.ledger.lookup(ref) if r["target"] in router.targets.companies]
+    if target is not None:
+        rows = [r for r in rows if r["target"] == target]
+    retracted_ids: list[int] = []
+    by_target: dict[str, int] = {}
+    errors: list[dict] = []
+    for row in rows:
+        name, tool, payload = row["target"], row["tool"], row["payload"]
+        if tool == "mempalace_add_drawer":
+            call = ("mempalace_delete_drawer", {"drawer_id": row["remote_ref"]})
+        else:
+            obj = payload.get("new_object") if tool == "mempalace_kg_supersede" else payload.get("object")
+            call = (
+                "mempalace_kg_invalidate",
+                {"subject": payload.get("subject"), "predicate": payload.get("predicate"), "object": obj},
+            )
+        ok, value = router.fan_out([name], lambda n, c=call: router.client(n).call_tool(*c))[name]
+        if not ok:
+            errors.append({"target": name, "ref": row["remote_ref"], "error": str(value)})
+        elif value.get("success") is False:
+            errors.append({"target": name, "ref": row["remote_ref"], "error": str(value.get("error"))})
+        else:
+            retracted_ids.append(row["id"])
+            by_target[name] = by_target.get(name, 0) + 1
+    router.ledger.forget(retracted_ids)
+    return {"retracted": len(retracted_ids), "by_target": by_target, "errors": errors}
+
+
+# -- router_replicate --------------------------------------------------------
+
+
+def tool_replicate(router, args: dict) -> dict:
+    """``router_replicate``: copy a local drawer or fact to company targets."""
+    to = args.get("to")
+    if not isinstance(to, list) or not to or not all(isinstance(t, str) for t in to):
+        raise RpcError(-32602, "to must be a non-empty list of company target names")
+    names = [_company_name(router, t) for t in dict.fromkeys(to)]
+    subject = args.get("ref_or_fact")
+    call_id = uuid.uuid4().hex
+    if isinstance(subject, str) and subject:
+        try:
+            drawer = router.client(router.local_name).call_tool("mempalace_get_drawer", {"drawer_id": subject})
+        except HubError as exc:
+            raise RpcError(-32000, "local_unreachable", {"detail": str(exc)}) from exc
+        content = drawer.get("content", drawer.get("text"))
+        wing, room = drawer.get("wing"), drawer.get("room")
+        if drawer.get("success") is False or not isinstance(content, str) or not wing or not room:
+            raise RpcError(-32602, f"drawer not found or incomplete: {subject}")
+        tool, payload, local_ref = (
+            "mempalace_add_drawer",
+            {"wing": wing, "room": room, "content": content},
+            subject,
+        )
+    elif isinstance(subject, dict):
+        fields = ("subject", "predicate", "object")
+        if not all(isinstance(subject.get(k), str) and subject.get(k) for k in fields):
+            raise RpcError(-32602, "fact must have string subject, predicate and object")
+        tool, payload, local_ref = "mempalace_kg_add", dict(subject), None
+    else:
+        raise RpcError(-32602, "ref_or_fact must be a drawer id or a fact object")
+    by_target = {
+        name: router.write_company(name, tool, payload, local_ref=local_ref, call_id=call_id)
+        for name in names
+    }
+    return {"call_id": call_id, "by_target": by_target}
+
+
+# -- router_mine -------------------------------------------------------------
+
+
+def chunk_text(text: str, limit: int = CHUNK_CHARS) -> list[str]:
+    """Split text into chunks of at most ``limit`` chars on paragraph breaks."""
+    chunks: list[str] = []
+    current = ""
+    for para in text.split("\n\n"):
+        para = para.strip()
+        if not para:
+            continue
+        while len(para) > limit:  # a single oversized paragraph is hard-split
+            if current:
+                chunks.append(current)
+                current = ""
+            chunks.append(para[:limit])
+            para = para[limit:]
+        joined = f"{current}\n\n{para}" if current else para
+        if len(joined) <= limit:
+            current = joined
+        else:
+            chunks.append(current)
+            current = para
+    if current:
+        chunks.append(current)
+    return chunks
+
+
+def _mine_files(root: Path) -> list[Path]:
+    return sorted(
+        p for p in root.rglob("*") if p.suffix in MINE_SUFFIXES and p.is_file() and not p.is_symlink()
+    )
+
+
+def tool_mine(router, args: dict, scope: list[str]) -> dict:
+    """``router_mine``: mine locally, and chunk files into a company target."""
+    directory = _require_str(args, "dir")
+    root = Path(directory)
+    if not root.is_dir():
+        raise RpcError(-32602, f"dir is not a directory: {directory}")
+    company = next((n for n in scope if n != router.local_name), None)
+    wing, room = args.get("wing"), args.get("room")
+    if company and not (isinstance(wing, str) and wing and isinstance(room, str) and room):
+        raise RpcError(-32602, "wing and room are required for company scope")
+    try:
+        local_result = router.client(router.local_name).call_tool("mempalace_mine", {"path": directory})
+    except HubError as exc:
+        raise RpcError(-32000, "local_unreachable", {"detail": str(exc)}) from exc
+    job_id = uuid.uuid4().hex
+    by_target: dict = {router.local_name: local_result}
+    files = chunks = 0
+    if company:
+        tally = {"filed": 0, "queued": 0, "partial": 0, "refused": 0}
+        down = False
+        for path in _mine_files(root):
+            files += 1
+            rel = path.relative_to(root).as_posix()
+            for chunk in chunk_text(path.read_text(errors="replace")):
+                chunks += 1
+                outcome = router.write_company(
+                    company,
+                    "mempalace_add_drawer",
+                    {"wing": wing, "room": room, "content": chunk, "source_file": rel},
+                    local_ref=None,
+                    call_id=job_id,
+                    mine_job_id=job_id,
+                    skip_send=down,
+                )
+                tally[outcome["status"]] += 1
+                down = down or outcome["status"] == "queued"
+        by_target[company] = tally
+    return {"job_id": job_id, "files": files, "chunks": chunks, "by_target": by_target}
