@@ -36,7 +36,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 44 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 136 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 137 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
@@ -182,7 +182,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (136) include packaging (`package-toolkit` classifies generic pack
+**Skills** (137) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -205,6 +205,7 @@ rebuild → oracle → retry; optional Craft Anything engine; inner check is
 printable pages (`printable-webpage`),
 Meld-style side-by-side diffs plus dyff for YAML/JSON (`meld-style-diff`),
 illustrated brochures (`illustrated-brochure`, landscape PDF with Dia and Graphviz),
+system-flow dashboards (`system-flow-viz`, data-flow-path GIF with volume-scaled packet speed; preview `agent/skills/system-flow-viz/docs/compose-stack.gif`),
 resume tailoring (`resume-tailor`, Markdown/XeLaTeX plus `md2pdf`),
 verification helpers such as `check-work` / `code-review`,
 a find-patch loop (`find-patch-loop`, then `bug-finder` / `bug-skeptic` /

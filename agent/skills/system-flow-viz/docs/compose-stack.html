@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Sample compose stack</title><style>
+:root {
+  --bg: #101218;
+  --chrome: #1c1f27;
+  --card: #16181f;
+  --muted: #8b919c;
+  --dim: #6a717c;
+  --text: #e6e8ee;
+  --orange: #e89562;
+  --blue: #6ea0ff;
+  --green: #7dffa3;
+  --green-dim: #3dba72;
+  --purple: #c4b5fd;
+  --red: #f07178;
+  --magenta: #e06090;
+  --amber: #e6c07b;
+  --cyan: #5ec8e8;
+  --yellow: #f0d24a;
+  --t: 0;
+  --play: running;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  width: 1200px; height: 1500px; overflow: hidden;
+  background: #0b0c10;
+  font-family: "FiraCode Nerd Font", "Fira Code", "DejaVu Sans Mono", ui-monospace, monospace;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.35;
+}
+.window {
+  width: 1200px; height: 1500px;
+  background: var(--bg);
+  border: 1px solid #2b303b;
+  display: flex; flex-direction: column;
+}
+.titlebar {
+  height: 36px;
+  background: var(--chrome);
+  display: flex; align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid #2b303b;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.dots { display: flex; gap: 7px; }
+.dots i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+.dots .r { background: #ff5f57; }
+.dots .y { background: #febc2e; }
+.dots .g { background: #28c840; }
+.titlebar .path {
+  flex: 1; text-align: center;
+  color: var(--muted); font-size: 12px;
+}
+.header {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 10px 18px 4px;
+  flex-shrink: 0;
+  letter-spacing: 0.01em;
+}
+.header .host { font-weight: 700; }
+.header .sep { color: var(--dim); }
+.header .sys { color: var(--muted); }
+.header .elapsed { margin-left: auto; color: var(--text); font-weight: 700; }
+.stage-list { padding: 2px 18px 8px; flex-shrink: 0; }
+.stage {
+  display: flex; gap: 10px; align-items: baseline;
+  color: var(--muted); font-size: 13px;
+}
+.stage .dia { width: 14px; color: var(--cyan); }
+.stage.status-running .dia, .stage.status-running .lab { color: var(--yellow); font-weight: 700; }
+.stage.status-done .dia, .stage.status-done .lab { color: var(--green); }
+.stage.status-failed .dia, .stage.status-failed .lab { color: var(--magenta); }
+.stage .meta { color: var(--dim); }
+.body {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  gap: 12px;
+  padding: 0 18px 8px;
+  min-height: 0;
+}
+.rail {
+  border: 1px solid #6d5bbd;
+  border-radius: 6px;
+  background: linear-gradient(180deg, #1a1726 0%, #14151c 40%);
+  padding: 12px 10px;
+  color: var(--purple);
+  display: flex; flex-direction: column; gap: 6px;
+  min-height: 0;
+}
+.rail h2 { font-size: 12px; letter-spacing: 0.08em; text-align: center; }
+.gate {
+  display: flex; align-items: flex-start; gap: 8px;
+  font-size: 12px; color: #d6ccff;
+  padding: 5px 6px; border-radius: 4px;
+}
+.gate span { white-space: nowrap; }
+.gate .dia {
+  width: 8px; height: 8px; transform: rotate(45deg);
+  border: 1.5px solid var(--purple); margin-top: 4px; flex-shrink: 0;
+}
+.gate.active { background: #3b2f66; color: #fff; }
+.gate.active .dia { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
+.main {
+  display: flex; flex-direction: column; min-height: 0; min-width: 0; gap: 10px;
+}
+.tree {
+  flex: 0 0 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.unit {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.5fr) 88px 1fr 64px;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+  padding: 1px 0;
+}
+.unit .idcell { display: flex; align-items: center; min-width: 0; }
+.unit .glyph { color: var(--dim); margin-right: 6px; flex-shrink: 0; }
+.unit .name { color: var(--text); }
+.unit .kind { color: var(--dim); }
+.unit .desc { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.unit .run { color: var(--yellow); text-align: right; }
+.unit.state-running .glyph, .unit.state-running .name { color: var(--yellow); }
+.unit.state-done .glyph, .unit.state-done .name { color: var(--green); }
+.unit.state-failed .glyph, .unit.state-failed .name { color: var(--magenta); font-weight: 700; }
+.unit.state-blocked .glyph, .unit.state-blocked .name { color: #a05060; }
+.unit.state-waiting .name { color: var(--text); }
+.unit.kind-target .name { color: var(--cyan); font-weight: 700; }
+.unit.kind-target.state-running .name { color: var(--yellow); }
+.unit.kind-target.state-done .name { color: var(--green); }
+.cols {
+  display: grid;
+  grid-template-columns: minmax(240px, 1.5fr) 88px 1fr 64px;
+  gap: 8px;
+  color: var(--dim); font-size: 11px; padding: 0 0 4px;
+}
+.packet-stage {
+  display: flex; align-items: stretch; gap: 0;
+  flex: 0 0 auto;
+  min-height: 110px;
+}
+.packet-stage.vertical { flex-direction: column; flex: 1; }
+.packet-stage.horizontal {
+  flex-direction: row;
+  align-items: center;
+  flex: 1 1 auto;
+  min-height: 180px;
+}
+.pcard {
+  border: 1.5px solid #2b303b;
+  background: var(--card);
+  border-radius: 6px;
+  padding: 12px 14px;
+  min-width: 150px;
+  min-height: 96px;
+  position: relative;
+}
+.pcard h4 { font-size: 14px; }
+.pcard .model { color: var(--muted); font-size: 11px; margin: 2px 0 6px; }
+.pcard.role-lead { border-color: var(--orange); }
+.pcard.role-lead h4 { color: var(--orange); }
+.pcard.role-swarm { border-color: var(--blue); }
+.pcard.role-swarm h4 { color: var(--blue); }
+.pcard.role-local { border-color: var(--green); }
+.pcard.role-local h4 { color: var(--green); }
+.pcard.role-advisor { border-color: var(--purple); }
+.pcard.role-advisor h4 { color: var(--purple); }
+.pcard.state-failed { border-color: var(--magenta); }
+.pcard.state-failed h4 { color: var(--magenta); }
+.pcard .elabel {
+  position: absolute; top: -10px; left: 10px;
+  background: var(--bg); padding: 0 5px;
+  font-size: 10px; color: var(--dim);
+}
+.vline, .hline { position: relative; background: #2b303b; }
+.vline { width: 2px; flex: 1 1 28px; min-height: 18px; margin: 0 auto; }
+.hline { height: 2px; flex: 1 1 36px; min-width: 28px; margin: 18px 0; }
+.pkt {
+  position: absolute;
+  width: 8px; height: 8px; border-radius: 50%;
+  z-index: 5; pointer-events: none;
+  animation-play-state: var(--play);
+}
+.pkt.o { background: var(--orange); box-shadow: 0 0 8px var(--orange); }
+.pkt.b { background: var(--blue); box-shadow: 0 0 8px var(--blue); }
+.pkt.g { background: var(--green); box-shadow: 0 0 8px var(--green); }
+.pkt.p { background: var(--purple); box-shadow: 0 0 8px var(--purple); }
+.pkt.a { background: var(--amber); box-shadow: 0 0 8px var(--amber); }
+.pkt.r { background: var(--magenta); box-shadow: 0 0 8px var(--magenta); }
+.pkt.drop {
+  left: 50%; margin-left: -4px;
+  --dur: 1.6s; --d: 0s;
+  animation: fall var(--dur) linear infinite;
+  animation-delay: calc(var(--d) - var(--dur) * var(--t));
+}
+.pkt.slide {
+  top: -3px;
+  --dur: 2.2s; --d: 0s;
+  animation: slide var(--dur) linear infinite;
+  animation-delay: calc(var(--d) - var(--dur) * var(--t));
+}
+@keyframes fall {
+  0% { top: 0; opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { top: calc(100% - 8px); opacity: 0; }
+}
+@keyframes slide {
+  0% { left: 0; opacity: 0; }
+  8% { opacity: 1; }
+  92% { opacity: 1; }
+  100% { left: calc(100% - 8px); opacity: 0; }
+}
+.failures {
+  margin: 0 18px 6px;
+  border-top: 1px solid #5a3040;
+  padding-top: 8px;
+  flex-shrink: 0;
+  color: var(--magenta);
+}
+.failures h3 { font-size: 13px; margin-bottom: 4px; }
+.failures .reason { color: var(--text); }
+.failures pre {
+  color: var(--muted); font-size: 12px;
+  font-family: inherit; white-space: pre-wrap;
+}
+.timeline {
+  margin: 0 18px 6px;
+  border-top: 1px solid #2b303b;
+  padding-top: 8px;
+  flex-shrink: 0;
+}
+.timeline h3 { font-size: 12px; color: var(--dim); margin-bottom: 4px; }
+.trow {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 2px 0;
+  font-size: 12px;
+}
+.trow .tl { color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ttrack { position: relative; height: 10px; background: #1a1d24; }
+.tbar {
+  position: absolute; top: 0; height: 100%;
+  background: var(--green-dim);
+}
+.tbar.state-running { background: var(--yellow); }
+.tbar.state-waiting { background: repeating-linear-gradient(90deg, #3a3f4a 0 4px, transparent 4px 8px); }
+.tbar.state-failed { background: var(--magenta); }
+.taxis { display: flex; justify-content: space-between; color: var(--dim); font-size: 11px; margin-bottom: 4px; }
+.logwrap {
+  margin: 0 18px 6px;
+  border: 1px solid #2b303b;
+  background: #0c0e14;
+  padding: 8px 12px 8px;
+  height: 92px;
+  flex-shrink: 0;
+  position: relative;
+}
+.loghead {
+  position: absolute; top: -9px; left: 10px;
+  background: var(--bg); padding: 0 6px;
+  font-size: 11px; color: var(--dim);
+}
+.log { font-size: 12px; color: var(--muted); overflow: hidden; padding-top: 4px; }
+.log .row { display: grid; grid-template-columns: 64px 88px 1fr; gap: 10px; padding: 1px 0; white-space: nowrap; }
+.tag.o { color: var(--orange); }
+.tag.b { color: var(--blue); }
+.tag.g { color: var(--green); }
+.tag.p { color: var(--purple); }
+.tag.a { color: var(--amber); }
+.tag.r { color: var(--magenta); }
+.footer {
+  margin: 0 18px 6px;
+  font-size: 13px;
+  flex-shrink: 0;
+  display: flex; gap: 16px;
+}
+.footer .done { color: var(--green); }
+.footer .running { color: var(--yellow); }
+.footer .waiting { color: var(--muted); }
+.footer .failed { color: var(--magenta); }
+.cli {
+  margin: 0 18px 10px;
+  font-size: 12.5px;
+  flex-shrink: 0;
+}
+.cli .prompt { color: var(--muted); }
+.cli .cmd { color: var(--green); }
+.cursor {
+  display: inline-block; width: 8px; height: 14px; background: var(--green);
+  vertical-align: text-bottom; margin-left: 2px;
+  animation: blink 1s steps(1) infinite;
+  animation-play-state: var(--play);
+}
+@keyframes blink { 50% { opacity: 0; } }
+.hidden { display: none; }
+:root { --t: 0.0000; --play: running; }
+</style></head><body>
+<div class="window"><div class="header"><span class="host">sample</span><span class="sep">·</span><span class="sys">compose stack</span><span class="sep">·</span><span class="sys">Linux</span><span class="elapsed">0.2s</span></div><div class="stage-list">
+<div class="stage status-running"><span class="dia">◆</span><span class="lab">Edge</span><span class="meta">0.2s · 1 units</span></div>
+<div class="stage status-waiting"><span class="dia">◇</span><span class="lab">App</span><span class="meta">0.0s · 3 units</span></div>
+</div><div class="body"><aside class="rail"><h2>gates</h2>
+<div class="gate active" id="g-g1"><i class="dia"></i><span>before start</span></div>
+<div class="gate" id="g-g2"><i class="dia"></i><span>same error twice</span></div>
+<div class="gate" id="g-g3"><i class="dia"></i><span>before done</span></div>
+</aside><div class="main"><div class="tree"><div class="cols"><span>Unit</span><span>Kind</span><span>Description</span><span>Running</span></div>
+<div class="unit state-running kind-edge" id="n-ingress"><span class="idcell" style="padding-left:4px"><span class="glyph">[|]</span><span class="name">proxy</span></span><span class="kind">edge</span><span class="desc">TLS terminator</span><span class="run"></span></div>
+<div class="unit state-waiting kind-service" id="n-api"><span class="idcell" style="padding-left:22px"><span class="glyph">[ ]</span><span class="name">app</span></span><span class="kind">service</span><span class="desc">API workers</span><span class="run"></span></div>
+<div class="unit state-waiting kind-service" id="n-store"><span class="idcell" style="padding-left:40px"><span class="glyph">[ ]</span><span class="name">db</span></span><span class="kind">service</span><span class="desc">Primary store</span><span class="run"></span></div>
+<div class="unit state-waiting kind-service" id="n-jobs"><span class="idcell" style="padding-left:40px"><span class="glyph">[ ]</span><span class="name">worker</span></span><span class="kind">service</span><span class="desc">Background jobs</span><span class="run"></span></div></div><div class="packet-stage horizontal">
+<div class="pcard role-lead state-running" id="p-ingress"><h4>proxy</h4><div class="model">edge · running</div><div class="desc">TLS terminator</div></div>
+<div class="hline"><i class="pkt slide o" style="--d:0.00s;--dur:0.82s"></i><i class="pkt slide o" style="--d:0.14s;--dur:0.82s"></i><i class="pkt slide o" style="--d:0.27s;--dur:0.82s"></i><i class="pkt slide o" style="--d:0.41s;--dur:0.82s"></i><i class="pkt slide o" style="--d:0.55s;--dur:0.82s"></i><i class="pkt slide o" style="--d:0.68s;--dur:0.82s"></i></div>
+<div class="pcard role-swarm state-waiting" id="p-api"><span class="elabel">HTTPS</span><h4>app</h4><div class="model">service · waiting</div><div class="desc">API workers</div></div>
+<div class="hline"><i class="pkt slide b" style="--d:0.00s;--dur:2.20s"></i><i class="pkt slide b" style="--d:0.73s;--dur:2.20s"></i><i class="pkt slide b" style="--d:1.47s;--dur:2.20s"></i></div>
+<div class="pcard role-swarm state-waiting" id="p-store"><span class="elabel">SQL</span><h4>db</h4><div class="model">service · waiting</div><div class="desc">Primary store</div></div>
+<div class="hline"><i class="pkt slide g" style="--d:0.00s;--dur:5.50s"></i><i class="pkt slide g" style="--d:2.75s;--dur:5.50s"></i></div>
+<div class="pcard role-local state-waiting" id="p-jobs"><span class="elabel">queue</span><h4>worker</h4><div class="model">service · waiting</div><div class="desc">Background jobs</div></div>
+</div></div></div><div class="timeline"><h3>Timeline</h3><div class="taxis"><span>0s</span><span>0.8s</span><span>1.6s</span><span>2.4s</span><span>3.2s</span></div>
+<div class="trow"><span class="tl">Edge (1 unit)</span><div class="ttrack"><i class="tbar state-done" style="left:0.00%;width:25.00%"></i></div></div>
+<div class="trow"><span class="tl">app</span><div class="ttrack"><i class="tbar state-running" style="left:25.00%;width:75.00%"></i></div></div>
+<div class="trow"><span class="tl">db</span><div class="ttrack"><i class="tbar state-waiting" style="left:50.00%;width:50.00%"></i></div></div>
+</div><div class="logwrap"><div class="loghead">session log</div><div class="log">
+<div class="row"><span>00:00:00</span><span class="tag o">proxy</span><span>bind :443</span></div>
+</div></div><div class="footer"><span class="done">✓ 0 done</span><span class="running">1 running</span><span class="waiting">3 waiting</span><span class="failed">× 0 failed</span></div><div class="cli"><span class="prompt">$</span> <span class="cmd">render-flow --graph compose-stack.json</span><i class="cursor"></i></div></div>
+
+<script>
+(function () {
+  var start = performance.now();
+  var dur = 8000;
+  function tick(now) {
+    var t = ((now - start) % dur) / dur;
+    document.documentElement.style.setProperty("--t", t.toFixed(4));
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body></html>
