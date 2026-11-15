@@ -111,6 +111,49 @@ Rewrites: `${CLAUDE_PLUGIN_ROOT}` / plugin-root `docs/` and
 `../../../../agents/` → `../../resources/egm/docs/…` and
 `../../agents/…`.
 
+## Google Chrome Modern Web Guidance (Apache-2.0)
+
+- Upstream: https://github.com/GoogleChrome/modern-web-guidance
+- Snapshot: `4dd968349e54ca45a05dd5c818fb035c9054b022` (2026-11-10, v1.0.0)
+- Copyright: Copyright 2026 Google LLC (Apache-2.0; upstream ships no
+  NOTICE file. This section is the NOTICE-equivalent for the packed copy.)
+- License: Apache License 2.0 (copy in each packed skill dir)
+- CLI (not vendored): `npx -y modern-web-guidance@latest`
+  (`search` / `retrieve` / `legacy-scan`). Source of the CLI is npm /
+  https://github.com/GoogleChrome/modern-web-guidance-src
+
+Packed skills: `modern-web-guidance` (209 guide files under `guides/`),
+`chrome-extensions` (Manifest V3 + Chrome Web Store references).
+
+Clone used for the copy: `{HOME}/repos/external/modern-web-guidance`.
+
+### Modified files (Apache-2.0 §4(b))
+
+- `agent/skills/modern-web-guidance/SKILL.md` — HTML comment
+  `Pack path adapt 2026-11-14` plus a **Pack local guides** section so
+  offline retrieve can read `guides/**/<id>.md`. The `npx` search index
+  is unchanged.
+- Some `guides/**/*.md` files received a trailing newline from pack
+  pre-commit `end-of-file-fixer`.
+- `guides/security/client-side-encryption.md` is unmodified. Gitleaks
+  v8.30.1 `generic-api-key` treats the public algorithm name
+  `MLKEM768-X25519` next to `encapsulateKey` as a secret. Pack
+  `.gitleaks.toml` allowlists that identifier (secret regex, not a
+  path skip).
+
+## Motion Canvas (MIT, clone only)
+
+- Upstream: https://github.com/motion-canvas/motion-canvas
+- Snapshot: `7b91435c301d530351dcf5ebb91dd139c002e405` (2026-07-02)
+- Copyright: Copyright (c) 2022 motion-canvas
+- License: MIT
+
+The monorepo is **not** copied into this pack. Keep a read-only clone at
+`{HOME}/repos/external/motion-canvas`. Packed skill `motion-canvas` is
+original pack prose that points at `npm init @motion-canvas@latest` and
+that clone. Do **not** copy `packages/ffmpeg` (`@motion-canvas/ffmpeg`,
+GPLv3) into a toolkit.
+
 ## Routing
 
 Do not keep a second copy of these skills in an “external pack” or

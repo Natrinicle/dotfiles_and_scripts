@@ -5,14 +5,14 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
 
 ## Contents
 
-- **Rules** (43) including `code-quality`, `security`, `subagents-first`,
+- **Rules** (44) including `code-quality`, `security`, `subagents-first`,
   `prefer-subagents-before-compaction`,
   `public-api-auth`, `ask-before-remote-actions`,
   `prefer-helper-scripts`, `prefer-updates-before-workarounds`,
   `toolkit-residual-identity`,
   `expected-value`, `agent-graphs`, `cups-custom-backend`, `mempalace-compact-filing`,
   `claim-source-check`, `skill-composition` (merged-skill routing).
-- **Skills** (135) covering packaging, scanners, PII detection, MemPalace,
+- **Skills** (140) covering packaging, scanners, PII detection, MemPalace,
   Flipper IR, compiled-app unpack, forensic cores plus thin server companions,
   expected-value spend gate, agent graphs (`agent-graphs` / `loop-until-green`),
   clean-room reconstruct (`clean-room-reconstruct`),
@@ -20,13 +20,16 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
   Kubernetes control-plane WAN gate (`k8s-control-plane-vpn`),
   CUPS custom-backend persist, claim-source-check,
   merged public skills (`grilling`, `security-audit`, `egm-*`,
-  `obsidian-*`, and others — see `THIRD-PARTY.md`),
+  `obsidian-*`, `modern-web-guidance`, `chrome-extensions`, `motion-canvas`,
+  and others — see `THIRD-PARTY.md`),
   and workflow helpers.
 - **Agents** (10) — EGM Goldfish personas in `agent/agents/` →
   `{AGENT_HOME}/agents/`.
 - **Resources** — shared checklists and EGM document standards in
   `agent/resources/` → `{AGENT_HOME}/resources/`.
-- **Third-party notices** — `THIRD-PARTY.md` (MIT ×4 + Apache-2.0 EGM).
+- **Third-party notices** — `THIRD-PARTY.md` (MIT ×4 + Apache-2.0 EGM +
+  Apache-2.0 Google Chrome Modern Web Guidance; Motion Canvas MIT clone
+  only, ffmpeg exporter stays out).
 - **Hooks** — `agent/hooks/` copies into `{AGENT_HOME}/hooks/`. Register in
   host `settings.json` (see `hooks/README.md`). Includes
   `control-plane-exposure.py` and `prefer-spawn-search.py`.

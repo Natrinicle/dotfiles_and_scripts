@@ -54,6 +54,8 @@ names it. Do not `mempalace sync` in a way that prunes those drawers.
 | Security review of any code | `{MEMORY_ROOT}/vulnerability-patterns.md` |
 | Building or exposing a host / VM / cluster | rule `system-security`; `{MEMORY_ROOT}/vulnerability-patterns.md` |
 | Looking up an API, CLI, device, MCP, library, or protocol | rules `prefer-mempalace` + `mempalace-file-interfaces`; search palace first, then file methods the same turn. A chat recap is not filing. Palace `add_drawer` is the commit. |
+| Modern Web Guidance / Chrome extensions | skill `modern-web-guidance` / `chrome-extensions`; palace `modern-web-guidance npx search retrieve legacy-scan guides offline 2026-11-14` |
+| Motion Canvas vector scenes | skill `motion-canvas`; palace `Motion Canvas npm init @motion-canvas@latest localhost:9000 makeScene2D 2026-11-14` |
 | Compaction-time session continuity | rules `prefer-mempalace` + `mempalace-compact-filing`; file necessary pieces to palace before compact; lookup drawers later; the compact summary is not filing |
 | Durable facts vs local memory files | rule `prefer-mempalace`; palace KG / newest `filed_at` wins |
 | Scope-routed MemPalace / company palaces / mempalace-router | rule `mempalace-scope`; `kg_query` `mempalace-router` + search `mempalace-router scope local always one company filed tag retract outbox 2026-11-09` (wing personal / tools) |

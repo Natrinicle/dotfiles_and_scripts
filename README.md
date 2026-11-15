@@ -18,7 +18,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | **Safe to share** | Secrets and machine-local paths kept out; optional LDAP is example-only |
 | **Installable** | `install.sh --shell` / `--agent` / `--all`; skips existing files unless `--force`; Grok links to Claude |
 | **Reusable packager** | Ship `package-toolkit` so others can re-export their own trees |
-| **pre-commit** | `.pre-commit-config.yaml` — gitleaks, hygiene, residual-identity-scan (`pre-commit install`) |
+| **pre-commit** | `.pre-commit-config.yaml` — gitleaks v8.30.1, hygiene, residual-identity-scan (`pre-commit install`). `.gitleaks.toml` extends defaults. |
 
 ## What's where
 
@@ -36,7 +36,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 44 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 137 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 140 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
@@ -175,7 +175,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (137) include packaging (`package-toolkit` classifies generic pack
+**Skills** (140) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -231,7 +231,10 @@ merged public skills (`grilling`, `wait-what`, `wayfinder`, `codebase-design`,
 `security-audit`; `obsidian-markdown`, `obsidian-bases`, `json-canvas`,
 `obsidian-cli`, `defuddle`, `knap`; `egm-brainstorm` / `egm-draft` /
 `egm-review` / `egm-review-loop` / `egm-resolve` / `egm-bootstrap` /
-`egm-drift-report` — notices in `agent/THIRD-PARTY.md`),
+`egm-drift-report`; `modern-web-guidance` / `chrome-extensions`
+(Google Chrome Apache-2.0); `motion-canvas` (MIT clone at
+`{HOME}/repos/external/motion-canvas`, ffmpeg exporter stays out of the
+pack) — notices in `agent/THIRD-PARTY.md`),
 `nate-writing-style` (`{user}` placeholder voice notes; replace with your own),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
@@ -296,6 +299,8 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | Reverse Engineer Anything / `rea-agents` | Third-party MCP + skill (MIT, [morluto/rea](https://github.com/morluto/rea)). Pack ships a skill snapshot (v42, package `rea-agents@6.5.0`). Refresh with `npx -y rea-agents@6.5.0 setup --client claude_code` or `--client grok_build`. |
 | n8n / Traefik / `n8n.localhost` | Workflow UI image, reverse-proxy Host rule, and RFC 6761 editor URL |
 | Matt Pocock / Addy Osmani / Cloudflare / kepano / Google EGM skills | Inbound MIT / Apache-2.0 copies in `agent/skills` (plus `agent/agents` and `agent/resources` for EGM/Addy). Notices in `agent/THIRD-PARTY.md`. Copyright lines in per-skill `LICENSE` files stay. |
+| Google Chrome Modern Web Guidance | Apache-2.0 skill + guides (`modern-web-guidance`, `chrome-extensions`). CLI stays `npx -y modern-web-guidance@latest`. `.gitleaks.toml` allowlists the public WebCrypto name `MLKEM768-X25519` (hook v8.30.1 `generic-api-key`). |
+| Motion Canvas | MIT library clone under `{HOME}/repos/external/motion-canvas`. Pack ships a skill only. `@motion-canvas/ffmpeg` is GPLv3 — not packed. |
 
 Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.
 

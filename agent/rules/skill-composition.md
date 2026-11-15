@@ -90,5 +90,15 @@ unrelated media or artifact kinds.
     **interview-me** / **grilling** vs **grade-stated-ask**. Grilling
     gathers requirements. Grade-stated-ask quotes the user's words and
     grades that ask.
+17. **Web platform CSS/JS vs Chrome extensions vs Motion Canvas scenes** →
+    **modern-web-guidance** for HTML/CSS/client JS (guides + `npx`
+    search/retrieve; offline `guides/**/<id>.md`). **chrome-extensions**
+    for Manifest V3 extension builds and Chrome Web Store listing files.
+    **motion-canvas** for TypeScript generator vector animations
+    (`makeScene2D`, Vite editor). CSS view transitions stay on
+    modern-web-guidance. Labeled system-flow GIFs stay on
+    **system-flow-viz**. Print PDFs stay on **illustrated-brochure**.
+    Unlabeled generated video stays on **imagine**. Do not vendor
+    `@motion-canvas/ffmpeg` (GPLv3) into a toolkit.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

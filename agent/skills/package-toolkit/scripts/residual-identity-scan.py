@@ -68,6 +68,8 @@ SKIP_SUFFIXES = {
 EMAIL_RE = re.compile(
     r"\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b",
 )
+# npm / CDN "pkg@1.2.3.js" matches EMAIL_RE; the domain starts with a digit.
+NPM_AT_VERSION_RE = re.compile(r"^[A-Za-z0-9._%+\-]+@\d+\.\d+")
 HOME_RE = re.compile(r"(?:/home|/Users)/[A-Za-z0-9._-]+")
 
 EMAIL_ALLOW_DOMAINS = {
@@ -134,7 +136,6 @@ def account_number_is_synthetic(digits: str) -> bool:
 def imb_id_is_synthetic(token: str) -> bool:
     upper = token.upper()
     return any(upper.startswith(p) for p in IMB_ALLOW_PREFIXES)
-
 
 
 def should_skip_file(path: Path, root: Path) -> bool:
@@ -206,6 +207,8 @@ def email_allowed(addr: str) -> bool:
     lower = addr.lower()
     if any(m.lower() in lower for m in PLACEHOLDER_MARKERS):
         return True
+    if NPM_AT_VERSION_RE.match(lower):
+        return True
     domain = lower.rsplit("@", 1)[-1]
     if domain in EMAIL_ALLOW_DOMAINS:
         return True
@@ -237,21 +240,15 @@ def scan_text(
         if check_fixtures:
             acct = ACCOUNT_NUMBER_RE.search(line)
             if acct and not account_number_is_synthetic(acct.group(1)):
-                hits.append(
-                    (i, "fixture-account", redact(line, acct.group(1)))
-                )
+                hits.append((i, "fixture-account", redact(line, acct.group(1))))
                 continue
             imb = IMB_HUMAN_RE.search(line)
             if imb and not imb_id_is_synthetic(imb.group(1)):
-                hits.append(
-                    (i, "fixture-imb", redact(line, imb.group(0)))
-                )
+                hits.append((i, "fixture-imb", redact(line, imb.group(0))))
                 continue
             compact = IMB_COMPACT_RE.search(line)
             if compact and not imb_id_is_synthetic(compact.group(1)):
-                hits.append(
-                    (i, "fixture-imb", redact(line, compact.group(0)))
-                )
+                hits.append((i, "fixture-imb", redact(line, compact.group(0))))
                 continue
         if check_email:
             for em in EMAIL_RE.findall(line):
@@ -327,6 +324,15 @@ def self_test() -> int:
     if clean:
         print(f"self-test: unexpected hits {clean}", file=sys.stderr)
         return 1
+    npm_at = scan_text(
+        '<script src="https://cdn.example.com/lib@1.0.0.js" crossorigin="anonymous"></script>\n',
+        token_re,
+        check_email=True,
+        check_home=True,
+    )
+    if npm_at:
+        print(f"self-test: unexpected npm-at-version hits {npm_at}", file=sys.stderr)
+        return 1
     example_home = "/home/" + "notareallogin"
     home_hits = scan_text(
         f"path {example_home}/.bashrc\n",
@@ -369,7 +375,9 @@ def self_test() -> int:
         check_fixtures=True,
     )
     if good_acct:
-        print(f"self-test: unexpected synthetic-account hits {good_acct}", file=sys.stderr)
+        print(
+            f"self-test: unexpected synthetic-account hits {good_acct}", file=sys.stderr
+        )
         return 1
     bad_imb_id = "9ABCD" + "EF1"
     bad_imb = scan_text(

@@ -39,6 +39,31 @@ class ResidualIdentityScanTests(unittest.TestCase):
         proc = self._run(["--self-test"])
         self.assertEqual(proc.returncode, 0, proc.stderr)
 
+    def test_npm_package_at_version_is_not_email(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            denylist = root / "denylist.yaml"
+            denylist.write_text("forbidden:\n  - AcmeCorpXYZ\n", encoding="utf-8")
+            sample = root / "sri.md"
+            sample.write_text(
+                '<script src="https://cdn.example.com/lib@1.0.0.js" '
+                'crossorigin="anonymous"></script>\n',
+                encoding="utf-8",
+            )
+            proc = self._run(
+                [
+                    "--root",
+                    str(root),
+                    "--denylist",
+                    str(denylist),
+                    "--no-host-denylist",
+                    str(sample),
+                ],
+                cwd=root,
+            )
+            self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
+            self.assertIn("PASS", proc.stdout)
+
     def test_denylist_hit_and_clean(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -243,8 +268,7 @@ class ResidualIdentityScanTests(unittest.TestCase):
             bad_acct = "4099" + "123477"
             bad_imb = "9ABCD" + "EF1"
             dirty.write_text(
-                f'text = "account number {bad_acct}"\n'
-                f'mail = "{bad_imb} 0004 001234"\n',
+                f'text = "account number {bad_acct}"\nmail = "{bad_imb} 0004 001234"\n',
                 encoding="utf-8",
             )
             proc = self._run(
@@ -289,7 +313,6 @@ class ResidualIdentityScanTests(unittest.TestCase):
                 cwd=root,
             )
             self.assertEqual(proc.returncode, 0, proc.stdout + proc.stderr)
-
 
 
 if __name__ == "__main__":
