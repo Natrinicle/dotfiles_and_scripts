@@ -107,5 +107,9 @@ unrelated media or artifact kinds.
     **thread-screenshots**. OCR of already-captured images stays
     **screenshot-writing-style**. Do not grow browser-testing into
     KWin window capture.
+19. **Agent-only nested Plasma / preview / isolated Chromium / teardown**
+    → **ephemeral-display** (`ephemeral-display` on PATH). Capture still
+    **screenshot-window** or **screenshot-webpage**. Host plasmashell
+    stays up. Do not grow screenshot into session lifecycle.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

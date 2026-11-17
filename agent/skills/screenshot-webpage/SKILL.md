@@ -7,7 +7,7 @@ description: Use when capturing a browser page or URL (not a desktop window). Gi
 
 Thin wrap. Load **browser-testing-with-devtools** (Chrome DevTools MCP) and take the page screenshot there.
 
-**REQUIRED** parent: **screenshot**. Desktop windows: **screenshot-window**. GitHub/Slack thread evidence directories: **thread-screenshots**.
+**REQUIRED** parent: **screenshot**. Desktop windows: **screenshot-window**. GitHub/Slack thread evidence directories: **thread-screenshots**. A URL the user is not browsing: **ephemeral-display** `chrome-shot` / `chrome` (isolated profile, always torn down).
 
 ## Rules
 

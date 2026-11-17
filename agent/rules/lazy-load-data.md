@@ -79,5 +79,6 @@ names it. Do not `mempalace sync` in a way that prunes those drawers.
 | Change comparisons / Meld-style diffs / YAML JSON dyff | skill `meld-style-diff` |
 | KDE / CUPS custom backend persist | palace `cups-custom-backend lpadmin retry-job last-seen print-manager list vs Add`; skill `cups-custom-backend` |
 | Window-only screenshot / no activate / /tmp dest | skill `screenshot` then `screenshot-window`; PATH `screenshot-window`; palace `screenshot-window CaptureWindow no-activate /tmp/agent-screenshots 2026-11-17` |
+| Nested Plasma / plasmawindowed / isolated Chromium lab + teardown | skill `ephemeral-display`; PATH `ephemeral-display`; palace `ephemeral-display run chrome-shot plasmawindowed teardown 2026-11-17` |
 
 Do not list secrets, tokens, or private hostnames in always-loaded files.

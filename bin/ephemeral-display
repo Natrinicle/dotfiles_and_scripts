@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Agent-only display labs with guaranteed teardown.
+# Wrapper around ephemeral-display/scripts/ephemeral-display.py
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+candidates=(
+	"${HOME}/.claude/skills/ephemeral-display/scripts/ephemeral-display.py"
+	"${HOME}/.grok/skills/ephemeral-display/scripts/ephemeral-display.py"
+	"${here}/ephemeral-display.py"
+	"${here}/../agent/skills/ephemeral-display/scripts/ephemeral-display.py"
+)
+
+for script in "${candidates[@]}"; do
+	if [[ -f $script ]]; then
+		exec python3 "$script" "$@"
+	fi
+done
+
+echo "ephemeral-display.py not found (install ephemeral-display)" >&2
+exit 1

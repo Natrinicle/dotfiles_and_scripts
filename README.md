@@ -31,12 +31,12 @@ out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr, screenshot-window)
+├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr, screenshot-window, ephemeral-display)
 ├── lib/                           # Off-PATH helpers (adf-ocr.py → ~/.local/lib)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 45 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 143 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # 46 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # 144 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
@@ -98,6 +98,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | `docker-service-check.sh` | Docker service health check |
 | `unpack-artifact` | Classify APK/XAPK/IPA/ELF/firmware and print likely protocol sources |
 | `screenshot-window` | Capture one KWin window by UUID/title without activating it (`/tmp/agent-screenshots`) |
+| `ephemeral-display` | Nested Plasma / plasmawindowed / isolated Chromium / Docker webtop labs; `run` always tears them down |
 | `find-patch-queue` | File and update `.find-patch-queue.json` for tester / skeptic / patcher agents |
 | `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work; fade-out, solo sting, yields on a video call; compositor/portal video-in is not a call; flock resumes after a sting if another session is still busy (`install`/`status`/`mute`/`test`) |
 | `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |

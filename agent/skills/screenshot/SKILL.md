@@ -9,6 +9,7 @@ Dispatcher only. Load the sub-skill. Do not capture here.
 
 **REQUIRED SUB-SKILL:** **screenshot-window** for a KDE/KWin window, plasmoid, or plasmawindowed preview.
 **REQUIRED SUB-SKILL:** **screenshot-webpage** for a browser page or URL.
+**REQUIRED SUB-SKILL:** **ephemeral-display** when the window or browser must be started for the agent and torn down after.
 
 GitHub/Slack thread evidence stays **thread-screenshots**. OCR of already-captured images stays **screenshot-writing-style**.
 
@@ -16,6 +17,7 @@ GitHub/Slack thread evidence stays **thread-screenshots**. OCR of already-captur
 |--------|-----------|
 | Desktop window, plasmoid, plasmawindowed | **screenshot-window** |
 | Browser page / URL | **screenshot-webpage** |
+| Agent-only nested Plasma, preview, isolated Chromium | **ephemeral-display** then capture |
 | GitHub PR / Slack thread evidence | **thread-screenshots** |
 
 Window helper on PATH: `screenshot-window`. Default dest `/tmp/agent-screenshots/` (reboot clears). Cleanup when the user asks, or when the visual QA pass is done looking.

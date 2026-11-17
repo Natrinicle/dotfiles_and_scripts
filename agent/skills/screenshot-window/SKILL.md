@@ -7,7 +7,7 @@ description: Use when capturing one KDE/KWin window, plasmoid, or plasmawindowed
 
 Capture **one** window by KWin UUID or unique caption. Do not activate it. Do not notify. Write under `/tmp/agent-screenshots/`.
 
-**REQUIRED** parent: **screenshot** (dispatch). Browser pages: **screenshot-webpage**. Thread evidence: **thread-screenshots**.
+**REQUIRED** parent: **screenshot** (dispatch). Browser pages: **screenshot-webpage**. Thread evidence: **thread-screenshots**. If the window is not already on the session, start and tear it down with **ephemeral-display**.
 
 ## Command
 
