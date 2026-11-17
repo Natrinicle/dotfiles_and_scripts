@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Capture one KWin window by UUID/title without activating it.
+# Wrapper around screenshot-window/scripts/screenshot-window.py
+set -euo pipefail
+
+here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+candidates=(
+	"${HOME}/.claude/skills/screenshot-window/scripts/screenshot-window.py"
+	"${HOME}/.grok/skills/screenshot-window/scripts/screenshot-window.py"
+	"${here}/screenshot-window.py"
+	"${here}/../agent/skills/screenshot-window/scripts/screenshot-window.py"
+)
+
+for script in "${candidates[@]}"; do
+	if [[ -f $script ]]; then
+		exec python3 "$script" "$@"
+	fi
+done
+
+echo "screenshot-window.py not found (install screenshot-window)" >&2
+exit 1

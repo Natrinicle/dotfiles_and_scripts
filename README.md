@@ -31,12 +31,12 @@ out of exports via `${HOME}` / `{...}` placeholders.
 │   ├── bashrc
 │   ├── bash_aliases
 │   └── bash_aliases.d/
-├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr)
+├── bin/                           # PATH commands (+ voice-recorder, unpack-artifact, rperks, find-patch-queue, gpg-git-commit, adf-ocr, screenshot-window)
 ├── lib/                           # Off-PATH helpers (adf-ocr.py → ~/.local/lib)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 44 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 140 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── rules/                     # 45 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── skills/                    # 143 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
@@ -97,6 +97,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 | `slack-auth-check` | Messaging auth preflight |
 | `docker-service-check.sh` | Docker service health check |
 | `unpack-artifact` | Classify APK/XAPK/IPA/ELF/firmware and print likely protocol sources |
+| `screenshot-window` | Capture one KWin window by UUID/title without activating it (`/tmp/agent-screenshots`) |
 | `find-patch-queue` | File and update `.find-patch-queue.json` for tester / skeptic / patcher agents |
 | `session-tunes` | Quiet evolving RTTTL flock plus 70s computer-room analog beeps while Grok/Claude work; fade-out, solo sting, yields on a video call; compositor/portal video-in is not a call; flock resumes after a sting if another session is still busy (`install`/`status`/`mute`/`test`) |
 | `rperks-activate` | PATH wrapper for the Node RPerks coupon runner |
@@ -131,7 +132,10 @@ check upstream callers on updates; research claims vs a cited source →
 `claim-source-check`; graph topology → `agent-graphs`; reconstruct loop →
 `clean-room-reconstruct`; `security-audit` vs `find-patch-loop`; `egm-*`
 vs `check-work`; Obsidian OFM vs a vault plugin; `grilling` /
-`interview-me` vs `grade-stated-ask`), `independent-checker` (the agent that produced a
+`interview-me` vs `grade-stated-ask`; desktop window vs webpage vs
+thread evidence → `screenshot` then `screenshot-window` /
+`screenshot-webpage`), `screenshot` (window-only capture, no activate,
+`/tmp/agent-screenshots`; do not `spectacle -a`), `independent-checker` (the agent that produced a
 claim does not grade it; graphs use `agent-graphs`), `claim-source-check` (cheap checker gets claim +
 source only; vault `supported` pages), `system-security` (WAN bind of kube-apiserver /
 kubelet / SSH / IPMI / dashboards plus scraped KEV/NVD/GainSec CWE review;
@@ -175,7 +179,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (140) include packaging (`package-toolkit` classifies generic pack
+**Skills** (143) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -196,6 +200,8 @@ clean-room reconstruct (`clean-room-reconstruct`: four rules, SPEC.md →
 rebuild → oracle → retry; optional Craft Anything engine; inner check is
 `loop-until-green`),
 printable pages (`printable-webpage`),
+window/page screenshots (`screenshot`, then `screenshot-window` /
+`screenshot-webpage`; PATH `screenshot-window`; dest `/tmp/agent-screenshots`),
 Meld-style side-by-side diffs plus dyff for YAML/JSON (`meld-style-diff`),
 illustrated brochures (`illustrated-brochure`, landscape PDF with Dia and Graphviz),
 system-flow dashboards (`system-flow-viz`, data-flow-path GIF with volume-scaled packet speed; preview `agent/skills/system-flow-viz/docs/compose-stack.gif`),
@@ -301,6 +307,7 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | Matt Pocock / Addy Osmani / Cloudflare / kepano / Google EGM skills | Inbound MIT / Apache-2.0 copies in `agent/skills` (plus `agent/agents` and `agent/resources` for EGM/Addy). Notices in `agent/THIRD-PARTY.md`. Copyright lines in per-skill `LICENSE` files stay. |
 | Google Chrome Modern Web Guidance | Apache-2.0 skill + guides (`modern-web-guidance`, `chrome-extensions`). CLI stays `npx -y modern-web-guidance@latest`. `.gitleaks.toml` allowlists the public WebCrypto name `MLKEM768-X25519` (hook v8.30.1 `generic-api-key`). |
 | Motion Canvas | MIT library clone under `{HOME}/repos/external/motion-canvas`. Pack ships a skill only. `@motion-canvas/ffmpeg` is GPLv3 — not packed. |
+| KWin `ScreenShot2` / Spectacle | Window-capture D-Bus interface and the CLI that must not be used for unfocused windows |
 
 Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.
 

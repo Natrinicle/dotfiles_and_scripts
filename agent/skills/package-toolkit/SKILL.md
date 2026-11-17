@@ -125,10 +125,10 @@ credit-union mailers into the pack.
 
 ## Residual scan (required before commit)
 
-Hard gate. From the pack root:
+Hard gate. From the pack root. Always pass `--root` (default is cwd; a home-directory cwd walks `$HOME`).
 
 ```bash
-python3 agent/skills/package-toolkit/scripts/residual-identity-scan.py
+python3 agent/skills/package-toolkit/scripts/residual-identity-scan.py --root .
 ```
 
 The pack pre-commit hook `residual-identity-scan` scans the **whole pack root**

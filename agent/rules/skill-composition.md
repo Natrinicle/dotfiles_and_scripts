@@ -100,5 +100,12 @@ unrelated media or artifact kinds.
     **system-flow-viz**. Print PDFs stay on **illustrated-brochure**.
     Unlabeled generated video stays on **imagine**. Do not vendor
     `@motion-canvas/ffmpeg` (GPLv3) into a toolkit.
+18. **Desktop window vs webpage vs thread evidence** → **screenshot**
+    dispatcher, then **screenshot-window** (KWin CaptureWindow, no
+    activate, `/tmp/agent-screenshots`) or **screenshot-webpage**
+    (Chrome DevTools). GitHub/Slack thread evidence stays
+    **thread-screenshots**. OCR of already-captured images stays
+    **screenshot-writing-style**. Do not grow browser-testing into
+    KWin window capture.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

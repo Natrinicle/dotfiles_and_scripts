@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Window Screenshot Helper
+Comment=Capture a KWin window by UUID without activating it
+Exec=@EXEC@
+NoDisplay=true
+StartupNotify=false
+Terminal=false
+Categories=Qt;KDE;
+X-KDE-DBUS-Restricted-Interfaces=org.kde.KWin.ScreenShot2
