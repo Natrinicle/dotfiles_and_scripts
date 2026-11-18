@@ -13,16 +13,19 @@ The user does **not** have to say “use subagents”.
 
 Hook `prefer-spawn-search` **denies** forest and multi-location search
 (`$HOME`, `/`, `~/repos`, missing-path workspace hunt, two+ directory
-operands, unpiped `rg`/`grep` with no path). A single `rg` / `grep` /
-`find` / `list_dir` of **one** tree (including a git repo root) stays on
-the parent. A grep-family filter of stdin (`ss | grep 11434`,
-`git show … | grep version`) stays on the parent.
+operands, unpiped `rg`/`grep` with no path). After a deny, **spawn**. Do
+not retry the same hunt as a series of one-tree `rg` / `list_dir` /
+`find` on the parent; that fills the parent window and is why the hook
+exists. A single `rg` / `grep` / `find` / `list_dir` of **one already-known
+tree** (including a git repo root) stays on the parent. A grep-family
+filter of stdin (`ss | grep 11434`, `git show … | grep version`) stays on
+the parent.
 
 ## Shape (do not collapse)
 
 | Work | Run |
 |------|-----|
-| One command (`rg`, `grep`, `list_dir` of one tree) | Parent |
+| One command (`rg`, `grep`, `list_dir` of one already-known tree) | Parent |
 | One command piped into grep (`ss \| grep 11434`) | Parent |
 | Existing helper script | Parent (`prefer-helper-scripts`) |
 | More than one command, or reusable multi-grep diagnostics | Prefer a helper script; spawn only if the work is still large |
@@ -49,7 +52,7 @@ the parent “so the graph has context”.
 
 ## Parent keeps
 
-- Single commands: `rg`, `grep`, `find` of one tree, `list_dir`, `git status`
+- Single commands: `rg`, `grep`, `find` of one already-known tree, `list_dir`, `git status`
 - One-shot pipes into grep (`ss | grep 11434` to verify a port opened)
 - Calling an existing helper; writing one when the sequence is more than a
   single command **and** looks useful later (`prefer-helper-scripts`)
@@ -119,7 +122,8 @@ Ollama — skip it on overload.
   should (router iptables/clients/stats). A one-shot verify stays here.
 - Search several trees on the parent. Forest / multi-location search is
   **denied**; spawn or graph instead. Escape:
-  `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`.
+  `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`. After a deny, spawn. Serial
+  one-tree walks on the parent cost more parent tokens than one child.
 - Walk a dump (jadx, `libapp.so`, firmware) on the parent because it is
   “one tree”.
 - Skip `model-router` for dump-harvest because of the Grok T0 short-circuit.
@@ -134,7 +138,8 @@ multi-file implementation). It does not override a single search command.
 | Excuse | Reality |
 |--------|---------|
 | “I'll spawn a child to rg this dir” | Spawn tax + re-ingest exceeds one rg; parent runs the command |
-| “Faster to grep here” | Yes for one tree; spawn when the search spans several locations |
+| “Forest denied; I'll list_dir each tree here” | Serial parent walks fill the window; spawn |
+| “Faster to grep here” | Yes for one already-known tree; spawn when the search spans several locations |
 | “It's one jadx tree so I'll grep here” | Discovery loop fills the parent; spawn |
 | “I need JADX in this context to verify” | Child returns the frames; parent re-runs self-test |
 | “model-router says T3 stays on parent” | T3 stays on the **child** |

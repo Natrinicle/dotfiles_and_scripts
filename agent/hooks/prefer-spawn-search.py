@@ -61,11 +61,15 @@ FLAGS_WITH_ARG = frozenset(
 
 BLOCK_REASON = (
     "Parent forest or multi-location search is blocked (rule subagents-first, "
-    "hook prefer-spawn-search). A single rg/grep/find/list of one tree belongs "
-    "on the parent: spawn tax plus re-ingest exceeds running the command. "
-    "A single command piped into grep (ss | grep 11434) also stays here.\n"
+    "hook prefer-spawn-search). SPAWN a child (or skill agent-graphs) for this "
+    "hunt. Serial one-tree rg/list_dir/find on the parent fills the parent "
+    "window and is why this hook exists.\n"
+    "A single already-known tree rg/grep/find/list_dir, or a stdin grep "
+    "(ss | grep 11434), stays on the parent only when that one command is the "
+    "whole next step. Spawn tax plus re-ingest exceeds that one command.\n"
     "Spawn when:\n"
     "- Searching several locations ($HOME, ~/repos, two+ trees)\n"
+    "- Finding which tree holds the files\n"
     "- Installing software including config and service files\n"
     "- Large extract, decompile, or multi-file implementation\n"
     "Several independent units → skill agent-graphs (workflow agent-graph). "

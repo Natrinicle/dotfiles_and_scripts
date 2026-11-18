@@ -80,19 +80,25 @@ class PreferSpawnSearchTests(unittest.TestCase):
             SEARCH.is_wide_search("grep", {"path": str(HOOKS), "pattern": "x"})
         )
 
-    def test_git_toplevel_grep_is_not_wide(self) -> None:
+    def _git_toplevel(self) -> Path:
         repo = HOOKS
         while repo != repo.parent and not (repo / ".git").exists():
             repo = repo.parent
         self.assertTrue((repo / ".git").exists())
+        return repo
+
+    def test_git_toplevel_grep_is_not_wide(self) -> None:
+        repo = self._git_toplevel()
+        if SEARCH._is_wide_dir(str(repo)):
+            self.skipTest("git toplevel is a forest root ($HOME, ~/repos, /)")
         self.assertFalse(
             SEARCH.is_wide_search("grep", {"path": str(repo), "pattern": "x"})
         )
 
     def test_list_dir_git_toplevel_is_not_wide(self) -> None:
-        repo = HOOKS
-        while repo != repo.parent and not (repo / ".git").exists():
-            repo = repo.parent
+        repo = self._git_toplevel()
+        if SEARCH._is_wide_dir(str(repo)):
+            self.skipTest("git toplevel is a forest root ($HOME, ~/repos, /)")
         self.assertFalse(
             SEARCH.is_wide_search("list_dir", {"target_directory": str(repo)})
         )
@@ -239,7 +245,10 @@ class PreferSpawnSearchTests(unittest.TestCase):
         self.assertEqual(result["decision"], "block")
         self.assertEqual(result["hookSpecificOutput"]["permissionDecision"], "deny")
         reason = result["reason"]
-        self.assertIn("spawn tax", reason)
+        self.assertIn("SPAWN a child", reason)
+        self.assertIn("Serial one-tree", reason)
+        self.assertIn("fills the parent window", reason)
+        self.assertIn("Spawn tax", reason)
         self.assertIn("agent-graphs", reason)
         self.assertIn("loop-until-green", reason)
         self.assertIn("prefer-helper-scripts", reason)

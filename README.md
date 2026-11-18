@@ -172,7 +172,7 @@ is the commit; later sessions query the palace first),
 (file necessary pieces to MemPalace before parent compact so later lookup
 has full drawers; the compact summary is not filing; PostCompact mines
 `compaction/INDEX.md` as a pointer only),
-`subagents-first` (spawn large work and dump discovery loops; parent runs one `rg`/`grep` of one tree or one command piped into grep; every spawn uses `model-router`; dump-harvest is T2 effort high, not xhigh/Fable, not Haiku; Ollama overload may fall back to T1; hook `prefer-spawn-search` denies forest/multi-location search; reusable multi-grep diagnostics → helper script; several independent units → `agent-graphs`),
+`subagents-first` (spawn large work and dump discovery loops; parent runs one `rg`/`grep` of one already-known tree or one command piped into grep; after a forest deny, spawn — serial one-tree parent walks fill the window; every spawn uses `model-router`; dump-harvest is T2 effort high, not xhigh/Fable, not Haiku; Ollama overload may fall back to T1; hook `prefer-spawn-search` denies forest/multi-location search; reusable multi-grep diagnostics → helper script; several independent units → `agent-graphs`),
 `expected-value` (take an expensive action only with an edge; ledger is USD, tokens, wall-clock, context-window, and parent compaction; spawn value is parent context saved vs re-ingest),
 `agent-graphs` (shape of multi-agent work: splitter, isolated workers, code nodes, blast-radius gate; inner retry is `loop-until-green`),
 `cups-custom-backend` (KDE Printers list is configured dests; last-seen discovery; `retry-job` holds jobs while the printer is off), etc.

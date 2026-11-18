@@ -106,17 +106,20 @@ Restart the session after changing hook registration.
 **Denies** forest and multi-location search (missing path, `$HOME` / `/` /
 `~/repos`, unscoped `**` glob, two+ directory operands, unpiped shell
 `rg`/`grep`/`find` with no path). A single `rg` / `grep` / `find` /
-`list_dir` of **one** tree (including a git repo root) stays allowed.
-A grep-family filter of stdin (`ss | grep 11434`, `git show … | grep`)
-stays allowed. Named-file grep and `git status` stay allowed. Fail-open.
+`list_dir` of **one already-known** tree (including a git repo root)
+stays allowed. A grep-family filter of stdin (`ss | grep 11434`,
+`git show … | grep`) stays allowed. Named-file grep and `git status`
+stay allowed. Fail-open.
 Escape: `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`.
 
-The deny reason tells the parent: one command stays here; spawn for
-multi-location search, software install with config+units, or large extract.
-Several independent units → skill `agent-graphs`. Bug hunt stays
-`find-patch-loop`. One-shot verify (did this open the port) stays on the
-parent. Reusable multi-grep diagnostics (router iptables/clients/stats)
-→ helper script.
+The deny reason tells the parent: **spawn** for this hunt. Serial one-tree
+`rg`/`list_dir`/`find` on the parent fills the parent window. One already-known
+tree command stays here only when that command is the whole next step.
+Spawn for multi-location search, finding which tree, software install with
+config+units, or large extract. Several independent units → skill
+`agent-graphs`. Bug hunt stays `find-patch-loop`. One-shot verify (did this
+open the port) stays on the parent. Reusable multi-grep diagnostics
+(router iptables/clients/stats) → helper script.
 
 On Grok Build, multi-location unknown-path search: omit `subagent_type`
 (cloud general-purpose). Do not pin plugin explorers to `ollama-gemma4`.
