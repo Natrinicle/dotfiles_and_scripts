@@ -36,7 +36,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 46 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 144 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 146 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
@@ -135,7 +135,8 @@ check upstream callers on updates; research claims vs a cited source →
 vs `check-work`; Obsidian OFM vs a vault plugin; `grilling` /
 `interview-me` vs `grade-stated-ask`; desktop window vs webpage vs
 thread evidence → `screenshot` then `screenshot-window` /
-`screenshot-webpage`), `screenshot` (window-only capture, no activate,
+`screenshot-webpage`; code-drawn one-file game/film/walkthrough →
+`code-drawn-media`; landing/icon galleries → `design-inspiration`), `screenshot` (window-only capture, no activate,
 `/tmp/agent-screenshots`; do not `spectacle -a`), `independent-checker` (the agent that produced a
 claim does not grade it; graphs use `agent-graphs`), `claim-source-check` (cheap checker gets claim +
 source only; vault `supported` pages), `system-security` (WAN bind of kube-apiserver /
@@ -180,7 +181,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (143) include packaging (`package-toolkit` classifies generic pack
+**Skills** (146) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -241,7 +242,10 @@ merged public skills (`grilling`, `wait-what`, `wayfinder`, `codebase-design`,
 `egm-drift-report`; `modern-web-guidance` / `chrome-extensions`
 (Google Chrome Apache-2.0); `motion-canvas` (MIT clone at
 `{HOME}/repos/external/motion-canvas`, ffmpeg exporter stays out of the
-pack) — notices in `agent/THIRD-PARTY.md`),
+pack); `code-drawn-media` (one-file three.js games, JS/Python frame
+video, floor-plan walkthroughs); `design-inspiration` (gallery index
+for landings/icons/logos/footers before generating UI) — notices in
+`agent/THIRD-PARTY.md`),
 `nate-writing-style` (`{user}` placeholder voice notes; replace with your own),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
@@ -308,6 +312,8 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | Matt Pocock / Addy Osmani / Cloudflare / kepano / Google EGM skills | Inbound MIT / Apache-2.0 copies in `agent/skills` (plus `agent/agents` and `agent/resources` for EGM/Addy). Notices in `agent/THIRD-PARTY.md`. Copyright lines in per-skill `LICENSE` files stay. |
 | Google Chrome Modern Web Guidance | Apache-2.0 skill + guides (`modern-web-guidance`, `chrome-extensions`). CLI stays `npx -y modern-web-guidance@latest`. `.gitleaks.toml` allowlists the public WebCrypto name `MLKEM768-X25519` (hook v8.30.1 `generic-api-key`). |
 | Motion Canvas | MIT library clone under `{HOME}/repos/external/motion-canvas`. Pack ships a skill only. `@motion-canvas/ffmpeg` is GPLv3 — not packed. |
+| Playwright / ffmpeg / three.js | Code-drawn video capture + stitch, and in-browser 3D. Not packed as binaries. |
+| Design galleries (`recent.design`, `landdding.com`, `60fps.design`, `footer.design`, `gentleface.com`, …) | Public inspiration URLs in `design-inspiration`. Commercial shops stay optional. |
 | KWin `ScreenShot2` / Spectacle | Window-capture D-Bus interface and the CLI that must not be used for unfocused windows |
 
 Store address and geopin are **not** in the pack. Set `latitude` / `longitude` in your `config.json`.

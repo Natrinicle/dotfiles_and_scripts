@@ -12,7 +12,7 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
   `toolkit-residual-identity`,
   `expected-value`, `agent-graphs`, `cups-custom-backend`, `mempalace-compact-filing`,
   `claim-source-check`, `skill-composition` (merged-skill routing).
-- **Skills** (144) covering packaging, scanners, PII detection, MemPalace,
+- **Skills** (146) covering packaging, scanners, PII detection, MemPalace,
   Flipper IR, compiled-app unpack, forensic cores plus thin server companions,
   expected-value spend gate, agent graphs (`agent-graphs` / `loop-until-green`),
   clean-room reconstruct (`clean-room-reconstruct`),
@@ -21,6 +21,7 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
   CUPS custom-backend persist, claim-source-check,
   merged public skills (`grilling`, `security-audit`, `egm-*`,
   `obsidian-*`, `modern-web-guidance`, `chrome-extensions`, `motion-canvas`,
+  `code-drawn-media`, `design-inspiration`,
   and others — see `THIRD-PARTY.md`),
   and workflow helpers.
 - **Agents** (10) — EGM Goldfish personas in `agent/agents/` →

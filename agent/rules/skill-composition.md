@@ -98,7 +98,9 @@ unrelated media or artifact kinds.
     (`makeScene2D`, Vite editor). CSS view transitions stay on
     modern-web-guidance. Labeled system-flow GIFs stay on
     **system-flow-viz**. Print PDFs stay on **illustrated-brochure**.
-    Unlabeled generated video stays on **imagine**. Do not vendor
+    Unlabeled generated video stays on **imagine**. Code-drawn
+    JS/Python frame video, one-file three.js games, and floor-plan
+    walkthroughs stay on **code-drawn-media**. Do not vendor
     `@motion-canvas/ffmpeg` (GPLv3) into a toolkit.
 18. **Desktop window vs webpage vs thread evidence** → **screenshot**
     dispatcher, then **screenshot-window** (KWin CaptureWindow, no
@@ -111,5 +113,15 @@ unrelated media or artifact kinds.
     → **ephemeral-display** (`ephemeral-display` on PATH). Capture still
     **screenshot-window** or **screenshot-webpage**. Host plasmashell
     stays up. Do not grow screenshot into session lifecycle.
+20. **One-file code-drawn game / film / 3D walkthrough** →
+    **code-drawn-media** (from-scratch three.js HTML, JS/Python frames,
+    Playwright + ffmpeg, floor-plan tour). Unlabeled generated clips stay
+    on **imagine**. Motion Canvas scenes stay on **motion-canvas**.
+    Labeled system GIFs stay on **system-flow-viz**. Do not grow
+    **vibe-pm** into this media path.
+21. **Landing / icon / logo / footer / motion galleries before generating
+    UI** → **design-inspiration**. Aesthetic identity stays on
+    **frontend-design**. Classic/desktop reskin stays on
+    **classic-ui-reskin**. Do not grow frontend-design into a URL dump.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.
