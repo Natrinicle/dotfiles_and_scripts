@@ -36,7 +36,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
 │   ├── rules/                     # 46 rules → ~/.claude/rules + ~/.grok/rules
-│   ├── skills/                    # 146 skills → ~/.claude/skills + ~/.grok/skills
+│   ├── skills/                    # 147 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
 │   ├── hooks/                     # spawn-subagent-local-pin.py, retarget-grok-plugin-symlinks.py, prefer-spawn-search.py, mempalace-postcompact-index.py, control-plane-exposure.py (register in settings.json)
@@ -181,7 +181,7 @@ Optional **MemPalace multi-RW hub** (Qdrant compose, systemd HTTP hub, write
 daemon, Claude/Grok client snippets): `examples/mempalace-multi-rw/`. Copy
 those units yourself; `install.sh` does not enable them.
 
-**Skills** (146) include packaging (`package-toolkit` classifies generic pack
+**Skills** (147) include packaging (`package-toolkit` classifies generic pack
 vs repo-specific product work, then resolves `general_pack` from host
 `toolkit-homes.yaml`; example under
 `package-toolkit/references/toolkit-homes.example.yaml`), scanners, PII detection, MemPalace
@@ -246,6 +246,9 @@ pack); `code-drawn-media` (one-file three.js games, JS/Python frame
 video, floor-plan walkthroughs); `design-inspiration` (gallery index
 for landings/icons/logos/footers before generating UI) — notices in
 `agent/THIRD-PARTY.md`),
+`travel-aware-event-reminders` (calendar events with a street address: day-before 9 AM
+pop-up, leave-soon pop-up from drive time to `{home_address}`, and a weather re-check
+before long drives; supply home address and time zone from your own vault),
 `nate-writing-style` (`{user}` placeholder voice notes; replace with your own),
 forensic analysis cores (`file-timestamp-clues`, `download-bandwidth-likelihood`,
 `identical-folder-copy-indicators`, `software-install-dating`, `usb-device-history`,
@@ -313,6 +316,7 @@ See `agent/examples/EXCLUDED.md` for large or non-portable items left out of thi
 | Google Chrome Modern Web Guidance | Apache-2.0 skill + guides (`modern-web-guidance`, `chrome-extensions`). CLI stays `npx -y modern-web-guidance@latest`. `.gitleaks.toml` allowlists the public WebCrypto name `MLKEM768-X25519` (hook v8.30.1 `generic-api-key`). |
 | Motion Canvas | MIT library clone under `{HOME}/repos/external/motion-canvas`. Pack ships a skill only. `@motion-canvas/ffmpeg` is GPLv3 — not packed. |
 | Playwright / ffmpeg / three.js | Code-drawn video capture + stitch, and in-browser 3D. Not packed as binaries. |
+| OSRM / Google Calendar | Public routing service (or any maps lookup) and calendar connector used by `travel-aware-event-reminders` for drive time and pop-up reminders. Home address and time zone are caller-supplied. |
 | Design galleries (`recent.design`, `landdding.com`, `60fps.design`, `footer.design`, `gentleface.com`, …) | Public inspiration URLs in `design-inspiration`. Commercial shops stay optional. |
 | KWin `ScreenShot2` / Spectacle | Window-capture D-Bus interface and the CLI that must not be used for unfocused windows |
 
