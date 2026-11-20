@@ -68,6 +68,9 @@ names it. Do not `mempalace sync` in a way that prunes those drawers.
 | Dump harvest spawn / Ollama overload T1 | palace `subagents-first dump-harvest T2 high model-router Ollama overload T1 2026-11-09` / `prefer-spawn-search spawn after deny no serial one-tree parent walks 2026-11-18`; rules `subagents-first` + `model-routing`; skill `model-router` |
 | Packaging a toolkit | `toolkit-homes.md`; classify first; rule `toolkit-residual-identity` (host denylist, never pack real names) |
 | Reverse Engineer Anything / `rea-agents` / REA MCP | `{MEMORY_ROOT}/reverse-engineer-anything-2026-10-16.md` |
+| Python CLI / PyPI app installs | rule `prefer-pipx`; palace `pip tools prefer pipx not apt python3-pwntools 2026-11-20` |
+| Firmware/pcap RE CLIs (binwalk unblob tshark sigrok pwntools) | palace `binwalk unblob tshark sigrok-cli pwntools pipx 2026-11-20` |
+| JADX-AI-MCP / apktool-mcp (Zin GUI plugin + Python servers) | palace `jadx-ai-mcp zinja-coder jadx-mcp-server plugin 8650 8651` / `apktool-mcp-server zinja-coder 8652`; wrap stdio with mcp-proxy (native `--http` is unauthenticated) |
 | Reconstruct / SPEC.md / oracle retry | palace `clean-room-reconstruct SPEC.md oracle retry`; skill `clean-room-reconstruct` |
 | Craft Anything CLI/MCP (optional reconstruct engine) | palace `Craft Anything craft-anything-cli clean room Deep`; skill `clean-room-reconstruct` |
 | ADF scan file-and-route | PATH `adf-ocr` (`bin/adf-ocr`) + helper `lib/adf-ocr.py` → `~/.local/lib`; taxonomy `${XDG_CONFIG_HOME:-$HOME/.config}/adf-ocr/taxonomy.yaml` (copy `share/adf-ocr/taxonomy.example.yaml`) |
