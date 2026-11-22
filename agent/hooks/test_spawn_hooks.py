@@ -57,216 +57,210 @@ class SpawnPinTests(unittest.TestCase):
         )
 
 
+def _allow(tool: str, tool_input: dict, session_id: str | None = None) -> None:
+    event: dict = {"tool_name": tool, "tool_input": tool_input}
+    if session_id is not None:
+        event["session_id"] = session_id
+    result = SEARCH.decide(event)
+    if result is not None:
+        raise AssertionError(f"expected allow, got deny: {result}")
+
+
+def _deny(tool: str, tool_input: dict, session_id: str | None = None) -> dict:
+    event: dict = {"tool_name": tool, "tool_input": tool_input}
+    if session_id is not None:
+        event["session_id"] = session_id
+    result = SEARCH.decide(event)
+    assert result is not None
+    return result
+
+
 class PreferSpawnSearchTests(unittest.TestCase):
-    def test_named_file_is_silent(self) -> None:
+    def setUp(self) -> None:
+        self._state = tempfile.TemporaryDirectory()
+        self._old_state = os.environ.get("PREFER_SPAWN_SEARCH_STATE_DIR")
+        self._old_max = os.environ.get("SUBAGENTS_FIRST_PARENT_SEARCH_MAX")
+        self._old_window = os.environ.get("SUBAGENTS_FIRST_PARENT_SEARCH_WINDOW_SEC")
+        os.environ["PREFER_SPAWN_SEARCH_STATE_DIR"] = self._state.name
+        os.environ["SUBAGENTS_FIRST_PARENT_SEARCH_MAX"] = "3"
+        os.environ["SUBAGENTS_FIRST_PARENT_SEARCH_WINDOW_SEC"] = "600"
+
+    def tearDown(self) -> None:
+        if self._old_state is None:
+            os.environ.pop("PREFER_SPAWN_SEARCH_STATE_DIR", None)
+        else:
+            os.environ["PREFER_SPAWN_SEARCH_STATE_DIR"] = self._old_state
+        if self._old_max is None:
+            os.environ.pop("SUBAGENTS_FIRST_PARENT_SEARCH_MAX", None)
+        else:
+            os.environ["SUBAGENTS_FIRST_PARENT_SEARCH_MAX"] = self._old_max
+        if self._old_window is None:
+            os.environ.pop("SUBAGENTS_FIRST_PARENT_SEARCH_WINDOW_SEC", None)
+        else:
+            os.environ["SUBAGENTS_FIRST_PARENT_SEARCH_WINDOW_SEC"] = self._old_window
+        self._state.cleanup()
+
+    def test_named_file_is_allowed(self) -> None:
         path = Path(__file__).resolve()
-        self.assertFalse(
-            SEARCH.is_wide_search("grep", {"path": str(path), "pattern": "x"})
-        )
+        _allow("grep", {"path": str(path), "pattern": "x"})
 
-    def test_missing_path_grep_is_wide(self) -> None:
-        self.assertTrue(SEARCH.is_wide_search("grep", {"pattern": "x"}))
+    def test_missing_path_grep_is_allowed(self) -> None:
+        _allow("grep", {"pattern": "x"})
 
-    def test_home_dir_is_wide(self) -> None:
-        self.assertTrue(
-            SEARCH.is_wide_search("grep", {"path": str(Path.home()), "pattern": "x"})
-        )
+    def test_home_dir_single_grep_is_allowed(self) -> None:
+        _allow("grep", {"path": str(Path.home()), "pattern": "x"})
 
-    def test_globstar_is_wide(self) -> None:
-        self.assertTrue(SEARCH.is_wide_search("Glob", {"glob": "**/*.md"}))
+    def test_globstar_single_is_allowed(self) -> None:
+        _allow("Glob", {"glob": "**/*.md"})
 
-    def test_directory_grep_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search("grep", {"path": str(HOOKS), "pattern": "x"})
-        )
+    def test_directory_grep_is_allowed(self) -> None:
+        _allow("grep", {"path": str(HOOKS), "pattern": "x"})
 
-    def _git_toplevel(self) -> Path:
-        repo = HOOKS
-        while repo != repo.parent and not (repo / ".git").exists():
-            repo = repo.parent
-        self.assertTrue((repo / ".git").exists())
-        return repo
-
-    def test_git_toplevel_grep_is_not_wide(self) -> None:
-        repo = self._git_toplevel()
-        if SEARCH._is_wide_dir(str(repo)):
-            self.skipTest("git toplevel is a forest root ($HOME, ~/repos, /)")
-        self.assertFalse(
-            SEARCH.is_wide_search("grep", {"path": str(repo), "pattern": "x"})
-        )
-
-    def test_list_dir_git_toplevel_is_not_wide(self) -> None:
-        repo = self._git_toplevel()
-        if SEARCH._is_wide_dir(str(repo)):
-            self.skipTest("git toplevel is a forest root ($HOME, ~/repos, /)")
-        self.assertFalse(
-            SEARCH.is_wide_search("list_dir", {"target_directory": str(repo)})
-        )
-
-    def test_repos_dir_is_wide(self) -> None:
+    def test_repos_dir_single_grep_is_allowed(self) -> None:
         repos = Path.home() / "repos"
         if not repos.is_dir():
             self.skipTest("~/repos is not a directory")
-        self.assertTrue(
-            SEARCH.is_wide_search("grep", {"path": str(repos), "pattern": "x"})
+        _allow("grep", {"path": str(repos), "pattern": "x"})
+
+    def test_list_dir_of_hooks_is_allowed(self) -> None:
+        _allow("list_dir", {"target_directory": str(HOOKS)})
+
+    def test_list_dir_home_is_allowed(self) -> None:
+        _allow("list_dir", {"target_directory": str(Path.home())})
+
+    def test_shell_rg_cwd_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": "rg prefer-spawn-search"})
+
+    def test_unpiped_grep_cwd_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": "grep foo"})
+
+    def test_and_single_grep_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": "true && grep foo"})
+
+    def test_rg_piped_to_head_is_allowed(self) -> None:
+        _allow(
+            "run_terminal_command",
+            {"command": "rg prefer-spawn-search | head"},
         )
 
-    def test_globstar_scoped_to_one_tree_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search(
-                "Glob", {"glob": "**/*.md", "target_directory": str(HOOKS)}
-            )
+    def test_piped_ss_grep_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": "ss -tnp | grep 11434"})
+
+    def test_piped_git_show_grep_is_allowed(self) -> None:
+        _allow(
+            "run_terminal_command",
+            {"command": "git show HEAD:toolkit.yaml | grep version"},
         )
 
-    def test_list_dir_of_hooks_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search("list_dir", {"target_directory": str(HOOKS)})
+    def test_piped_journalctl_rg_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": "journalctl -u x | rg error"})
+
+    def test_piped_stderr_grep_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": "ss -tnp |& grep 11434"})
+
+    def test_double_piped_grep_is_allowed(self) -> None:
+        _allow(
+            "run_terminal_command",
+            {"command": "ss -tnp | grep 11434 | grep LISTEN"},
         )
 
-    def test_list_dir_home_is_wide(self) -> None:
-        self.assertTrue(
-            SEARCH.is_wide_search("list_dir", {"target_directory": str(Path.home())})
+    def test_piped_grep_forest_path_is_allowed(self) -> None:
+        _allow(
+            "run_terminal_command",
+            {"command": f"ss -tnp | grep foo {Path.home()}"},
         )
 
-    def test_shell_rg_cwd_is_wide(self) -> None:
-        self.assertTrue(
-            SEARCH.is_wide_search(
-                "run_terminal_command", {"command": "rg prefer-spawn-search"}
-            )
-        )
-
-    def test_unpiped_grep_cwd_is_wide(self) -> None:
-        self.assertTrue(
-            SEARCH.is_wide_search("run_terminal_command", {"command": "grep foo"})
-        )
-
-    def test_and_grep_cwd_is_wide(self) -> None:
-        self.assertTrue(
-            SEARCH.is_wide_search(
-                "run_terminal_command", {"command": "true && grep foo"}
-            )
-        )
-
-    def test_rg_piped_to_head_is_wide(self) -> None:
-        self.assertTrue(
-            SEARCH.is_wide_search(
-                "run_terminal_command",
-                {"command": "rg prefer-spawn-search | head"},
-            )
-        )
-
-    def test_piped_ss_grep_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search(
-                "run_terminal_command", {"command": "ss -tnp | grep 11434"}
-            )
-        )
-
-    def test_piped_git_show_grep_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search(
-                "run_terminal_command",
-                {"command": "git show HEAD:toolkit.yaml | grep version"},
-            )
-        )
-
-    def test_piped_journalctl_rg_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search(
-                "run_terminal_command",
-                {"command": "journalctl -u x | rg error"},
-            )
-        )
-
-    def test_piped_stderr_grep_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search(
-                "run_terminal_command", {"command": "ss -tnp |& grep 11434"}
-            )
-        )
-
-    def test_double_piped_grep_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search(
-                "run_terminal_command",
-                {"command": "ss -tnp | grep 11434 | grep LISTEN"},
-            )
-        )
-
-    def test_piped_grep_forest_path_is_wide(self) -> None:
-        self.assertTrue(
-            SEARCH.is_wide_search(
-                "run_terminal_command",
-                {"command": f"ss -tnp | grep foo {Path.home()}"},
-            )
-        )
-
-    def test_shell_rg_named_file_is_not_wide(self) -> None:
+    def test_shell_rg_named_file_is_allowed(self) -> None:
         path = Path(__file__).resolve()
-        self.assertFalse(
-            SEARCH.is_wide_search("Bash", {"command": f"rg prefer-spawn-search {path}"})
-        )
+        _allow("Bash", {"command": f"rg prefer-spawn-search {path}"})
 
-    def test_shell_rg_one_dir_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search(
-                "Bash", {"command": f"rg prefer-spawn-search {HOOKS}"}
-            )
-        )
+    def test_shell_rg_one_dir_is_allowed(self) -> None:
+        _allow("Bash", {"command": f"rg prefer-spawn-search {HOOKS}"})
 
-    def test_shell_rg_two_dirs_is_wide(self) -> None:
+    def test_shell_rg_two_dirs_is_allowed(self) -> None:
         other = HOOKS.parent
-        self.assertTrue(
-            SEARCH.is_wide_search(
-                "Bash", {"command": f"rg prefer-spawn-search {HOOKS} {other}"}
-            )
-        )
+        _allow("Bash", {"command": f"rg prefer-spawn-search {HOOKS} {other}"})
 
-    def test_find_one_dir_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search("run_terminal_command", {"command": f"find {HOOKS}"})
-        )
+    def test_find_one_dir_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": f"find {HOOKS}"})
 
-    def test_find_home_is_wide(self) -> None:
-        self.assertTrue(
-            SEARCH.is_wide_search(
-                "run_terminal_command", {"command": f"find {Path.home()}"}
-            )
-        )
+    def test_find_home_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": f"find {Path.home()}"})
 
-    def test_shell_git_status_is_not_wide(self) -> None:
-        self.assertFalse(
-            SEARCH.is_wide_search("run_terminal_command", {"command": "git status -sb"})
-        )
+    def test_shell_git_status_is_allowed(self) -> None:
+        _allow("run_terminal_command", {"command": "git status -sb"})
 
-    def test_wide_grep_is_denied_not_nagged(self) -> None:
-        result = SEARCH.decide({"tool_name": "grep", "tool_input": {"pattern": "x"}})
-        assert result is not None
+    def test_compound_two_rg_is_denied(self) -> None:
+        result = _deny(
+            "run_terminal_command",
+            {"command": f"rg a {HOOKS} && rg b {HOOKS.parent}"},
+        )
         self.assertEqual(result["decision"], "block")
         self.assertEqual(result["hookSpecificOutput"]["permissionDecision"], "deny")
         reason = result["reason"]
         self.assertIn("SPAWN a child", reason)
-        self.assertIn("Serial one-tree", reason)
-        self.assertIn("fills the parent window", reason)
-        self.assertIn("Spawn tax", reason)
-        self.assertIn("agent-graphs", reason)
-        self.assertIn("loop-until-green", reason)
-        self.assertIn("prefer-helper-scripts", reason)
+        self.assertIn("discovery loop", reason.lower())
+        self.assertIn("One search command", reason)
 
-    def test_named_file_decide_is_none(self) -> None:
-        path = Path(__file__).resolve()
-        self.assertIsNone(
-            SEARCH.decide(
-                {"tool_name": "grep", "tool_input": {"path": str(path), "pattern": "x"}}
-            )
+    def test_compound_rg_semicolon_is_denied(self) -> None:
+        _deny(
+            "run_terminal_command",
+            {"command": f"rg a {HOOKS}; rg b {HOOKS.parent}"},
         )
 
-    def test_escape_hatch_allows_wide_search(self) -> None:
+    def test_same_tree_repeated_is_allowed(self) -> None:
+        for _ in range(5):
+            _allow(
+                "grep",
+                {"path": str(HOOKS), "pattern": "x"},
+                session_id="same-tree",
+            )
+
+    def test_fourth_distinct_tree_is_denied(self) -> None:
+        trees = []
+        for i in range(4):
+            tree = Path(self._state.name) / f"tree{i}"
+            tree.mkdir()
+            trees.append(tree)
+        for tree in trees[:3]:
+            _allow(
+                "grep",
+                {"path": str(tree), "pattern": "x"},
+                session_id="loop1",
+            )
+        result = _deny(
+            "grep",
+            {"path": str(trees[3]), "pattern": "x"},
+            session_id="loop1",
+        )
+        self.assertIn("SPAWN a child", result["reason"])
+
+    def test_named_file_does_not_count_toward_streak(self) -> None:
+        path = Path(__file__).resolve()
+        trees = []
+        for i in range(3):
+            tree = Path(self._state.name) / f"n{i}"
+            tree.mkdir()
+            trees.append(tree)
+        for tree in trees:
+            _allow(
+                "grep",
+                {"path": str(tree), "pattern": "x"},
+                session_id="files-skip",
+            )
+            _allow(
+                "grep",
+                {"path": str(path), "pattern": "x"},
+                session_id="files-skip",
+            )
+
+    def test_escape_hatch_allows_compound_search(self) -> None:
         old = os.environ.get("SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH")
         os.environ["SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH"] = "1"
         try:
-            self.assertIsNone(
-                SEARCH.decide({"tool_name": "grep", "tool_input": {"pattern": "x"}})
+            _allow(
+                "run_terminal_command",
+                {"command": f"rg a {HOOKS} && rg b {HOOKS.parent}"},
             )
         finally:
             if old is None:

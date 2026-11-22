@@ -11,21 +11,20 @@ command whose output the parent must read anyway stays on the parent.
 
 The user does **not** have to say “use subagents”.
 
-Hook `prefer-spawn-search` **denies** forest and multi-location search
-(`$HOME`, `/`, `~/repos`, missing-path workspace hunt, two+ directory
-operands, unpiped `rg`/`grep` with no path). After a deny, **spawn**. Do
-not retry the same hunt as a series of one-tree `rg` / `list_dir` /
-`find` on the parent; that fills the parent window and is why the hook
-exists. A single `rg` / `grep` / `find` / `list_dir` of **one already-known
-tree** (including a git repo root) stays on the parent. A grep-family
-filter of stdin (`ss | grep 11434`, `git show … | grep version`) stays on
-the parent.
+Hook `prefer-spawn-search` **denies** a nested discovery loop: two+
+tree-search invocations in one command, or a fourth distinct tree in
+10 minutes (search → sub-search → sub-sub-search, then spawn). After a
+deny, **spawn**. Do not serial-walk trees on the parent. A **single**
+search command stays on the parent, including `$HOME`, `~/repos`, two
+directory operands, cwd `rg`, and `rg | head`. Spawn tax plus re-ingest
+exceeds that one command. Named-file grep and stdin grep (`ss | grep
+11434`) stay on the parent.
 
 ## Shape (do not collapse)
 
 | Work | Run |
 |------|-----|
-| One command (`rg`, `grep`, `list_dir` of one already-known tree) | Parent |
+| One search command (`rg`, `grep`, `list_dir`, including `$HOME` / two dirs) | Parent |
 | One command piped into grep (`ss \| grep 11434`) | Parent |
 | Existing helper script | Parent (`prefer-helper-scripts`) |
 | More than one command, or reusable multi-grep diagnostics | Prefer a helper script; spawn only if the work is still large |
@@ -41,10 +40,9 @@ the parent “so the graph has context”.
 ## Spawn for
 
 - Software install that includes config and service files
-- Search across multiple locations (`$HOME`, `~/repos`, several trees)
-- Discovery loops: many searches, reads, or commands through a dump or tree
-  (jadx out, `libapp.so`, firmware, unpack dirs) even when the path is one
-  tree. One `rg` stays here; a walk that would fill this window does not.
+- Nested discovery loops: search → sub-search → sub-sub-search, or a dump
+  walk (jadx out, `libapp.so`, firmware, unpack dirs). One search command
+  stays here even when the path is `$HOME` or two trees.
 - Decompile, protocol recovery, JADX/Ghidra/REA, unpack
 - Architecture mapping, large-file extract
 - Multi-file implementation, packing, README, tests, lint, palace filing
@@ -52,7 +50,7 @@ the parent “so the graph has context”.
 
 ## Parent keeps
 
-- Single commands: `rg`, `grep`, `find` of one already-known tree, `list_dir`, `git status`
+- Single search commands: `rg`, `grep`, `find`, `list_dir` (including `$HOME` / `~/repos` / two dirs / cwd), `git status`
 - One-shot pipes into grep (`ss | grep 11434` to verify a port opened)
 - Calling an existing helper; writing one when the sequence is more than a
   single command **and** looks useful later (`prefer-helper-scripts`)
@@ -91,7 +89,7 @@ tokens saved (`C_parent_do`) plus avoided parent compaction
 (`C_compact_parent`, window-in + summary-out at parent $/token) vs brief +
 re-ingest. Cap parallel `N` so reports fit remaining parent context. Cheap
 or local children are the compact hedge. Extra cloud children need their
-own edge. One `rg` of one tree, or one command piped into grep, has
+own edge. One search command, or one command piped into grep, has
 `C_prompt + C_reingest` larger than the hits; do not spawn it.
 
 ## Model and effort (skill `model-router`)
@@ -115,15 +113,14 @@ Ollama — skip it on overload.
 
 ## Do not
 
-- Spawn a child to run one `rg` / `grep` / `list_dir` of one tree, or
-  `ss | grep` / `git show | grep`. Spawn tax plus re-ingest exceeds
-  running the command and reading the hits.
+- Spawn a child to run one search command, or `ss | grep` / `git show |
+  grep`. Spawn tax plus re-ingest exceeds running the command and reading
+  the hits.
 - Inline a reusable multi-command host procedure when a helper exists or
   should (router iptables/clients/stats). A one-shot verify stays here.
-- Search several trees on the parent. Forest / multi-location search is
-  **denied**; spawn or graph instead. Escape:
-  `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`. After a deny, spawn. Serial
-  one-tree walks on the parent cost more parent tokens than one child.
+- Run a nested discovery loop on the parent (hits → more searches → more
+  searches). Escape: `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`. After a
+  deny, spawn. Serial tree-hops after a deny fill the window.
 - Walk a dump (jadx, `libapp.so`, firmware) on the parent because it is
   “one tree”.
 - Skip `model-router` for dump-harvest because of the Grok T0 short-circuit.
@@ -138,8 +135,8 @@ multi-file implementation). It does not override a single search command.
 | Excuse | Reality |
 |--------|---------|
 | “I'll spawn a child to rg this dir” | Spawn tax + re-ingest exceeds one rg; parent runs the command |
-| “Forest denied; I'll list_dir each tree here” | Serial parent walks fill the window; spawn |
-| “Faster to grep here” | Yes for one already-known tree; spawn when the search spans several locations |
+| “Loop denied; I'll list_dir each tree here” | Serial parent walks fill the window; spawn |
+| “Faster to grep here” | Yes for one command; spawn when the next step is nested sub-searches |
 | “It's one jadx tree so I'll grep here” | Discovery loop fills the parent; spawn |
 | “I need JADX in this context to verify” | Child returns the frames; parent re-runs self-test |
 | “model-router says T3 stays on parent” | T3 stays on the **child** |

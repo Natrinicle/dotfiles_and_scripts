@@ -24,10 +24,10 @@ Landing is **ask-before-remote-actions**.
 
 This layer is the better shape when several units do not consume each
 other's output, or a gate / named output sits between steps. One unit
-→ `spawn_subagent` (rule **subagents-first**). Forest / multi-location
-grep / list / `rg` is **denied** by hook `prefer-spawn-search`. A single
-`rg` of one tree, or a command piped into grep, may run on the parent.
-Do not dump several trees into the parent “for context”.
+→ `spawn_subagent` (rule **subagents-first**). A nested discovery loop is
+**denied** by hook `prefer-spawn-search`. One search command may run on
+the parent. Do not dump a search → sub-search → sub-sub-search into the
+parent “for context”.
 
 Use a graph when any of these is true:
 

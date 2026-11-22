@@ -40,8 +40,8 @@ Any of these before starting the work, not after the window fills:
 - Treat a post-compact summary as if the half-done task were done.
 - Spawn for one `rg`, one `kubectl get`, or one command piped into grep
   (rule `subagents-first` keeps those on the parent).
-- After a forest-search deny, spawn. Serial one-tree parent walks are the
-  compaction the hook is preventing.
+- After a discovery-loop deny, spawn. Serial tree-hops on the parent are
+  the compaction the hook is preventing.
 
 Cost model: skill `expected-value` (`C_compact_parent`). Dispatch shape:
 rule `subagents-first`, skill `agent-graphs`.

@@ -29,20 +29,20 @@ On every subagent spawn, score parent context:
 - Cheap/local child's own compact is `$0`. Prefer that hedge when parent-do
   would grow the expensive window. Hedge holds when `C_reingest` stays small.
 
-One `rg`/`grep` of a single already-known tree, or one command piped into
-grep: parent (spawn tax exceeds the hits). Multi-location search, finding
-which tree, large extract, decompile, or software install with
-config+units: spawn (context payoff is the point). After a forest-search
-deny, spawn; serial one-tree parent walks cost more than one child. T0
-text already in context: direct local generate. Extra cloud children need
+One search command (including `$HOME` / two dirs), or one command piped
+into grep: parent (spawn tax exceeds the hits). Nested discovery loops
+(hits → sub-searches → sub-sub-searches), dump walks, large extract,
+decompile, or software install with config+units: spawn. After a
+discovery-loop deny, spawn; serial tree-hops fill the window. T0 text
+already in context: direct local generate. Extra cloud children need
 their own edge. Cap `N` so the parent can still answer.
 
 ## Cheap vs expensive
 
-Skip the spreadsheet: palace query, named file, one grep of one already-known tree,
+Skip the spreadsheet: palace query, named file, one search command,
 one command piped into grep, direct local generate, helper script.
-Reusable multi-grep diagnostics belong in a helper. Local explore for
-multi-location unknown paths.
+Reusable multi-grep diagnostics belong in a helper. Spawn a nested
+discovery loop (search → sub-search → sub-sub-search).
 
 Run the 4-number check (`p`, stake, payoff, binding resource) before cloud
 spawn, extra children, browser, crawl, REA, full suite, image/video, or

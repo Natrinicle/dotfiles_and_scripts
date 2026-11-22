@@ -33,8 +33,8 @@ Use the parent for:
 Use local Ollama when the work is extract / classify / summarize of
 **already-in-context** text, or a pinned light subagent. The always-on
 `model-routing` rule requires spawning `explore` / `code-explorer` for
-architecture mapping, multi-location search, and large-file extract. A
-single `rg` / `grep` of one tree stays on the parent.
+architecture mapping, nested discovery loops, and large-file extract. A
+single search command stays on the parent.
 
 | Path | When |
 |------|------|
@@ -78,7 +78,7 @@ Dump-harvest stays T2.
 
 - Switching the interactive parent to Ollama for a tool-using task
 - Spawning `explore` for tool-free T0 text (instruction-injection tax)
-- Parent running a 3+ step grep/read discovery loop **across several
-  trees** that `explore` / `code-explorer` should have done
+- Parent running a nested discovery loop (search → sub-search →
+  sub-sub-search) that `explore` / `code-explorer` should have done
 - Spawning `explore` to run one `rg` of one tree (instruction-injection tax)
 - Pinning `plan`, `general-purpose`, or reviewers to 8B local

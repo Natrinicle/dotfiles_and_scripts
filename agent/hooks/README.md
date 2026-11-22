@@ -103,26 +103,23 @@ Restart the session after changing hook registration.
 `PreToolUse` matcher:
 `grep|Grep|list_dir|LS|Glob|glob|Bash|bash|run_terminal_command`
 
-**Denies** forest and multi-location search (missing path, `$HOME` / `/` /
-`~/repos`, unscoped `**` glob, two+ directory operands, unpiped shell
-`rg`/`grep`/`find` with no path). A single `rg` / `grep` / `find` /
-`list_dir` of **one already-known** tree (including a git repo root)
-stays allowed. A grep-family filter of stdin (`ss | grep 11434`,
-`git show … | grep`) stays allowed. Named-file grep and `git status`
-stay allowed. Fail-open.
+**Denies** a nested discovery loop: two+ tree-search invocations in one
+command, or a fourth distinct tree in 10 minutes (env
+`SUBAGENTS_FIRST_PARENT_SEARCH_MAX` / `_WINDOW_SEC`). A **single** search
+command stays allowed, including `$HOME` / `/` / `~/repos`, two directory
+operands, cwd `rg`, unscoped `**`, and `rg | head`. Named-file grep,
+stdin grep (`ss | grep 11434`), and `git status` stay allowed. Fail-open.
 Escape: `SUBAGENTS_FIRST_ALLOW_PARENT_SEARCH=1`.
 
-The deny reason tells the parent: **spawn** for this hunt. Serial one-tree
-`rg`/`list_dir`/`find` on the parent fills the parent window. One already-known
-tree command stays here only when that command is the whole next step.
-Spawn for multi-location search, finding which tree, software install with
-config+units, or large extract. Several independent units → skill
-`agent-graphs`. Bug hunt stays `find-patch-loop`. One-shot verify (did this
-open the port) stays on the parent. Reusable multi-grep diagnostics
-(router iptables/clients/stats) → helper script.
+The deny reason tells the parent: **spawn**. Serial tree-hops after a deny
+fill the parent window. Spawn for search → sub-search → sub-sub-search,
+dump walks, software install with config+units, or large extract. Several
+independent units → skill `agent-graphs`. Bug hunt stays
+`find-patch-loop`. One-shot verify stays on the parent. Reusable
+multi-grep diagnostics → helper script.
 
-On Grok Build, multi-location unknown-path search: omit `subagent_type`
-(cloud general-purpose). Do not pin plugin explorers to `ollama-gemma4`.
+On Grok Build, a nested discovery loop: omit `subagent_type` (cloud
+general-purpose). Do not pin plugin explorers to `ollama-gemma4`.
 
 ## mempalace-postcompact-index
 
