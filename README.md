@@ -35,7 +35,7 @@ out of exports via `${HOME}` / `{...}` placeholders.
 ├── lib/                           # Off-PATH helpers (adf-ocr.py → ~/.local/lib)
 ├── share/                         # Optional unit files / non-PATH assets
 ├── agent/                         # Shared Claude + Grok pack
-│   ├── rules/                     # 47 rules → ~/.claude/rules + ~/.grok/rules
+│   ├── rules/                     # 48 rules → ~/.claude/rules + ~/.grok/rules
 │   ├── skills/                    # 147 skills → ~/.claude/skills + ~/.grok/skills
 │   ├── agents/                    # 10 EGM personas → ~/.claude/agents + ~/.grok/agents
 │   ├── resources/                 # shared checklists + EGM docs → ~/.claude/resources
@@ -161,6 +161,7 @@ write or call a PATH helper instead of re-deriving it in the parent),
 `prefer-updates-before-workarounds` (check for a
 newer version of the installed wrapper before extract-and-run),
 `prefer-pipx` (Python CLI / PyPI apps install via pipx, not `pip --user` or apt `python3-<name>`),
+`recap-touched-hardware` (flash/use recaps name only hardware that was touched; do not inventory unused adjacent boards),
 `prefer-mempalace` (durable facts live in MemPalace; one HTTP hub; directory
 mines use `mempalace mine DIR --daemon`; harness skills/rules stay on disk;
 **this pack only**, not domain-only toolkits),

@@ -5,11 +5,11 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
 
 ## Contents
 
-- **Rules** (47) including `code-quality`, `security`, `subagents-first`,
+- **Rules** (48) including `code-quality`, `security`, `subagents-first`,
   `prefer-subagents-before-compaction`,
   `public-api-auth`, `ask-before-remote-actions`,
   `prefer-helper-scripts`, `prefer-updates-before-workarounds`,
-  `prefer-pipx`,
+  `prefer-pipx`, `recap-touched-hardware`,
   `toolkit-residual-identity`,
   `expected-value`, `agent-graphs`, `cups-custom-backend`, `mempalace-compact-filing`,
   `claim-source-check`, `skill-composition` (merged-skill routing).

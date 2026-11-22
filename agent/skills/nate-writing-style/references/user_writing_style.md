@@ -22,6 +22,11 @@ health details, or employer identities.
   profile. Never adopt other participants' phrasing.
 - Do not treat group-chat register as the professional register.
 
+## Recaps
+
+- Flash, attach, and use recaps name only the hardware that was actually
+  touched. Do not inventory unused adjacent boards, dongles, or stacks.
+
 ## Channels (adapt)
 
 - Casual IM: ellipses, trailing `?`, collaborative softeners
