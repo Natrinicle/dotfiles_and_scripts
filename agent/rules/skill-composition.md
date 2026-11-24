@@ -123,5 +123,12 @@ unrelated media or artifact kinds.
     UI** → **design-inspiration**. Aesthetic identity stays on
     **frontend-design**. Classic/desktop reskin stays on
     **classic-ui-reskin**. Do not grow frontend-design into a URL dump.
+22. **Dead code vs readability vs footprint** → **shrink-anything** for
+    unused code, files, dependencies, and assets, with the project's own
+    tests as the gate and byte-for-byte undo. Readability without deleting
+    behavior stays on **code-simplification**. RAM / binary / runtime-weight
+    cuts after it works stay on host **footprint-trimmer** (not in this
+    pack). Do not grow those skills to cover test-gated dead-code deletion.
+    Do not edit tests to make a cut pass.
 
 Own hardware / own copy only. Do not commit APKs, blobs, or secrets.

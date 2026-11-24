@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "shrink-anything": {
+      "command": "shrink-anything",
+      "args": ["mcp"]
+    }
+  }
+}

@@ -141,6 +141,21 @@ Clone used for the copy: `{HOME}/repos/external/modern-web-guidance`.
   `.gitleaks.toml` allowlists that identifier (secret regex, not a
   path skip).
 
+## shrink-anything (MIT, clone + skill)
+
+- Upstream: https://github.com/EL4CTEO/shrink-anything
+- Snapshot: `28ef88d716c31e2350108aa43407e21821a41aa4` (2026-11-23, v0.1.0)
+- Copyright: Copyright (c) 2026 EL4CTEO
+- License: MIT (copy in `agent/skills/shrink-anything/LICENSE`)
+
+The CLI and source tree are **not** copied into this pack. Keep a
+read-only clone at `{HOME}/repos/external/shrink-anything`. Packed skill
+`shrink-anything` is the upstream loop plus pack routing (vs
+`code-simplification` / host `footprint-trimmer`). CLI install stays
+`cargo install shrink-anything` or `npm i -g @el4cteo/shrink-anything`.
+Optional MCP snippets: `examples/shrink-anything-mcp/` (`install.sh` does
+not register).
+
 ## Motion Canvas (MIT, clone only)
 
 - Upstream: https://github.com/motion-canvas/motion-canvas

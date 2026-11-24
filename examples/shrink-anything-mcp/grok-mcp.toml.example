@@ -1,0 +1,9 @@
+# Vendor-specific: shrink-anything.
+# Requires shrink-anything on PATH (cargo install or npm i -g @el4cteo/shrink-anything).
+# Copy into ~/.grok/config.toml. Do not register unless you named it.
+
+[mcp_servers.shrink-anything]
+command = "shrink-anything"
+args = ["mcp"]
+enabled = true
+startup_timeout_sec = 60

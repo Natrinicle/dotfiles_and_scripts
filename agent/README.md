@@ -13,7 +13,7 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
   `toolkit-residual-identity`,
   `expected-value`, `agent-graphs`, `cups-custom-backend`, `mempalace-compact-filing`,
   `claim-source-check`, `skill-composition` (merged-skill routing).
-- **Skills** (147) covering packaging, scanners, PII detection, MemPalace,
+- **Skills** (148) covering packaging, scanners, PII detection, MemPalace,
   Flipper IR, compiled-app unpack, forensic cores plus thin server companions,
   expected-value spend gate, agent graphs (`agent-graphs` / `loop-until-green`),
   clean-room reconstruct (`clean-room-reconstruct`),
@@ -22,7 +22,8 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
   CUPS custom-backend persist, claim-source-check,
   merged public skills (`grilling`, `security-audit`, `egm-*`,
   `obsidian-*`, `modern-web-guidance`, `chrome-extensions`, `motion-canvas`,
-  `code-drawn-media`, `design-inspiration`, `travel-aware-event-reminders`,
+  `code-drawn-media`, `design-inspiration`, `shrink-anything`,
+  `travel-aware-event-reminders`,
   and others — see `THIRD-PARTY.md`),
   and workflow helpers.
 - **Agents** (10) — EGM Goldfish personas in `agent/agents/` →
@@ -31,7 +32,8 @@ Counts and layout match the root `README.md` and `toolkit.yaml`.
   `agent/resources/` → `{AGENT_HOME}/resources/`.
 - **Third-party notices** — `THIRD-PARTY.md` (MIT ×4 + Apache-2.0 EGM +
   Apache-2.0 Google Chrome Modern Web Guidance; Motion Canvas MIT clone
-  only, ffmpeg exporter stays out).
+  only, ffmpeg exporter stays out; shrink-anything MIT clone + skill,
+  CLI not packed).
 - **Hooks** — `agent/hooks/` copies into `{AGENT_HOME}/hooks/`. Register in
   host `settings.json` (see `hooks/README.md`). Includes
   `control-plane-exposure.py` and `prefer-spawn-search.py`.
