@@ -20,9 +20,10 @@ to the cheapest **viable** tier (missed GATT/opcodes are not viable).
 | Tier | Role |
 |------|------|
 | T0 Local | Structured extract, simple parse, commit-scan-like tasks — Ollama when healthy. Down or **overloaded** → lowest upstream (T1). Closed yes/no, enum, or score is a **decision-model** (System One) *shape*; keep T0 on the chat model until a DMM is eval'd (palace: `Jev Nimble Kev System One gemma4`). |
-| T1 Cheap cloud | Extraction when local quality fails. **Ollama-overload fallback.** Not dump/jadx/protocol harvest. |
-| T2 Mid | Categorization, rule-following analysis. **Dump harvest** and protocol recover; effort **high**. Not parent xhigh, not Fable, not Haiku. |
-| T3 Strong | Friction judgment, subtle language, architecture critique. Not file/dump search. |
+| T1 Cheap cloud | Extraction when local quality fails. **Ollama-overload fallback.** Grok: `grok-4.5` effort **low**. Not dump/jadx/protocol harvest. Never `grok-4.7-build-fast`, never parent `grok-4.6`. |
+| T2 Mid | Categorization, rule-following analysis. **Dump harvest** and protocol recover; Grok `grok-4.7` effort **high**. Not parent xhigh, not Fable, not Haiku, not build-fast. |
+| T3-plan | Architecture / planning. Fable. Do **not** set `advisorModel`. Not dump harvest. |
+| T3-judge | Friction judgment, subtle language. Opus / parent. Not file/dump search. |
 
 Search/answer backends (web_search, Firecrawl, vendor Search APIs) are
 **tools**, not rows in this table. Do not scrape a consumer Ask UI as a
@@ -36,8 +37,10 @@ table before every T0 spawn. Dump walks spawn **before** a parent discovery
 loop (rule `subagents-first`). Parent vs local: skill `skill-router`.
 
 Task ids: `dump-harvest`, `protocol-recover` — T2, effort **high**. Grok:
-pass a cloud id whose default effort is high (not the xhigh parent session
-id). Claude: sonnet, effort high.
+pass `grok-4.7` (pinned `[model."grok-4.7"] reasoning_effort = "high"`;
+not the xhigh parent session id, not `grok-4.7-build-fast`). Claude:
+sonnet, effort high. Architecture / planning is `architecture-plan`
+(T3-plan, Fable). Do not set `advisorModel`.
 
 ## Trust then verify
 
@@ -48,9 +51,9 @@ id). Claude: sonnet, effort high.
 
 **T0 → T1 silent fallback** if Ollama is down **or overloaded:** `/api/tags`
 fails, empty generate, or HTTP 503 after one retry → **lowest upstream**
-(T1 Haiku / cheapest Grok cloud slug that is not the xhigh parent and not
-another Ollama id). Local is best-effort. A slow VRAM load is not overload —
-wait a 600s client timeout. Do not fall back to Fable, Opus, or parent xhigh.
+(T1 Haiku / Grok `grok-4.5` effort **low**). Local is best-effort. A slow
+VRAM load is not overload — wait a 600s client timeout. Do not fall back
+to Fable, Opus, parent xhigh, or `grok-4.7-build-fast`.
 
 ## Ollama VRAM load
 
@@ -71,10 +74,13 @@ The Ollama **server** is often a system unit (`User=ollama`) with
 user-owned keepalive sidecar can re-pin already-loaded models. Changing the
 systemd drop-in needs root.
 
-Escalation path: T0 → T1 → T2 → T3. Log outcomes when practical.
+Escalation path: T0 → T1 → T2 → T3-judge (Opus). Architecture / planning is
+T3-plan (Fable) and is not an escalation from dump harvest. Log outcomes
+when practical.
 
 ## What stays expensive
 
-Reviews, adversarial judgment, PII risk calls, multi-file implementation,
-planning, dump harvest / protocol recover (T2 high; not T3 Fable/xhigh,
-not T1 Haiku).
+Reviews, adversarial judgment, PII risk calls, multi-file implementation
+(Opus / T3-judge). Planning / architecture (Fable / T3-plan; do not set
+`advisorModel`). Dump harvest / protocol recover (T2 `grok-4.7` high; not T3
+Fable/xhigh, not T1 Haiku/`grok-4.5`, not `grok-4.7-build-fast`).

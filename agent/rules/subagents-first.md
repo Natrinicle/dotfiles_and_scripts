@@ -107,9 +107,9 @@ opcodes, and device lists. Full ids: `dump-harvest`, `protocol-recover` in
 **Ollama overloaded:** T0 pin is allowed to fail over to the **lowest
 upstream** tier (T1). Claude: Haiku. Grok: cheapest cloud slug in the spawn
 enum that is **not** the xhigh parent session id and **not** another Ollama
-id (`grok-4.7` default **high** on this host). Retry 503 once; then T1 is
-allowed. A slow VRAM load is not overload. `litellm-gemma4` still hits
-Ollama — skip it on overload.
+id (`grok-4.5` effort **low** on this host). Never `grok-4.7-build-fast`.
+Retry 503 once; then T1 is allowed. A slow VRAM load is not overload.
+`litellm-gemma4` still hits Ollama — skip it on overload.
 
 ## Do not
 

@@ -70,9 +70,10 @@ parent (or `general-purpose`). Keep the local result when it is usable.
 
 **Ollama down or overloaded:** T1 lowest-upstream fallback is **allowed**
 (skill `model-router`). Retry HTTP 503 once. Then pass T1 (Claude: cheapest
-small-cloud; Grok: cheapest cloud slug that is not the xhigh parent).
-Omitting `model` still hits the local pin; the harness does not rewrite it.
-Dump-harvest stays T2.
+small-cloud; Grok: `grok-4.5` effort **low**). Never parent `grok-4.6`
+(inherits xhigh) and never `grok-4.7-build-fast`. Omitting `model` still
+hits the local pin; the harness does not rewrite it. Dump-harvest stays
+T2 (`grok-4.7` effort **high**).
 
 ## Anti-patterns
 
