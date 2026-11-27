@@ -5,6 +5,9 @@ paths:
 
 # Employer org PR findings gate
 
+These `employer-*` rules and helpers are part of a personal, generic pack.
+They route work under whatever employer policy you are in, using placeholders, not work product for a current employer.
+
 Hard gate. Before `gh pr create`, pushing a branch that opens a PR, or
 declaring an existing PR ready in the **current employer's GitHub org**:
 
